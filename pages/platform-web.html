@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>平台端 Web - 满改平台</title>
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+  </head>
+  <body data-page="platform-web">
+    <div class="desktop-app page-shell" id="platformApp">
+      <aside class="sidebar">
+        <div class="brand-lockup">
+          <div class="brand-mark">MG</div>
+          <div>
+            <strong>满改平台</strong>
+            <div class="muted">Platform Control Center</div>
+          </div>
+        </div>
+        <nav class="sidebar-nav" id="platformSidebar"></nav>
+      </aside>
+      <main class="app-main">
+        <header class="topbar">
+          <label class="topbar-search">
+            <span>⌕</span>
+            <input id="platformSearch" type="search" placeholder="搜索订单号 / 服务商 / 车型 / 关键词" />
+          </label>
+          <div class="topbar-actions">
+            <button class="icon-btn" type="button">✦</button>
+            <button class="icon-btn" type="button">⎋</button>
+            <div class="avatar-chip">PA / 平台管理员</div>
+          </div>
+        </header>
+        <section id="platformContent"></section>
+      </main>
+    </div>
+    <div class="modal" id="platformModal">
+      <div class="panel modal-card" id="platformModalCard"></div>
+    </div>
+
+    <script src="../assets/js/mock-data.js?v=20260403"></script>
+    <script src="../assets/js/platform-web.js?v=20260403"></script>
+  </body>
+</html>
