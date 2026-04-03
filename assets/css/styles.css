@@ -1785,6 +1785,130 @@ body.provider-screen-mode {
   font-size: 28px;
 }
 
+.admin-pick-card {
+  width: 100%;
+  text-align: left;
+}
+
+.admin-pick-card.active {
+  border-color: rgba(255, 106, 0, 0.3);
+  background: rgba(255, 106, 0, 0.08);
+}
+
+.admin-inline-block {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-detail-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 106, 0, 0.2);
+  background:
+    linear-gradient(135deg, rgba(255, 106, 0, 0.12), rgba(255, 255, 255, 0.04)),
+    rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 106, 0, 0.08);
+}
+
+.admin-detail-card h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.admin-kv-list,
+.admin-doc-list,
+.admin-suggest-list,
+.admin-comment-list,
+.admin-timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-kv-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.admin-kv-list span {
+  color: var(--text-muted);
+}
+
+.admin-kv-list strong {
+  text-align: right;
+}
+
+.admin-doc-item,
+.admin-suggest-item,
+.admin-comment-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 12, 16, 0.34);
+}
+
+.admin-suggest-item {
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+}
+
+.admin-suggest-item.active {
+  border-color: rgba(255, 106, 0, 0.3);
+  background: rgba(255, 106, 0, 0.08);
+}
+
+.admin-suggest-item strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.admin-suggest-item span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.admin-action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-action-row .btn {
+  flex: 1 1 120px;
+}
+
+.admin-timeline {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.admin-comment-block > strong {
+  font-size: 14px;
+}
+
+.admin-comment-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-comment-item p {
+  margin: 10px 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.admin-shortcut-card {
+  cursor: pointer;
+  text-align: left;
+}
+
 .bottom-nav {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
