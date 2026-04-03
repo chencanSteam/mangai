@@ -50,6 +50,34 @@
       type: "",
       orderId: "",
     },
+    userSelected: {
+      goods: products[0]?.sku || "",
+      service: services[0]?.id || services[0]?.name || "",
+    },
+    userOrderForm: {
+      type: "",
+      id: "",
+    },
+    userFeedback: "",
+    userMe: {
+      selectedOrder: orders[0]?.id || "",
+      selectedMessage: "msg-2",
+      addressCreateOpen: false,
+    },
+    userGarage: {
+      selectedVehicle: vehicles[0]?.id || vehicles[0]?.plate || vehicles[0]?.model || "",
+      createOpen: false,
+    },
+    userForum: {
+      selectedPost: posts[0]?.id || "",
+      createOpen: false,
+      replyPostId: "",
+    },
+    userDialog: {
+      type: "",
+      orderId: "",
+      sourceName: "",
+    },
   };
 
   const fallback = {
@@ -70,11 +98,25 @@
       { name: "RS Track", spokes: 10, color: "#707782" },
       { name: "Monarch Aero", spokes: 3, color: "#d5d7dd" },
     ],
+    userBanners: [
+      "M3 Touring 轻度姿态方案本周热度上涨 26%，适合春季城市通勤与周末山路。",
+      "AMG 夜间氛围灯套件支持分区联动，新增车主到店体验预约。",
+      "高性能街道刹车套装到货，适配宝马 G 系与奥迪 S/RS 常见车型。",
+    ],
     providerMessages: [
       { id: "msg-1", title: "平台调度", preview: "OD-240403-021 已派送至当前门店，请尽快接单。", time: "刚刚", status: "在线", messages: [{ from: "platform", text: "OD-240403-021 已派送至当前门店，请尽快接单并安排施工位。", time: "09:42" }, { from: "provider", text: "收到，正在确认施工位，5 分钟内反馈。", time: "09:43" }] },
       { id: "msg-2", title: "客户验收群", preview: "客户想确认尾段排气声浪是否已调校完成。", time: "12 分钟前", status: "沟通中", messages: [{ from: "user", text: "想确认尾段排气声浪是否已经调校完成？", time: "09:18" }, { from: "provider", text: "已经完成联调，稍后我把完工视频发您确认。", time: "09:20" }] },
       { id: "msg-3", title: "采购物流", preview: "BBS 轮毂已发货，预计明天下午送达。", time: "35 分钟前", status: "已发货", messages: [{ from: "platform", text: "BBS 轮毂已发货，预计明天下午送达门店。", time: "08:55" }, { from: "provider", text: "收到，到货后我这边安排签收。", time: "08:58" }] },
       { id: "msg-4", title: "运营审核", preview: "案例 AMG C43 排气升级建议补充完工图。", time: "今天 09:10", status: "待回复", messages: [{ from: "platform", text: "案例《AMG C43 排气升级》建议补充完工图后再次提交。", time: "09:10" }, { from: "provider", text: "明白，我补充完工图后重新提审。", time: "09:12" }] },
+    ],
+    userHistoryOrders: [
+      { id: "UO-240401", user: "当前用户", vehicle: "宝马 G20 330i", service: "BBS 轮毂套装 x1", quote: "¥ 18,800", status: "待验收", progress: "商品已安装完成，等待用户确认验收。", appointment: "2026-04-01 14:00" },
+      { id: "UO-240328", user: "当前用户", vehicle: "AMG C43", service: "Akrapovic 排气升级", quote: "¥ 31,500", status: "已完成", progress: "已完成验收并归档。", appointment: "2026-03-28 10:30" },
+      { id: "UO-240320", user: "当前用户", vehicle: "保时捷 718 Cayman", service: "XPEL 车衣施工", quote: "¥ 12,600", status: "施工中", progress: "门店已接单，正在施工中。", appointment: "2026-03-20 09:00" },
+    ],
+    userAddresses: [
+      { id: "ADDR-1", name: "周恺", phone: "13800138000", address: "上海市闵行区申长路 1688 号 2 栋 801", tag: "默认地址" },
+      { id: "ADDR-2", name: "周恺", phone: "13800138000", address: "杭州市滨江区江南大道 588 号 1 单元 1202", tag: "常用地址" },
     ],
   };
 
@@ -222,7 +264,7 @@
       <header class="android-topbar"><span class="eyebrow">${cfg.title}</span><h2>${cfg.labels[state.tab]}</h2><div class="muted">${appType === "admin" ? "轻审批、轻处理、待办集中办结" : appType === "provider" ? "门店作业、采购与结算" : "案例推荐、服务消费与爱车管理"}</div></header>
       <section class="screen-content">${appType === "admin" ? renderAdmin() : appType === "provider" ? renderProvider() : renderUser()}</section>
       <nav class="bottom-nav">${cfg.tabs.map((id) => `<button class="${state.tab === id ? "active" : ""}" type="button" data-tab="${id}"><span>${cfg.labels[id]}</span></button>`).join("")}</nav>
-      ${appType === "provider" ? renderProviderDialog() : ""}
+      ${appType === "provider" ? renderProviderDialog() : appType === "user" ? renderUserDialog() : ""}
     `;
     bindEvents();
   }
@@ -249,6 +291,23 @@
     screenEl.querySelectorAll("[data-provider-chat-form]").forEach((form) => form.addEventListener("submit", handleProviderChatSubmit));
     screenEl.querySelectorAll("[data-provider-dialog-action]").forEach((b) => b.addEventListener("click", () => handleProviderDialogAction(b)));
     screenEl.querySelectorAll("[data-provider-reject-form]").forEach((form) => form.addEventListener("submit", handleProviderRejectSubmit));
+    screenEl.querySelectorAll("[data-user-pick]").forEach((b) => b.addEventListener("click", () => {
+      if (b.dataset.userType === "garage-vehicle") {
+        state.userGarage.selectedVehicle = b.dataset.userId;
+      } else {
+        state.userSelected[b.dataset.userType] = b.dataset.userId;
+      }
+      render();
+    }));
+    screenEl.querySelectorAll("[data-user-action]").forEach((b) => b.addEventListener("click", () => handleUserAction(b)));
+    screenEl.querySelectorAll("select[data-user-action='user-vehicle-select']").forEach((s) => s.addEventListener("change", () => handleUserAction(s)));
+    screenEl.querySelectorAll("[data-user-order-form]").forEach((form) => form.addEventListener("submit", handleUserOrderSubmit));
+    screenEl.querySelectorAll("[data-user-vehicle-form]").forEach((form) => form.addEventListener("submit", handleUserVehicleSubmit));
+    screenEl.querySelectorAll("[data-user-forum-form]").forEach((form) => form.addEventListener("submit", handleUserForumSubmit));
+    screenEl.querySelectorAll("[data-user-forum-reply-form]").forEach((form) => form.addEventListener("submit", handleUserForumReplySubmit));
+    screenEl.querySelectorAll("[data-user-chat-form]").forEach((form) => form.addEventListener("submit", handleUserChatSubmit));
+    screenEl.querySelectorAll("[data-user-address-form]").forEach((form) => form.addEventListener("submit", handleUserAddressSubmit));
+    screenEl.querySelectorAll("[data-user-dialog-action]").forEach((b) => b.addEventListener("click", () => handleUserDialogAction(b)));
     screenEl.querySelectorAll("[data-setting-key]").forEach((b) => b.addEventListener("click", () => { const key = b.dataset.settingKey; state.adminSettings[key] = !state.adminSettings[key]; render(); }));
     screenEl.querySelectorAll("[data-color-index]").forEach((b) => b.addEventListener("click", () => { state.garageColor = Number(b.dataset.colorIndex); updateGarageRender(); }));
     screenEl.querySelectorAll("[data-wheel-index]").forEach((b) => b.addEventListener("click", () => { state.garageWheel = Number(b.dataset.wheelIndex); updateGarageRender(); }));
@@ -370,6 +429,19 @@
     }
     if (type === "reject") {
       return `<div class="modal visible"><div class="panel modal-card provider-dialog-card"><div class="eyebrow">Reject Order</div><h3>填写拒单原因</h3><p class="muted">拒单后，平台会依据原因重新分配订单。</p><form class="form-grid" data-provider-reject-form data-provider-id="${orderId}"><div class="provider-dialog-summary"><strong>${orderId}</strong><span>${safe(order.vehicle, "车辆")} / ${safe(order.service, "服务")}</span></div><div class="field-group"><label class="field-label" for="reject-reason-${orderId}">拒单原因</label><textarea class="textarea" id="reject-reason-${orderId}" name="rejectReason" placeholder="请填写无法接单的具体原因" required>当前施工位已满，建议平台重新分配。</textarea></div><div class="admin-action-row"><button class="btn btn-danger" type="submit">提交拒单</button><button class="btn btn-secondary" type="button" data-provider-dialog-action="close">取消</button></div></form></div></div>`;
+    }
+    return "";
+  }
+
+  function renderUserDialog() {
+    const { type, orderId, sourceName } = state.userDialog;
+    if (!type) return "";
+    if (type === "service-upsell") {
+      return `<div class="modal visible"><div class="panel modal-card provider-dialog-card"><div class="eyebrow">Payment Success</div><h3>是否需要改装服务？</h3><p class="muted">${safe(sourceName, "商品")} 已完成付款，是否同步预约门店安装或改装服务？</p><div class="provider-dialog-summary"><strong>${orderId}</strong><span>可继续选择到店安装、调校或施工服务</span></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-dialog-action="need-service">需要改装服务</button><button class="btn btn-secondary" type="button" data-user-dialog-action="skip-service">暂不需要</button></div></div></div>`;
+    }
+    if (type === "provider-pick") {
+      const options = providers.filter((item) => nAudit(item.auditStatus) === "已通过").slice(0, 3);
+      return `<div class="modal visible"><div class="panel modal-card provider-dialog-card"><div class="eyebrow">Provider Select</div><h3>选择意向服务商</h3><p class="muted">请选择承接 ${safe(sourceName, "商品")} 安装或改装服务的意向门店，也可以交由平台统一派单。</p><div class="admin-suggest-list">${options.map((item, index) => `<button class="admin-suggest-item" type="button" data-user-dialog-action="pick-provider" data-provider-id="${item.id}"><strong>${safe(item.name, "服务商")}</strong><span>${safe(item.city, "城市")} / ${safe(item.specialties, "改装服务")} / 参考价格 ¥${(index + 1) * 800 + 1200}</span></button>`).join("")}</div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-dialog-action="platform-assign">由平台派单</button><button class="btn btn-secondary" type="button" data-user-dialog-action="provider-back">返回</button></div></div></div>`;
     }
     return "";
   }
@@ -752,7 +824,433 @@
     render();
   }
 
-  function renderUser() { if (state.tab === "home") return `<div class="stack"><section class="hero-banner"><div class="eyebrow">Inspiration</div><h3 style="margin:10px 0 8px; font-size:28px; font-family:var(--font-display);">高端改装推荐</h3><p class="muted">${fallback.userBanners[0]}</p></section><section class="mobile-list">${cases.map((i) => `<article class="mobile-item"><strong>${safe(i.title, "案例")}</strong><div class="muted" style="margin-top:8px;">${safe(i.model, "车型")} / ${safe(i.style, "风格")}</div><div style="margin-top:10px; display:flex; gap:10px;"><span class="pill">${safe(i.cost, "-")}</span>${tag(nCaseDisplay(i.display))}</div></article>`).join("")}</section></div>`; if (state.tab === "mall") { const active = state.subTab.mall || "goods"; return `${subTabs([{ id: "goods", label: "商品列表" }, { id: "service", label: "服务下单" }])}<div class="mobile-list">${(active === "goods" ? products : services).map((i) => active === "goods" ? `<article class="mobile-item"><strong>${safe(i.name, "商品")}</strong><div class="muted" style="margin-top:8px;">${safe(i.brand, "品牌")} / ${safe(i.fitment, "适配车型")}</div><div style="margin-top:10px; display:flex; gap:10px;"><span class="pill">${safe(i.price, "-")}</span>${tag(nProduct(i.status))}</div></article>` : `<article class="mobile-item"><strong>${safe(i.name, "服务")}</strong><div class="muted" style="margin-top:8px;">${safe(i.desc, "服务说明")}</div><div style="margin-top:10px;"><span class="pill">${safe(i.price, "-")}</span></div></article>`).join("")}</div>`; } if (state.tab === "garage") { const active = state.subTab.garage || "render"; return `${subTabs([{ id: "vehicles", label: "我的车辆" }, { id: "render", label: "渲染展示" }])}${active === "vehicles" ? `<div class="mobile-list">${vehicles.map((i) => `<article class="mobile-item"><strong>${safe(i.model, "车辆")}</strong><div class="muted" style="margin-top:8px;">${safe(i.plate, "-")} / ${safe(i.owner, "-")}</div><div style="margin-top:8px;">${safe(i.history, "改装记录")}</div></article>`).join("")}</div>` : `<div class="stack"><section class="garage-preview"><div class="eyebrow">Render Lab</div><strong style="display:block; margin-top:10px; font-size:22px;">宝马 G20 330i 外观预览</strong><div class="muted" style="margin-top:6px;">点击切换车身颜色与轮毂样式，当前方案仅做图片式渲染模拟。</div><div class="car-render"><div class="car-wheel left" id="leftWheel"></div><div class="car-wheel right" id="rightWheel"></div><div class="car-render-body" id="carBody"></div></div><div class="swatch-row">${fallback.colors.map((i, idx) => `<button class="swatch ${idx === state.garageColor ? "active" : ""}" style="background:${i.value};" type="button" title="${i.name}" data-color-index="${idx}"></button>`).join("")}</div></section><section class="mobile-list">${fallback.wheels.map((i, idx) => `<button class="wheel-option ${idx === state.garageWheel ? "active" : ""}" type="button" data-wheel-index="${idx}"><span><strong>${i.name}</strong><div class="muted" style="margin-top:6px;">${i.spokes} 辐设计 / 高端改装风格</div></span><span class="wheel-badge" data-tone="${idx === 0 ? "gold" : idx === 1 ? "grey" : "silver"}"></span></button>`).join("")}</section></div>`}`; } if (state.tab === "forum") { const active = state.subTab.forum || "posts"; return `${subTabs([{ id: "posts", label: "帖子列表" }, { id: "mine", label: "我的发布" }])}<div class="mobile-list">${(active === "posts" ? posts : comments).map((i) => active === "posts" ? `<article class="mobile-item"><strong>${safe(i.title, "帖子")}</strong><div class="muted" style="margin-top:8px;">${safe(i.author, "作者")} / ${safe(i.time, "今天")}</div><div style="margin-top:10px; display:flex; gap:10px;"><span class="pill">回复 ${i.replies || 0}</span><span class="pill">点赞 ${i.likes || 0}</span></div></article>` : `<article class="mobile-item"><strong>${safe(i.content, "评论")}</strong><div class="muted" style="margin-top:8px;">所属 ${safe(i.post, "帖子")} / ${safe(i.time, "今天")}</div></article>`).join("")}</div>`; } return `<div class="stack"><section class="mobile-list">${orders.slice(0, 4).map((i) => `<article class="mobile-item"><strong>${i.id}</strong><div class="muted" style="margin-top:8px;">${safe(i.vehicle, "车型")}</div><div style="margin-top:8px;">${safe(i.service, "服务")}</div><div style="margin-top:10px;">${tag(nOrder(i.status))}</div></article>`).join("")}<article class="mobile-item"><strong>我的资料</strong><div class="muted" style="margin-top:8px;">地址管理、消息通知、金融授信与基础设置。</div></article></section></div>`; }
+  function renderUser() {
+    if (state.tab === "home") return `<div class="stack"><section class="hero-banner"><div class="eyebrow">Inspiration</div><h3 style="margin:10px 0 8px; font-size:28px; font-family:var(--font-display);">高端改装推荐</h3><p class="muted">${fallback.userBanners[0]}</p></section><section class="mobile-list">${cases.map((i) => `<article class="mobile-item"><strong>${safe(i.title, "案例")}</strong><div class="muted" style="margin-top:8px;">${safe(i.model, "车型")} / ${safe(i.style, "风格")}</div><div style="margin-top:10px; display:flex; gap:10px;"><span class="pill">${safe(i.cost, "-")}</span>${tag(nCaseDisplay(i.display))}</div></article>`).join("")}</section></div>`;
+    if (state.tab === "mall") {
+      const active = state.subTab.mall || "goods";
+      const rows = active === "goods" ? products : services;
+      const selectedKey = state.userSelected[active] || (active === "goods" ? rows[0]?.sku : rows[0]?.id || rows[0]?.name || "");
+      const selected = rows.find((item) => (active === "goods" ? item.sku : item.id || item.name) === selectedKey) || rows[0];
+      return `${subTabs([{ id: "goods", label: "商品列表" }, { id: "service", label: "服务下单" }])}${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<div class="mobile-list">${rows.map((i) => {
+        const itemId = active === "goods" ? i.sku : i.id || i.name;
+        const isActive = (active === "goods" ? i.sku : i.id || i.name) === (active === "goods" ? selected?.sku : selected?.id || selected?.name);
+        return `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${isActive ? "active" : ""}" type="button" data-user-pick data-user-type="${active}" data-user-id="${itemId}">${active === "goods" ? `<strong>${safe(i.name, "商品")}</strong><div class="muted" style="margin-top:8px;">${safe(i.brand, "品牌")} / ${safe(i.fitment || i.model, "适配车型")}</div><div style="margin-top:10px; display:flex; gap:10px;"><span class="pill">${safe(i.price, "-")}</span>${tag(nProduct(i.status))}</div>` : `<strong>${safe(i.name, "服务")}</strong><div class="muted" style="margin-top:8px;">${safe(i.desc, "服务说明")}</div><div class="muted" style="margin-top:6px;">${safe(i.duration, "支持预约到店")}</div><div style="margin-top:10px;"><span class="pill">${safe(i.price, "-")}</span></div>`}</button>${isActive ? renderUserMallDetail(i, active) : ""}</div>`;
+      }).join("")}</div>`;
+    }
+    if (state.tab === "garage") {
+      const active = state.subTab.garage || "vehicles";
+      const selectedVehicle = getSelectedUserVehicle();
+      return `${subTabs([{ id: "vehicles", label: "我的车辆" }, { id: "render", label: "渲染展示" }])}${active === "vehicles" ? renderUserGarageVehicles(selectedVehicle) : renderUserGarageRender(selectedVehicle)}`;
+    }
+    if (state.tab === "forum") return renderUserForum();
+    return renderUserMe();
+  }
+
+  function renderUserMe() {
+    const active = state.subTab.me || "profile";
+    return `${subTabs([{ id: "profile", label: "基本信息" }, { id: "orders", label: "历史订单" }, { id: "messages", label: "消息" }, { id: "address", label: "地址管理" }, { id: "credit", label: "金融授信" }])}${active === "profile" ? renderUserProfile() : active === "orders" ? renderUserHistoryOrders() : active === "messages" ? renderUserMessages() : active === "address" ? renderUserAddress() : renderUserCredit()}`;
+  }
+
+  function getUserOrders() {
+    return [...fallback.userHistoryOrders, ...orders.filter((item) => safe(item.user, "") === "当前用户")].slice(0, 8);
+  }
+
+  function renderUserProfile() {
+    return `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">User Profile</div><h3>用户基本信息</h3><div class="admin-kv-list"><div><span>昵称</span><strong>当前用户</strong></div><div><span>手机号</span><strong>13800138000</strong></div><div><span>常用城市</span><strong>上海</strong></div><div><span>默认爱车</span><strong>${safe(getSelectedUserVehicle()?.model, "未绑定车辆")}</strong></div><div><span>账号状态</span><strong>正常</strong></div></div></section></div>`;
+  }
+
+  function renderUserHistoryOrders() {
+    const rows = getUserOrders();
+    const selected = rows.find((item) => item.id === state.userMe.selectedOrder) || rows[0];
+    return `<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === item.id ? "active" : ""}" type="button" data-user-action="user-order-pick" data-user-id="${item.id}"><strong>${item.id}</strong><div class="muted" style="margin-top:8px;">${safe(item.vehicle, "车型")} / ${safe(item.appointment, "-")}</div><div style="margin-top:8px;">${safe(item.service, "服务")}</div><div class="muted" style="margin-top:8px;">${safe(item.progress, "处理中")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">${safe(item.quote, "-")}</span>${tag(nOrder(item.status))}</div></button>${selected?.id === item.id ? renderUserHistoryOrderDetail(item) : ""}</div>`).join("") || `<article class="mobile-item"><strong>暂无历史订单</strong></article>`}</div>`;
+  }
+
+  function renderUserMessages() {
+    const rows = fallback.providerMessages.filter((item) => item.messages.some((message) => message.from === "user" || message.from === "provider" || message.from === "platform"));
+    const selected = rows.find((item) => item.id === state.userMe.selectedMessage) || rows[0];
+    return `<section class="provider-chat-shell"><div class="provider-chat-list">${rows.map((item) => `<div class="admin-inline-block"><button class="provider-chat-thread ${selected?.id === item.id ? "active" : ""}" type="button" data-user-action="user-message-pick" data-user-id="${item.id}"><div class="provider-chat-thread-head"><strong>${safe(item.title, "消息")}</strong><span>${safe(item.time, "刚刚")}</span></div><div class="provider-chat-thread-preview">${safe(item.preview, "暂无消息内容")}</div><div class="provider-chat-thread-meta">${tag(safe(item.status, "正常"))}</div></button>${selected?.id === item.id ? `<section class="provider-chat-panel"><header class="provider-chat-header"><div><div class="eyebrow">Realtime Chat</div><h3>${safe(item.title, "即时对话")}</h3></div>${tag(safe(item.status, "正常"))}</header><div class="provider-chat-body">${item.messages.map((message) => `<article class="provider-chat-bubble ${message.from === "user" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "user" ? "我" : message.from === "provider" ? "服务商" : "平台"}</div><p>${message.text}</p><time>${message.time}</time></article>`).join("")}</div><form class="provider-chat-composer" data-user-chat-form data-user-id="${item.id}"><input class="input" name="userChatMessage" type="text" placeholder="输入消息并实时发送" autocomplete="off" required><button class="btn btn-primary" type="submit">发送</button></form></section>` : ""}</div>`).join("")}</div></section>`;
+  }
+
+  function renderUserHistoryOrderDetail(item) {
+    const canAccept = nOrder(item.status) === "待验收";
+    const providerMeta = providerOrderExtras[item.id] || {};
+    const completionSummary = safe(item.progress, "服务商暂未提交完工说明");
+    const uploadSummary = safe(providerMeta.arrival, "暂未上传完工图片");
+    const acceptanceTips = safe(providerMeta.remark, "请重点核对施工效果、功能联调和随车物品");
+    return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>服务</span><strong>${safe(item.service, "-")}</strong></div><div><span>预约时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>当前进度</span><strong>${completionSummary}</strong></div><div><span>订单状态</span><strong>${nOrder(item.status)}</strong></div></div>${canAccept ? `<section class="provider-complete-form"><div class="field-group"><label class="field-label">服务商完工情况</label><div class="admin-timeline"><div>${completionSummary}</div><div>${uploadSummary}</div><div>验收提示：${acceptanceTips}</div></div></div></section>` : ""}<div class="admin-action-row">${canAccept ? `<button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>` : `<button class="btn btn-secondary" type="button" disabled>当前无需验收</button>`}</div></section>`;
+  }
+
+  function renderUserAddress() {
+    const rows = fallback.userAddresses;
+    return `<div class="stack"><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="${state.userMe.addressCreateOpen ? "user-address-cancel" : "user-address-add"}">${state.userMe.addressCreateOpen ? "收起新增地址" : "新增地址"}</button></div>${state.userMe.addressCreateOpen ? renderUserAddressForm() : ""}<div class="mobile-list">${rows.map((item) => `<section class="mobile-item"><strong>${item.name} / ${item.phone}</strong><div class="muted" style="margin-top:8px;">${item.address}</div><div style="margin-top:10px; display:flex; justify-content:space-between; gap:12px; align-items:center;"><span class="pill">${item.tag}</span><button class="btn btn-danger" type="button" data-user-action="user-address-delete" data-user-id="${item.id}">删除</button></div></section>`).join("")}</div></div>`;
+  }
+
+  function renderUserAddressForm() {
+    return `<form class="provider-complete-form" data-user-address-form><div class="form-grid"><div class="field-group"><label class="field-label" for="address-name-new">收件人</label><input class="input" id="address-name-new" name="addressName" type="text" value="周恺" required></div><div class="field-group"><label class="field-label" for="address-phone-new">联系电话</label><input class="input" id="address-phone-new" name="addressPhone" type="text" value="13800138000" required></div><div class="field-group"><label class="field-label" for="address-detail-new">详细地址</label><input class="input" id="address-detail-new" name="addressDetail" type="text" value="上海市徐汇区虹桥路 188 号 3 单元 1201" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">保存地址</button><button class="btn btn-secondary" type="button" data-user-action="user-address-cancel">取消</button></div></form>`;
+  }
+
+  function renderUserCredit() {
+    return `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Credit Service</div><h3>金融授信</h3><div class="admin-kv-list"><div><span>授信状态</span><strong>已开通</strong></div><div><span>可用额度</span><strong>¥80,000</strong></div><div><span>已使用额度</span><strong>¥12,600</strong></div><div><span>最近还款日</span><strong>2026-04-10</strong></div></div><div class="admin-timeline"><div>支持商品分期、改装施工分期与门店联合金融方案。</div><div>如需提升额度，可在平台完成补充资料与信用评估。</div></div></section></div>`;
+  }
+
+  function renderUserForum() {
+    const active = state.subTab.forum || "posts";
+    const rows = active === "posts" ? posts : posts.filter((item) => safe(item.author, "") === "当前用户");
+    const selected = rows.find((item) => item.id === state.userForum.selectedPost) || rows[0];
+    return `${subTabs([{ id: "posts", label: "帖子列表" }, { id: "mine", label: "我的发布" }])}<div class="admin-action-row" style="margin-bottom:12px;"><button class="btn btn-primary" type="button" data-user-action="${state.userForum.createOpen ? "user-forum-cancel" : "user-forum-create"}">${state.userForum.createOpen ? "收起发布表单" : "发布帖子"}</button></div>${state.userForum.createOpen ? renderUserForumForm() : ""}<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === item.id ? "active" : ""}" type="button" data-user-action="user-forum-pick" data-user-id="${item.id}"><strong>${safe(item.title, "帖子")}</strong><div class="muted" style="margin-top:8px;">${safe(item.author, "作者")} / ${safe(item.time, "今天")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">回复 ${item.replies || 0}</span><span class="pill">点赞 ${item.likes || 0}</span>${tag(nForum(item.status))}</div></button>${selected?.id === item.id ? renderUserForumDetail(item) : ""}</div>`).join("") || `<article class="mobile-item"><strong>暂无帖子</strong><div class="muted" style="margin-top:8px;">先发布第一条帖子吧。</div></article>`}</div>`;
+  }
+
+  function renderUserForumForm() {
+    return `<form class="provider-complete-form" data-user-forum-form><div class="form-grid"><div class="field-group"><label class="field-label" for="forum-title-new">帖子标题</label><input class="input" id="forum-title-new" name="forumTitle" type="text" value="分享本周新改的轮毂搭配" required></div><div class="field-group"><label class="field-label" for="forum-media-new">上传图片或视频</label><label class="upload-panel" for="forum-media-new"><input id="forum-media-new" class="upload-input" name="forumMedia" type="file" accept="image/*,video/*" multiple><span class="upload-illustration"></span><strong>上传帖子素材</strong><small>支持上传图片或短视频，展示施工细节、完工效果或用车日常，最多选择 9 个文件</small></label></div><div class="field-group"><label class="field-label" for="forum-content-new">帖子内容</label><textarea class="textarea" id="forum-content-new" name="forumContent" required>刚换了新轮毂和短簧，欢迎大家看看效果，也想听听后续轮胎搭配建议。</textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">确认发布</button><button class="btn btn-secondary" type="button" data-user-action="user-forum-cancel">取消</button></div></form>`;
+  }
+
+  function renderUserForumDetail(item) {
+    const replyOpen = state.userForum.replyPostId === item.id;
+    const related = comments.filter((comment) => comment.post === item.id && nForum(comment.status) !== "已删除");
+    const mine = safe(item.author, "") === "当前用户";
+    return `<section class="admin-detail-card"><div class="eyebrow">Forum Detail</div><h3>${safe(item.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>作者</span><strong>${safe(item.author, "-")}</strong></div><div><span>发布时间</span><strong>${safe(item.time, "-")}</strong></div><div><span>互动数据</span><strong>回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</strong></div><div><span>状态</span><strong>${nForum(item.status)}</strong></div></div><div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${related.length ? related.map((comment) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(comment.author, "评论用户")}</strong><span class="muted">${safe(comment.time, "刚刚")}</span></div><p>${safe(comment.content, "评论内容")}</p></div>`).join("") : `<div class="muted">当前暂无评论</div>`}</div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="user-forum-like" data-user-id="${item.id}">点赞</button><button class="btn btn-secondary" type="button" data-user-action="${replyOpen ? "user-forum-reply-cancel" : "user-forum-reply"}" data-user-id="${item.id}">${replyOpen ? "取消回复" : "回复"}</button>${mine ? `<button class="btn btn-danger" type="button" data-user-action="user-forum-delete" data-user-id="${item.id}">删除</button>` : ""}</div>${replyOpen ? renderUserForumReplyForm(item) : ""}</section>`;
+  }
+
+  function renderUserForumReplyForm(item) {
+    return `<form class="provider-complete-form" data-user-forum-reply-form data-user-id="${item.id}"><div class="field-group"><label class="field-label" for="forum-reply-${item.id}">回复内容</label><textarea class="textarea" id="forum-reply-${item.id}" name="forumReply" required>这个搭配很顺眼，建议再试试更贴合街道使用场景的胎壁比例。</textarea></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交回复</button><button class="btn btn-secondary" type="button" data-user-action="user-forum-reply-cancel" data-user-id="${item.id}">取消</button></div></form>`;
+  }
+
+  function renderUserMallDetail(item, active) {
+    const itemId = active === "goods" ? item.sku : item.id || item.name;
+    const orderOpen = state.userOrderForm.type === active && state.userOrderForm.id === itemId;
+    return `<section class="admin-detail-card"><div class="eyebrow">${active === "goods" ? "Mall Goods" : "Service Booking"}</div><h3>${safe(item.name, active === "goods" ? "商品详情" : "服务详情")}</h3><div class="admin-kv-list">${active === "goods" ? `<div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>适配车型</span><strong>${safe(item.fitment || item.model, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>状态</span><strong>${nProduct(item.status)}</strong></div>` : `<div><span>服务名称</span><strong>${safe(item.name, "-")}</strong></div><div><span>服务说明</span><strong>${safe(item.desc, "-")}</strong></div><div><span>价格参考</span><strong>${safe(item.price, "-")}</strong></div><div><span>预约方式</span><strong>${safe(item.duration, "支持到店预约")}</strong></div>`}</div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="${orderOpen ? "user-order-cancel" : "user-order-open"}" data-user-id="${itemId}" data-user-type="${active}">${orderOpen ? "收起下单表单" : "立即下单"}</button></div>${orderOpen ? renderUserOrderForm(item, active) : ""}</section>`;
+  }
+
+  function getUserVehicleKey(item) {
+    return item.id || item.plate || item.model;
+  }
+
+  function getSelectedUserVehicle() {
+    return vehicles.find((item) => getUserVehicleKey(item) === state.userGarage.selectedVehicle) || vehicles[0];
+  }
+
+  function renderUserGarageVehicles(selectedVehicle) {
+    return `<div class="stack"><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="${state.userGarage.createOpen ? "user-vehicle-cancel" : "user-vehicle-add"}">${state.userGarage.createOpen ? "收起新增车辆" : "新增车辆"}</button></div>${state.userGarage.createOpen ? renderUserVehicleForm() : ""}<div class="mobile-list">${vehicles.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${getUserVehicleKey(item) === getUserVehicleKey(selectedVehicle) ? "active" : ""}" type="button" data-user-pick data-user-type="garage-vehicle" data-user-id="${getUserVehicleKey(item)}"><strong>${safe(item.model, "车辆")}</strong><div class="muted" style="margin-top:8px;">${safe(item.plate, "-")} / ${safe(item.owner, "-")}</div><div style="margin-top:8px;">查看车辆信息与系统记录的改装历史</div></button>${getUserVehicleKey(item) === getUserVehicleKey(selectedVehicle) ? renderUserVehicleDetail(item) : ""}</div>`).join("")}</div></div>`;
+  }
+
+  function renderUserVehicleForm() {
+    return `<form class="provider-complete-form" data-user-vehicle-form><div class="form-grid"><div class="field-group"><label class="field-label" for="garage-model-new">车型</label><input class="input" id="garage-model-new" name="garageModel" type="text" value="保时捷 718 Cayman" required></div><div class="field-group"><label class="field-label" for="garage-plate-new">车牌</label><input class="input" id="garage-plate-new" name="garagePlate" type="text" value="沪A 718CM" required></div><div class="field-group"><label class="field-label" for="garage-owner-new">车主</label><input class="input" id="garage-owner-new" name="garageOwner" type="text" value="周恺" required></div></div><div class="admin-timeline"><div>改装历史由系统根据订单、施工和交付记录自动沉淀。</div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">保存车辆</button><button class="btn btn-secondary" type="button" data-user-action="user-vehicle-cancel">取消</button></div></form>`;
+  }
+
+  function renderUserVehicleDetail(item) {
+    return `<section class="admin-detail-card"><div class="eyebrow">Vehicle Profile</div><h3>${safe(item.model, "车辆详情")}</h3><div class="admin-kv-list"><div><span>车型</span><strong>${safe(item.model, "-")}</strong></div><div><span>车牌</span><strong>${safe(item.plate, "-")}</strong></div><div><span>车主</span><strong>${safe(item.owner, "-")}</strong></div><div><span>当前状态</span><strong>已绑定</strong></div></div><div class="admin-action-row"><button class="btn btn-danger" type="button" data-user-action="user-vehicle-delete" data-user-id="${getUserVehicleKey(item)}">删除车辆</button></div><div class="admin-comment-block"><strong>改装历史记录</strong><div class="admin-comment-list">${String(item.history || "暂无改装记录").split(/[；;。]/).filter(Boolean).map((entry) => `<div class="admin-comment-item"><p>${entry.trim()}</p></div>`).join("") || `<div class="muted">暂无改装历史记录</div>`}</div></div></section>`;
+  }
+
+  function renderUserGarageRender(selectedVehicle) {
+    return `<div class="stack"><section class="garage-preview"><div class="eyebrow">Render Lab</div><strong style="display:block; margin-top:10px; font-size:22px;">${safe(selectedVehicle?.model, "宝马 G20 330i")} 外观预览</strong><div class="muted" style="margin-top:6px;">通过下拉切换当前爱车，再调整车身颜色与轮毂样式，当前方案仅做图片式渲染模拟。</div><div class="field-group" style="margin-top:14px;"><label class="field-label" for="garage-render-select">选择爱车</label><select class="input" id="garage-render-select" data-user-action="user-vehicle-select">${vehicles.map((item) => `<option value="${getUserVehicleKey(item)}" ${getUserVehicleKey(item) === getUserVehicleKey(selectedVehicle) ? "selected" : ""}>${safe(item.model, "爱车")} / ${safe(item.plate, "-")}</option>`).join("")}</select></div><div class="car-render"><div class="car-wheel left" id="leftWheel"></div><div class="car-wheel right" id="rightWheel"></div><div class="car-render-body" id="carBody"></div></div><div class="swatch-row">${fallback.colors.map((i, idx) => `<button class="swatch ${idx === state.garageColor ? "active" : ""}" style="background:${i.value};" type="button" title="${i.name}" data-color-index="${idx}"></button>`).join("")}</div></section><section class="mobile-list">${fallback.wheels.map((i, idx) => `<button class="wheel-option ${idx === state.garageWheel ? "active" : ""}" type="button" data-wheel-index="${idx}"><span><strong>${i.name}</strong><div class="muted" style="margin-top:6px;">${i.spokes} 辐设计 / 高端改装风格</div></span><span class="wheel-badge" data-tone="${idx === 0 ? "gold" : idx === 1 ? "grey" : "silver"}"></span></button>`).join("")}</section></div>`;
+  }
+
+  function renderUserOrderForm(item, active) {
+    const itemId = active === "goods" ? item.sku : item.id || item.name;
+    return `<form class="provider-complete-form" data-user-order-form data-user-type="${active}" data-user-id="${itemId}"><div class="form-grid"><div class="field-group"><label class="field-label" for="user-vehicle-${itemId}">车辆信息</label><input class="input" id="user-vehicle-${itemId}" name="userVehicle" type="text" value="${vehicles[0]?.model || "宝马 G20 330i"}" required></div><div class="field-group"><label class="field-label" for="user-phone-${itemId}">联系电话</label><input class="input" id="user-phone-${itemId}" name="userPhone" type="text" value="13800138000" required></div>${active === "goods" ? `<div class="field-group"><label class="field-label" for="user-receiver-${itemId}">收件人</label><input class="input" id="user-receiver-${itemId}" name="userReceiver" type="text" value="周恺" required></div><div class="field-group"><label class="field-label" for="user-address-${itemId}">收件地址</label><input class="input" id="user-address-${itemId}" name="userAddress" type="text" value="上海市闵行区申长路 1688 号 2 栋 801" required></div>` : ""}<div class="field-group"><label class="field-label" for="user-time-${itemId}">${active === "goods" ? "收货/到店时间" : "预约时间"}</label><input class="input" id="user-time-${itemId}" name="userTime" type="text" value="2026-04-03 14:30" required></div><div class="field-group"><label class="field-label" for="user-qty-${itemId}">${active === "goods" ? "数量" : "服务数量"}</label><input class="input" id="user-qty-${itemId}" name="userQuantity" type="number" min="1" max="9" value="1" required></div><div class="field-group"><label class="field-label" for="user-note-${itemId}">备注</label><textarea class="textarea" id="user-note-${itemId}" name="userNote" required>${active === "goods" ? "请确认到货后通知安装时间。" : "请优先安排周末到店。"} </textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交订单</button><button class="btn btn-secondary" type="button" data-user-action="user-order-cancel" data-user-id="${itemId}" data-user-type="${active}">取消</button></div></form>`;
+  }
+
+  function handleUserAction(button) {
+    const action = button.dataset.userAction;
+    const id = button.dataset.userId || "";
+    const type = button.dataset.userType || "";
+    if (action === "user-vehicle-add") {
+      state.userGarage.createOpen = true;
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-vehicle-cancel") {
+      state.userGarage.createOpen = false;
+      render();
+      return;
+    }
+    if (action === "user-vehicle-select") {
+      state.userGarage.selectedVehicle = button.value;
+      render();
+      return;
+    }
+    if (action === "user-vehicle-delete") {
+      const targetIndex = vehicles.findIndex((item) => getUserVehicleKey(item) === id);
+      if (targetIndex === -1) return;
+      vehicles.splice(targetIndex, 1);
+      state.userGarage.selectedVehicle = vehicles[0] ? getUserVehicleKey(vehicles[0]) : "";
+      state.userFeedback = "车辆已从爱车列表删除。";
+      render();
+      return;
+    }
+    if (action === "user-order-open") {
+      state.userOrderForm = { type, id };
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-order-pick") {
+      state.userMe.selectedOrder = id;
+      render();
+      return;
+    }
+    if (action === "user-order-acceptance") {
+      const target = orders.find((item) => item.id === id);
+      if (!target) return;
+      target.status = "已完成";
+      target.progress = "用户已完成验收，订单已归档。";
+      state.userFeedback = `${id} 已确认验收。`;
+      render();
+      return;
+    }
+    if (action === "user-order-cancel") {
+      state.userOrderForm = { type: "", id: "" };
+      render();
+      return;
+    }
+    if (action === "user-message-pick") {
+      state.userMe.selectedMessage = id;
+      render();
+      return;
+    }
+    if (action === "user-address-add") {
+      state.userMe.addressCreateOpen = true;
+      render();
+      return;
+    }
+    if (action === "user-address-cancel") {
+      state.userMe.addressCreateOpen = false;
+      render();
+      return;
+    }
+    if (action === "user-address-delete") {
+      const idx = fallback.userAddresses.findIndex((item) => item.id === id);
+      if (idx === -1) return;
+      fallback.userAddresses.splice(idx, 1);
+      state.userFeedback = "地址已删除。";
+      render();
+      return;
+    }
+    if (action === "user-forum-create") {
+      state.userForum.createOpen = true;
+      render();
+      return;
+    }
+    if (action === "user-forum-cancel") {
+      state.userForum.createOpen = false;
+      render();
+      return;
+    }
+    if (action === "user-forum-pick") {
+      state.userForum.selectedPost = id;
+      render();
+      return;
+    }
+    if (action === "user-forum-like") {
+      const target = posts.find((item) => item.id === id);
+      if (!target) return;
+      target.likes = (target.likes || 0) + 1;
+      state.userFeedback = `${safe(target.title, "帖子")} 已点赞。`;
+      render();
+      return;
+    }
+    if (action === "user-forum-reply") {
+      state.userForum.replyPostId = id;
+      render();
+      return;
+    }
+    if (action === "user-forum-reply-cancel") {
+      state.userForum.replyPostId = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-delete") {
+      const target = posts.find((item) => item.id === id);
+      if (!target) return;
+      target.status = "已删除";
+      state.userFeedback = `${safe(target.title, "帖子")} 已删除。`;
+      state.userForum.replyPostId = "";
+      render();
+    }
+  }
+
+  function handleUserVehicleSubmit(event) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const model = String(formData.get("garageModel") || "").trim();
+    const plate = String(formData.get("garagePlate") || "").trim();
+    const owner = String(formData.get("garageOwner") || "").trim();
+    if (!model || !plate || !owner) return;
+    const id = `CAR-${Date.now().toString().slice(-6)}`;
+    vehicles.unshift({ id, model, plate, owner, history: "系统已创建车辆档案，待后续订单和施工记录自动生成改装历史。" });
+    state.userGarage.selectedVehicle = id;
+    state.userGarage.createOpen = false;
+    state.userFeedback = `${model} 已添加到爱车列表。`;
+    render();
+  }
+
+  function handleUserForumSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const title = String(formData.get("forumTitle") || "").trim();
+    const content = String(formData.get("forumContent") || "").trim();
+    const mediaCount = form.querySelector('input[name="forumMedia"]')?.files?.length || 0;
+    if (!title || !content) return;
+    const id = `POST-${Date.now().toString().slice(-6)}`;
+    posts.unshift({
+      id,
+      title,
+      author: "当前用户",
+      time: "刚刚",
+      replies: 0,
+      likes: 0,
+      status: "正常",
+      content: mediaCount ? `${content} / 已上传 ${mediaCount} 个图片或视频文件` : content,
+    });
+    state.userForum.selectedPost = id;
+    state.userForum.createOpen = false;
+    state.userFeedback = mediaCount ? `${title} 已发布，并上传 ${mediaCount} 个图片或视频文件。` : `${title} 已发布。`;
+    render();
+  }
+
+  function handleUserForumReplySubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const id = form.dataset.userId || "";
+    const target = posts.find((item) => item.id === id);
+    if (!target) return;
+    const text = String(new FormData(form).get("forumReply") || "").trim();
+    if (!text) return;
+    comments.unshift({
+      id: `COMMENT-${Date.now().toString().slice(-6)}`,
+      post: id,
+      author: "当前用户",
+      time: "刚刚",
+      content: text,
+      status: "正常",
+    });
+    target.replies = (target.replies || 0) + 1;
+    state.userForum.replyPostId = "";
+    state.userFeedback = `${safe(target.title, "帖子")} 已回复。`;
+    render();
+  }
+
+  function handleUserChatSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const id = form.dataset.userId || "";
+    const target = fallback.providerMessages.find((item) => item.id === id);
+    if (!target) return;
+    const text = String(new FormData(form).get("userChatMessage") || "").trim();
+    if (!text) return;
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    target.messages.push({ from: "user", text, time });
+    target.preview = text;
+    target.time = time;
+    target.status = "沟通中";
+    state.userMe.selectedMessage = id;
+    state.userFeedback = `${safe(target.title, "消息")} 已发送。`;
+    render();
+  }
+
+  function handleUserAddressSubmit(event) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const name = String(formData.get("addressName") || "").trim();
+    const phone = String(formData.get("addressPhone") || "").trim();
+    const address = String(formData.get("addressDetail") || "").trim();
+    if (!name || !phone || !address) return;
+    fallback.userAddresses.unshift({
+      id: `ADDR-${Date.now().toString().slice(-6)}`,
+      name,
+      phone,
+      address,
+      tag: "新增地址",
+    });
+    state.userMe.addressCreateOpen = false;
+    state.userFeedback = "地址已新增。";
+    render();
+  }
+
+  function handleUserOrderSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const type = form.dataset.userType || "";
+    const id = form.dataset.userId || "";
+    const formData = new FormData(form);
+    const vehicle = String(formData.get("userVehicle") || "").trim();
+    const phone = String(formData.get("userPhone") || "").trim();
+    const receiver = String(formData.get("userReceiver") || "").trim();
+    const address = String(formData.get("userAddress") || "").trim();
+    const time = String(formData.get("userTime") || "").trim();
+    const quantity = Math.max(1, Number(formData.get("userQuantity") || 1));
+    const note = String(formData.get("userNote") || "").trim();
+    if (!vehicle || !phone || !time || !note) return;
+    if (type === "goods" && (!receiver || !address)) return;
+    const source = (type === "goods" ? products.find((item) => item.sku === id) : services.find((item) => String(item.id || item.name) === id));
+    if (!source) return;
+    const orderId = `UO-${Date.now().toString().slice(-6)}`;
+    orders.unshift({
+      id: orderId,
+      user: "当前用户",
+      vehicle,
+      service: `${safe(source.name, "下单项目")} x${quantity}`,
+      provider: safe(providers[0]?.name, "推荐门店"),
+      city: safe(providers[0]?.city, "上海"),
+      quote: safe(source.price, "待确认"),
+      payment: type === "goods" ? "已支付" : "待支付",
+      status: "待分配",
+      progress: `${type === "goods" ? `商品已付款，收件人 ${receiver} / ${address}` : "服务预约已提交"}，备注：${note}`,
+      appointment: time,
+      intention: safe(providers[0]?.name, "推荐门店"),
+      phone,
+    });
+    state.userOrderForm = { type: "", id: "" };
+    state.userFeedback = `${safe(source.name, "订单")} 已提交，下单编号 ${orderId}。`;
+    if (type === "goods") {
+      state.userDialog = { type: "service-upsell", orderId, sourceName: safe(source.name, "商品") };
+      state.tab = "mall";
+    } else {
+      state.tab = "me";
+    }
+    render();
+  }
+
+  function handleUserDialogAction(button) {
+    const action = button.dataset.userDialogAction;
+    const { orderId, sourceName } = state.userDialog;
+    if (action === "need-service") {
+      state.userDialog = { type: "provider-pick", orderId, sourceName };
+      render();
+      return;
+    }
+    if (action === "pick-provider") {
+      const provider = providers.find((item) => item.id === button.dataset.providerId) || providers[0];
+      state.userDialog = { type: "", orderId: "", sourceName: "" };
+      state.tab = "mall";
+      state.subTab.mall = "service";
+      state.userFeedback = `${orderId} 已付款，已选择 ${safe(provider?.name, "服务商")}，请继续预约改装服务。`;
+      render();
+      return;
+    }
+    if (action === "platform-assign") {
+      state.userDialog = { type: "", orderId: "", sourceName: "" };
+      state.tab = "mall";
+      state.subTab.mall = "service";
+      state.userFeedback = `${orderId} 已付款，改装服务将由平台统一派单。`;
+      render();
+      return;
+    }
+    if (action === "provider-back") {
+      state.userDialog = { type: "service-upsell", orderId, sourceName };
+      render();
+      return;
+    }
+    if (action === "skip-service") {
+      state.userDialog = { type: "", orderId: "", sourceName: "" };
+      state.tab = "me";
+      state.userFeedback = `${orderId} 已完成付款，暂不预约改装服务。`;
+      render();
+    }
+  }
 
   function updateGarageRender() { const color = fallback.colors[state.garageColor]; const wheel = fallback.wheels[state.garageWheel]; const body = document.getElementById("carBody"); const leftWheel = document.getElementById("leftWheel"); const rightWheel = document.getElementById("rightWheel"); if (!body || !leftWheel || !rightWheel) return; body.style.background = `linear-gradient(145deg, ${shade(color.value, -18)}, ${color.value})`; const g = `radial-gradient(circle, #a3a9b3 0 10%, ${shade(wheel.color, -30)} 12% 44%, #0a0d11 46% 100%)`; leftWheel.style.background = g; rightWheel.style.background = g; screenEl.querySelectorAll("[data-color-index]").forEach((e, i) => e.classList.toggle("active", i === state.garageColor)); screenEl.querySelectorAll("[data-wheel-index]").forEach((e, i) => e.classList.toggle("active", i === state.garageWheel)); }
   function shade(hex, amount) { const v = hex.replace("#", ""); const size = v.length === 3 ? 1 : 2; const parts = []; for (let i = 0; i < 3; i += 1) { const s = i * size; const c = size === 1 ? parseInt(v[s] + v[s], 16) : parseInt(v.slice(s, s + 2), 16); const n = Math.max(0, Math.min(255, c + amount)); parts.push(n.toString(16).padStart(2, "0")); } return `#${parts.join("")}`; }
