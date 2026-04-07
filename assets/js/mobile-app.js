@@ -81,6 +81,20 @@
     },
   };
 
+  if (appType === "user" && typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    if (window.location.pathname.endsWith("/pages/user-app.html")) {
+      const orderSku = params.get("orderSku") || "";
+      const mallPage = params.get("mallPage") || "";
+      if (orderSku) {
+        state.tab = "mall";
+        state.userMallPage = mallPage || (orderSku === "PR-8801" ? "wheel" : orderSku === "PR-8802" ? "exhaust" : orderSku === "PR-8805" ? "interior" : "exterior");
+        state.userSelected.goods = orderSku;
+        state.userOrderForm = { type: "goods", id: orderSku };
+      }
+    }
+  }
+
   const fallback = {
     adminMessages: [
       { title: "3 家服务商待审核", note: "上海 / 深圳 / 成都", time: "刚刚", detail: "有 1 家门店营业执照与门头照已提交，仍缺施工环境照和品牌授权资料。" },
@@ -845,7 +859,7 @@
       const selectedSku = state.userSelected.goods || "PR-8804";
       const selectedProduct = products.find((item) => item.sku === selectedSku) || products[0];
       const mallCards = [selectedProduct, ...products.filter((item) => item.sku !== selectedSku)].slice(0, 4);
-      return `<div class="stack">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="mobile-item"><input class="input" type="text" placeholder="搜索改装配件、品牌..." aria-label="搜索改装配件、品牌"></section><section class="mobile-grid-3"><article class="mobile-item"><div class="eyebrow">01</div><strong>外观套件</strong><div class="muted" style="margin-top:8px;">前唇 / 尾翼 / 宽体</div></article><article class="mobile-item"><div class="eyebrow">02</div><strong>动力性能</strong><div class="muted" style="margin-top:8px;">进气 / 排气 / 程序</div></article><article class="mobile-item"><div class="eyebrow">03</div><strong>电子系统</strong><div class="muted" style="margin-top:8px;">仪表 / ECU / 监控</div></article><article class="mobile-item"><div class="eyebrow">04</div><strong>更多</strong><div class="muted" style="margin-top:8px;">内饰 / 车灯 / 精品</div></article></section><section><div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;"><h3 style="margin:0; font-size:22px;">热门品牌</h3><span class="muted">查看全部</span></div><div class="mobile-grid-3"><article class="mobile-item"><strong>3D Design</strong><div class="muted" style="margin-top:8px;">宝马高端外观件</div></article><article class="mobile-item"><strong>Akrapovic</strong><div class="muted" style="margin-top:8px;">钛合金排气系统</div></article><article class="mobile-item"><strong>AERO PRO</strong><div class="muted" style="margin-top:8px;">空气动力学套件</div></article></div></section><section><div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><span style="display:inline-block; width:4px; height:28px; background:var(--brand); border-radius:999px;"></span><h3 style="margin:0; font-size:22px;">高性能改装店</h3></div><div class="mobile-grid-2">${mallCards.map((item, index) => `<article class="mobile-item"><div class="eyebrow">${index === 0 ? "当前推荐" : safe(item.category, "精选单品")}</div><strong>${safe(item.name, "商品")}</strong><div style="margin-top:10px; font-size:28px; font-weight:700; color:var(--brand);">${safe(item.price, "¥0")}</div><div class="muted" style="margin-top:8px;">${safe(item.fitment || item.description, "适配当前车型")}</div></article>`).join("")}</div></section></div>`;
+      return `<div class="stack">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="mobile-item"><input class="input" type="text" placeholder="搜索改装配件、品牌..." aria-label="搜索改装配件、品牌"></section><section class="mobile-grid-3"><article class="mobile-item"><div class="eyebrow">01</div><strong>外观套件</strong><div class="muted" style="margin-top:8px;">前唇 / 尾翼 / 宽体</div></article><article class="mobile-item"><div class="eyebrow">02</div><strong>动力性能</strong><div class="muted" style="margin-top:8px;">进气 / 排气 / 程序</div></article><article class="mobile-item"><div class="eyebrow">03</div><strong>电子系统</strong><div class="muted" style="margin-top:8px;">仪表 / ECU / 监控</div></article><article class="mobile-item"><div class="eyebrow">04</div><strong>更多</strong><div class="muted" style="margin-top:8px;">内饰 / 车灯 / 精品</div></article></section><section><div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;"><h3 style="margin:0; font-size:22px;">热门品牌</h3><span class="muted">查看全部</span></div><div class="mobile-grid-3"><article class="mobile-item"><strong>3D Design</strong><div class="muted" style="margin-top:8px;">宝马高端外观件</div></article><article class="mobile-item"><strong>Akrapovic</strong><div class="muted" style="margin-top:8px;">钛合金排气系统</div></article><article class="mobile-item"><strong>AERO PRO</strong><div class="muted" style="margin-top:8px;">空气动力学套件</div></article></div></section><section><div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><span style="display:inline-block; width:4px; height:28px; background:var(--brand); border-radius:999px;"></span><h3 style="margin:0; font-size:22px;">高性能改装店</h3></div><div class="mobile-grid-2">${mallCards.map((item, index) => `<a class="mobile-item" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(item.sku === "PR-8801" ? "wheel" : item.sku === "PR-8802" ? "exhaust" : item.sku === "PR-8805" ? "interior" : "exterior")}" style="display:block; color:inherit; text-decoration:none;"><div class="eyebrow">${index === 0 ? "当前推荐" : safe(item.category, "精选单品")}</div><strong>${safe(item.name, "商品")}</strong><div style="margin-top:10px; font-size:28px; font-weight:700; color:var(--brand);">${safe(item.price, "¥0")}</div><div class="muted" style="margin-top:8px;">${safe(item.fitment || item.description, "适配当前车型")}</div></a>`).join("")}</div></section></div>`;
     }
     if (state.tab === "mall") {
       const active = state.subTab.mall || "goods";
@@ -898,7 +912,7 @@
     const completionSummary = safe(item.progress, "服务商暂未提交完工说明");
     const uploadSummary = safe(providerMeta.arrival, "暂未上传完工图片");
     const acceptanceTips = safe(providerMeta.remark, "请重点核对施工效果、功能联调和随车物品");
-    return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>服务</span><strong>${safe(item.service, "-")}</strong></div><div><span>预约时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>当前进度</span><strong>${completionSummary}</strong></div><div><span>订单状态</span><strong>${nOrder(item.status)}</strong></div></div>${canAccept ? `<section class="provider-complete-form"><div class="field-group"><label class="field-label">服务商完工情况</label><div class="admin-timeline"><div>${completionSummary}</div><div>${uploadSummary}</div><div>验收提示：${acceptanceTips}</div></div></div></section>` : ""}<div class="admin-action-row">${canAccept ? `<button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>` : `<button class="btn btn-secondary" type="button" disabled>当前无需验收</button>`}</div></section>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>服务</span><strong>${safe(item.service, "-")}</strong></div><div><span>预约时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>当前进度</span><strong>${completionSummary}</strong></div><div><span>订单状态</span><strong>${nOrder(item.status)}</strong></div></div>${canAccept ? `<section class="provider-complete-form"><div class="field-group"><label class="field-label">服务商完工情况</label><div class="admin-timeline"><div>${completionSummary}</div><div>${uploadSummary}</div><div>验收提示：${acceptanceTips}</div></div></div></section>` : ""}<div class="admin-action-row">${canAccept ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系服务商</button><button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>` : `<button class="btn btn-secondary" type="button" disabled>当前无需验收</button>`}</div></section>`;
   }
 
   function renderUserAddress() {
@@ -1098,6 +1112,13 @@
     }
     if (action === "user-order-pick") {
       state.userMe.selectedOrder = id;
+      render();
+      return;
+    }
+    if (action === "user-order-contact") {
+      state.tab = "me";
+      state.subTab.me = "messages";
+      state.userMe.selectedMessage = fallback.providerMessages.find((item) => item.id === "msg-2")?.id || fallback.providerMessages[0]?.id || "";
       render();
       return;
     }
