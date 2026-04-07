@@ -54,6 +54,7 @@
       goods: products[0]?.sku || "",
       service: services[0]?.id || services[0]?.name || "",
     },
+    userMallPage: "",
     userOrderForm: {
       type: "",
       id: "",
@@ -270,7 +271,11 @@
   }
 
   function bindEvents() {
-    screenEl.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { state.tab = b.dataset.tab; render(); }));
+    screenEl.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
+      state.tab = b.dataset.tab;
+      if (b.dataset.tab === "mall") state.userMallPage = "";
+      render();
+    }));
     screenEl.querySelectorAll("[data-sub-tab]").forEach((b) => b.addEventListener("click", () => { state.subTab[state.tab] = b.dataset.subTab; render(); }));
     screenEl.querySelectorAll("[data-admin-pick]").forEach((b) => b.addEventListener("click", () => { state.adminSelected[b.dataset.adminType] = b.dataset.adminId; render(); }));
     screenEl.querySelectorAll("[data-admin-shortcut]").forEach((b) => b.addEventListener("click", () => { state.tab = b.dataset.adminShortcut; if (state.tab === "providers") state.subTab.providers = "audit"; if (state.tab === "orders") state.subTab.orders = "assign"; if (state.tab === "operations") state.subTab.operations = b.dataset.operationsTarget || "cases"; render(); }));
@@ -436,6 +441,9 @@
   function renderUserDialog() {
     const { type, orderId, sourceName } = state.userDialog;
     if (!type) return "";
+    if (type === "vehicle-create") {
+      return `<div class="modal visible"><div class="panel modal-card provider-dialog-card"><div class="eyebrow">New Vehicle</div><h3>新增车辆</h3><p class="muted">选择车辆型号，填写车牌号，并上传一张车辆图片用于爱车档案展示。</p>${renderUserVehicleForm()}</div></div>`;
+    }
     if (type === "service-upsell") {
       return `<div class="modal visible"><div class="panel modal-card provider-dialog-card"><div class="eyebrow">Payment Success</div><h3>是否需要改装服务？</h3><p class="muted">${safe(sourceName, "商品")} 已完成付款，是否同步预约门店安装或改装服务？</p><div class="provider-dialog-summary"><strong>${orderId}</strong><span>可继续选择到店安装、调校或施工服务</span></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-dialog-action="need-service">需要改装服务</button><button class="btn btn-secondary" type="button" data-user-dialog-action="skip-service">暂不需要</button></div></div></div>`;
     }
@@ -833,7 +841,11 @@
     }
     if (state.tab === "home") return `<div class="stack"><section class="hero-banner"><div class="eyebrow">Inspiration</div><h3 style="margin:10px 0 8px; font-size:28px; font-family:var(--font-display);">高端改装推荐</h3><p class="muted">${fallback.userBanners[0]}</p></section><section class="mobile-list">${cases.map((i) => `<article class="mobile-item"><strong>${safe(i.title, "案例")}</strong><div class="muted" style="margin-top:8px;">${safe(i.model, "车型")} / ${safe(i.style, "风格")}</div><div style="margin-top:10px; display:flex; gap:10px;"><span class="pill">${safe(i.cost, "-")}</span>${tag(nCaseDisplay(i.display))}</div></article>`).join("")}</section></div>`;
     if (state.tab === "mall") {
-      return `<div class="stack"><section class="mobile-item"><input class="input" type="text" placeholder="搜索改装配件、品牌..." aria-label="搜索改装配件、品牌"></section><section class="mobile-grid-3"><article class="mobile-item"><div class="eyebrow">01</div><strong>外观套件</strong><div class="muted" style="margin-top:8px;">前唇 / 尾翼 / 宽体</div></article><article class="mobile-item"><div class="eyebrow">02</div><strong>动力性能</strong><div class="muted" style="margin-top:8px;">进气 / 排气 / 程序</div></article><article class="mobile-item"><div class="eyebrow">03</div><strong>电子系统</strong><div class="muted" style="margin-top:8px;">仪表 / ECU / 监控</div></article><article class="mobile-item"><div class="eyebrow">04</div><strong>更多</strong><div class="muted" style="margin-top:8px;">内饰 / 车灯 / 精品</div></article></section><section><div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;"><h3 style="margin:0; font-size:22px;">热门品牌</h3><span class="muted">查看全部</span></div><div class="mobile-grid-3"><article class="mobile-item"><strong>3D Design</strong><div class="muted" style="margin-top:8px;">宝马高端外观件</div></article><article class="mobile-item"><strong>Akrapovic</strong><div class="muted" style="margin-top:8px;">钛合金排气系统</div></article><article class="mobile-item"><strong>AERO PRO</strong><div class="muted" style="margin-top:8px;">空气动力学套件</div></article></div></section><section><div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><span style="display:inline-block; width:4px; height:28px; background:var(--brand); border-radius:999px;"></span><h3 style="margin:0; font-size:22px;">高性能改装店</h3></div><div class="mobile-grid-2"><article class="mobile-item"><div class="eyebrow">热门推荐</div><strong>高强度碳纤维竞技型后尾翼</strong><div style="margin-top:10px; font-size:28px; font-weight:700; color:var(--brand);">¥12,800</div><div class="muted" style="margin-top:8px;">低至 ¥199 / 月（分期）</div></article><article class="mobile-item"><div class="eyebrow">轮毂升级</div><strong>轻量化锻造铝合金轮毂 R20</strong><div style="margin-top:10px; font-size:28px; font-weight:700; color:var(--brand);">¥24,500</div><div class="muted" style="margin-top:8px;">低至 ¥450 / 月（分期）</div></article><article class="mobile-item"><div class="eyebrow">新品上市</div><strong>钛合金高性能排气系统</strong><div style="margin-top:10px; font-size:28px; font-weight:700; color:var(--brand);">¥18,200</div><div class="muted" style="margin-top:8px;">低至 ¥320 / 月（分期）</div></article><article class="mobile-item"><div class="eyebrow">STAGE 2</div><strong>进阶性能升级套件</strong><div style="margin-top:10px; font-size:28px; font-weight:700; color:var(--brand);">¥45,000</div><div class="muted" style="margin-top:8px;">低至 ¥890 / 月（分期）</div></article></div></section></div>`;
+      if (state.userMallPage) return renderUserMallCategoryPage();
+      const selectedSku = state.userSelected.goods || "PR-8804";
+      const selectedProduct = products.find((item) => item.sku === selectedSku) || products[0];
+      const mallCards = [selectedProduct, ...products.filter((item) => item.sku !== selectedSku)].slice(0, 4);
+      return `<div class="stack">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="mobile-item"><input class="input" type="text" placeholder="搜索改装配件、品牌..." aria-label="搜索改装配件、品牌"></section><section class="mobile-grid-3"><article class="mobile-item"><div class="eyebrow">01</div><strong>外观套件</strong><div class="muted" style="margin-top:8px;">前唇 / 尾翼 / 宽体</div></article><article class="mobile-item"><div class="eyebrow">02</div><strong>动力性能</strong><div class="muted" style="margin-top:8px;">进气 / 排气 / 程序</div></article><article class="mobile-item"><div class="eyebrow">03</div><strong>电子系统</strong><div class="muted" style="margin-top:8px;">仪表 / ECU / 监控</div></article><article class="mobile-item"><div class="eyebrow">04</div><strong>更多</strong><div class="muted" style="margin-top:8px;">内饰 / 车灯 / 精品</div></article></section><section><div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;"><h3 style="margin:0; font-size:22px;">热门品牌</h3><span class="muted">查看全部</span></div><div class="mobile-grid-3"><article class="mobile-item"><strong>3D Design</strong><div class="muted" style="margin-top:8px;">宝马高端外观件</div></article><article class="mobile-item"><strong>Akrapovic</strong><div class="muted" style="margin-top:8px;">钛合金排气系统</div></article><article class="mobile-item"><strong>AERO PRO</strong><div class="muted" style="margin-top:8px;">空气动力学套件</div></article></div></section><section><div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><span style="display:inline-block; width:4px; height:28px; background:var(--brand); border-radius:999px;"></span><h3 style="margin:0; font-size:22px;">高性能改装店</h3></div><div class="mobile-grid-2">${mallCards.map((item, index) => `<article class="mobile-item"><div class="eyebrow">${index === 0 ? "当前推荐" : safe(item.category, "精选单品")}</div><strong>${safe(item.name, "商品")}</strong><div style="margin-top:10px; font-size:28px; font-weight:700; color:var(--brand);">${safe(item.price, "¥0")}</div><div class="muted" style="margin-top:8px;">${safe(item.fitment || item.description, "适配当前车型")}</div></article>`).join("")}</div></section></div>`;
     }
     if (state.tab === "mall") {
       const active = state.subTab.mall || "goods";
@@ -849,7 +861,7 @@
     if (state.tab === "garage") {
       const active = state.subTab.garage || "vehicles";
       const selectedVehicle = getSelectedUserVehicle();
-      return `${subTabs([{ id: "vehicles", label: "我的车辆" }, { id: "render", label: "渲染展示" }])}${active === "vehicles" ? renderUserGarageVehicles(selectedVehicle) : renderUserGarageRender(selectedVehicle)}`;
+      return `${subTabs([{ id: "vehicles", label: "我的车辆" }, { id: "render", label: "渲染展示" }, { id: "map", label: "附近门店" }])}${active === "vehicles" ? renderUserGarageVehicles(selectedVehicle) : active === "map" ? renderUserGarageMap(selectedVehicle) : renderUserGarageRender(selectedVehicle)}`;
     }
     if (state.tab === "forum") return renderUserForum();
     return renderUserMe();
@@ -939,12 +951,51 @@
   }
 
   function renderUserGarageVehicles(selectedVehicle) {
-    return `<div class="stack"><section class="mobile-item"><div style="display:flex; justify-content:space-between; align-items:center; gap:16px;"><div><div class="eyebrow">AERO S-LINE</div><strong style="display:block; margin-top:8px; font-size:24px;">${safe(selectedVehicle?.model, "AERO S-LINE")}</strong><div class="muted" style="margin-top:8px;">定制动力青</div></div><div style="display:flex; gap:10px;"><button class="btn btn-secondary" type="button" data-user-action="user-vehicle-add">新增</button><button class="btn btn-secondary" type="button">车主</button></div></div><div class="admin-timeline" style="margin-top:14px;"><div>车型参考：AERO S-LINE 经典双门定制版</div><div>当前车辆：${safe(selectedVehicle?.model, "未绑定车辆")} / ${safe(selectedVehicle?.plate, "-")}</div></div></section><section class="mobile-grid-2"><article class="mobile-item"><div class="eyebrow">Exterior</div><strong>车身套件</strong><div class="muted" style="margin-top:8px;">外观改装</div></article><article class="mobile-item"><div class="eyebrow">Wheel</div><strong>轮毂</strong><div class="muted" style="margin-top:8px;">轻量化轮组升级</div></article><article class="mobile-item"><div class="eyebrow">Exhaust</div><strong>排气</strong><div class="muted" style="margin-top:8px;">声浪与流量优化</div></article><article class="mobile-item"><div class="eyebrow">Interior</div><strong>内饰定制</strong><div class="muted" style="margin-top:8px;">座舱氛围与材质升级</div></article></section><section class="mobile-item" style="background:linear-gradient(135deg, rgba(122,233,255,0.95), rgba(30,216,255,0.85)); color:#062833;"><div style="display:flex; justify-content:space-between; align-items:center; gap:16px;"><strong style="font-size:22px; color:inherit;">附近门店</strong><span style="color:rgba(6,40,51,0.78);">找到 3 家门店</span></div></section><section class="mobile-item"><div style="display:flex; justify-content:center; align-items:center; min-height:64px;"><strong style="font-size:22px;">预约改装</strong></div></section></div>`;
+    return `<div class="stack"><section class="mobile-item"><div style="display:flex; justify-content:space-between; align-items:center; gap:16px;"><div><div class="eyebrow">AERO S-LINE</div><strong style="display:block; margin-top:8px; font-size:24px;">${safe(selectedVehicle?.model, "AERO S-LINE")}</strong><div class="muted" style="margin-top:8px;">定制动力青</div></div><div style="display:flex; gap:10px;"><button class="btn btn-secondary" type="button" data-user-action="user-vehicle-add">新增</button></div></div><div class="admin-timeline" style="margin-top:14px;"><div>车型参考：AERO S-LINE 经典双门定制版</div><div>当前车辆：${safe(selectedVehicle?.model, "未绑定车辆")} / ${safe(selectedVehicle?.plate, "-")}</div></div></section><section class="mobile-grid-2"><button class="mobile-item" type="button" data-user-action="user-garage-exterior"><div class="eyebrow">Exterior</div><strong>车身套件</strong><div class="muted" style="margin-top:8px;">外观改装</div></button><button class="mobile-item" type="button" data-user-action="user-garage-wheel"><div class="eyebrow">Wheel</div><strong>轮毂</strong><div class="muted" style="margin-top:8px;">轻量化轮组升级</div></button><button class="mobile-item" type="button" data-user-action="user-garage-exhaust"><div class="eyebrow">Exhaust</div><strong>排气</strong><div class="muted" style="margin-top:8px;">声浪与流量优化</div></button><button class="mobile-item" type="button" data-user-action="user-garage-interior"><div class="eyebrow">Interior</div><strong>内饰定制</strong><div class="muted" style="margin-top:8px;">座舱氛围与材质升级</div></button></section><button class="mobile-item" type="button" data-user-action="user-garage-store" style="background:linear-gradient(135deg, rgba(122,233,255,0.95), rgba(30,216,255,0.85)); color:#062833;"><div style="display:flex; justify-content:space-between; align-items:center; gap:16px;"><strong style="font-size:22px; color:inherit;">附近门店</strong><span style="color:rgba(6,40,51,0.78);">找到 3 家门店</span></div></button></div>`;
     return `<div class="stack"><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="${state.userGarage.createOpen ? "user-vehicle-cancel" : "user-vehicle-add"}">${state.userGarage.createOpen ? "收起新增车辆" : "新增车辆"}</button></div>${state.userGarage.createOpen ? renderUserVehicleForm() : ""}<div class="mobile-list">${vehicles.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${getUserVehicleKey(item) === getUserVehicleKey(selectedVehicle) ? "active" : ""}" type="button" data-user-pick data-user-type="garage-vehicle" data-user-id="${getUserVehicleKey(item)}"><strong>${safe(item.model, "车辆")}</strong><div class="muted" style="margin-top:8px;">${safe(item.plate, "-")} / ${safe(item.owner, "-")}</div><div style="margin-top:8px;">查看车辆信息与系统记录的改装历史</div></button>${getUserVehicleKey(item) === getUserVehicleKey(selectedVehicle) ? renderUserVehicleDetail(item) : ""}</div>`).join("")}</div></div>`;
   }
 
+  function renderUserGarageMap(selectedVehicle) {
+    const stores = [
+      { name: "德驭 Performance Studio", distance: "2.3km", address: "上海市闵行区申长路 1688 号 A 栋 102", intro: "主打欧系性能车外观套件、轮毂升级与高端施工交付。", hours: "10:00 - 20:00" },
+      { name: "AERO Lab Motorsport", distance: "4.8km", address: "上海市徐汇区龙腾大道 2450 号 1 层", intro: "专注排气、程序与街道赛道双用途底盘调校。", hours: "09:30 - 21:00" },
+      { name: "Urban Carbon Garage", distance: "6.1km", address: "上海市浦东新区锦绣东路 3899 号 3 号楼", intro: "擅长碳纤维车身件、内饰定制和精品升级方案。", hours: "10:00 - 19:30" },
+    ];
+    return `<div class="stack"><section class="mobile-item"><div style="display:flex; justify-content:space-between; align-items:center; gap:12px;"><div><div class="eyebrow">Map View</div><strong style="display:block; margin-top:8px; font-size:22px;">附近门店地图</strong><div class="muted" style="margin-top:8px;">已为 ${safe(selectedVehicle?.model, "当前车辆")} 找到附近 3 家适配门店</div></div><button class="btn btn-secondary" type="button" data-user-action="user-garage-map-back">返回爱车</button></div></section><section class="mobile-item"><div style="min-height:220px; border-radius:20px; position:relative; overflow:hidden; background:radial-gradient(circle at 20% 30%, rgba(122,233,255,0.22), transparent 28%), radial-gradient(circle at 70% 40%, rgba(122,233,255,0.18), transparent 24%), linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));"><div style="position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px); background-size:32px 32px;"></div><div style="position:absolute; top:22%; left:26%; width:18px; height:18px; border-radius:999px; background:var(--brand); box-shadow:0 0 0 8px rgba(122,233,255,0.16);"></div><div style="position:absolute; top:46%; left:58%; width:18px; height:18px; border-radius:999px; background:#ff7a45; box-shadow:0 0 0 8px rgba(255,122,69,0.16);"></div><div style="position:absolute; top:66%; left:38%; width:18px; height:18px; border-radius:999px; background:#7f9cff; box-shadow:0 0 0 8px rgba(127,156,255,0.16);"></div><div style="position:absolute; right:16px; bottom:16px;" class="pill">当前定位：上海市</div></div></section><div class="mobile-list">${stores.map((item, index) => `<section class="admin-detail-card"><div style="display:flex; justify-content:space-between; align-items:center; gap:12px;"><div><div class="eyebrow">门店 0${index + 1}</div><h3 style="margin-top:8px;">${item.name}</h3></div><span class="pill">${item.distance}</span></div><div class="admin-kv-list"><div><span>地址</span><strong>${item.address}</strong></div><div><span>营业时间</span><strong>${item.hours}</strong></div><div><span>适配车型</span><strong>${safe(selectedVehicle?.model, "高端改装车型")}</strong></div></div><div class="admin-timeline"><div>${item.intro}</div></div></section>`).join("")}</div></div>`;
+  }
+
   function renderUserVehicleForm() {
-    return `<form class="provider-complete-form" data-user-vehicle-form><div class="form-grid"><div class="field-group"><label class="field-label" for="garage-model-new">车型</label><input class="input" id="garage-model-new" name="garageModel" type="text" value="保时捷 718 Cayman" required></div><div class="field-group"><label class="field-label" for="garage-plate-new">车牌</label><input class="input" id="garage-plate-new" name="garagePlate" type="text" value="沪A 718CM" required></div><div class="field-group"><label class="field-label" for="garage-owner-new">车主</label><input class="input" id="garage-owner-new" name="garageOwner" type="text" value="周恺" required></div></div><div class="admin-timeline"><div>改装历史由系统根据订单、施工和交付记录自动沉淀。</div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">保存车辆</button><button class="btn btn-secondary" type="button" data-user-action="user-vehicle-cancel">取消</button></div></form>`;
+    const modelOptions = ["保时捷 718 Cayman", "宝马 M4 Coupe", "奔驰 AMG C63", "奥迪 RS5 Sportback", "日产 GT-R R35"];
+    return `<form class="provider-complete-form" data-user-vehicle-form><div class="form-grid"><div class="field-group"><label class="field-label" for="garage-model-new">车辆型号</label><select class="input" id="garage-model-new" name="garageModel" required>${modelOptions.map((item, index) => `<option value="${item}" ${index === 0 ? "selected" : ""}>${item}</option>`).join("")}</select></div><div class="field-group"><label class="field-label" for="garage-plate-new">车牌号</label><input class="input" id="garage-plate-new" name="garagePlate" type="text" value="沪A 718CM" placeholder="请输入车牌号" required></div><div class="field-group"><label class="field-label" for="garage-image-new">车辆图片</label><label class="upload-panel" for="garage-image-new"><input id="garage-image-new" class="upload-input" name="garageImage" type="file" accept="image/*"><span class="upload-illustration"></span><strong>上传车辆图片</strong><small>支持上传 1 张车辆外观图，用于爱车档案封面展示</small></label></div><div class="field-group"><label class="field-label" for="garage-owner-new">车主</label><input class="input" id="garage-owner-new" name="garageOwner" type="text" value="当前用户" required></div></div><div class="admin-timeline"><div>保存后会自动建立车辆档案，后续订单和施工记录会沉淀到这辆车名下。</div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">保存车辆</button><button class="btn btn-secondary" type="button" data-user-action="user-vehicle-cancel">取消</button></div></form>`;
+  }
+
+  function renderUserMallCategoryPage() {
+    const selectedVehicle = getSelectedUserVehicle();
+    const pageMap = {
+      exterior: {
+        title: "车身套件商城",
+        intro: `${safe(selectedVehicle?.model, "当前车型")} 适配外观件推荐`,
+        skus: ["PR-8804", "PR-8803", "PR-8801"],
+      },
+      wheel: {
+        title: "轮毂商城",
+        intro: "锻造轮毂与轮组升级推荐",
+        skus: ["PR-8801", "PR-8803", "PR-8804"],
+      },
+      exhaust: {
+        title: "排气商城",
+        intro: "阀门排气与高性能声浪升级推荐",
+        skus: ["PR-8802", "PR-8805", "PR-8803"],
+      },
+      interior: {
+        title: "内饰商城",
+        intro: "座舱氛围、材质升级与精品推荐",
+        skus: ["PR-8805", "PR-8804", "PR-8801"],
+      },
+    };
+    const current = pageMap[state.userMallPage] || pageMap.exterior;
+    const pageProducts = current.skus.map((sku) => products.find((item) => item.sku === sku)).filter(Boolean);
+    return `<div class="stack"><section class="mobile-item"><div style="display:flex; justify-content:space-between; align-items:center; gap:12px;"><div><div class="eyebrow">Mall Page</div><strong style="display:block; margin-top:8px; font-size:22px;">${current.title}</strong><div class="muted" style="margin-top:8px;">${current.intro}</div></div><button class="btn btn-secondary" type="button" data-user-action="user-mall-back">返回商城</button></div></section><div class="mobile-list">${pageProducts.map((item) => `<section class="admin-detail-card"><div class="eyebrow">${safe(item.category, "精选商品")}</div><h3>${safe(item.name, "商品")}</h3><div class="admin-kv-list"><div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>适配车型</span><strong>${safe(item.fitment || selectedVehicle?.model, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>状态</span><strong>${nProduct(item.status)}</strong></div></div><div class="admin-timeline"><div>${safe(item.description, "查看商品详情与安装建议。")}</div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="user-order-open" data-user-id="${item.sku}" data-user-type="goods">立即下单</button></div>${state.userOrderForm.type === "goods" && state.userOrderForm.id === item.sku ? renderUserOrderForm(item, "goods") : ""}</section>`).join("")}</div></div>`;
   }
 
   function renderUserVehicleDetail(item) {
@@ -967,16 +1018,65 @@
     if (action === "user-vehicle-add") {
       state.userGarage.createOpen = true;
       state.userFeedback = "";
+      state.userDialog = { type: "vehicle-create", orderId: "", sourceName: "" };
       render();
       return;
     }
     if (action === "user-vehicle-cancel") {
       state.userGarage.createOpen = false;
+      state.userDialog = { type: "", orderId: "", sourceName: "" };
       render();
       return;
     }
     if (action === "user-vehicle-select") {
       state.userGarage.selectedVehicle = button.value;
+      render();
+      return;
+    }
+    if (action === "user-garage-exterior") {
+      state.tab = "mall";
+      state.userMallPage = "exterior";
+      state.userSelected.goods = "PR-8804";
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-garage-wheel") {
+      state.tab = "mall";
+      state.userMallPage = "wheel";
+      state.userSelected.goods = "PR-8801";
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-garage-exhaust") {
+      state.tab = "mall";
+      state.userMallPage = "exhaust";
+      state.userSelected.goods = "PR-8802";
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-garage-interior") {
+      state.tab = "mall";
+      state.userMallPage = "interior";
+      state.userSelected.goods = "PR-8805";
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-garage-store") {
+      state.subTab.garage = "map";
+      render();
+      return;
+    }
+    if (action === "user-garage-map-back") {
+      state.subTab.garage = "vehicles";
+      render();
+      return;
+    }
+    if (action === "user-mall-back") {
+      state.userMallPage = "";
       render();
       return;
     }
@@ -1085,12 +1185,13 @@
     const formData = new FormData(event.currentTarget);
     const model = String(formData.get("garageModel") || "").trim();
     const plate = String(formData.get("garagePlate") || "").trim();
-    const owner = String(formData.get("garageOwner") || "").trim();
+    const owner = String(formData.get("garageOwner") || "当前用户").trim();
     if (!model || !plate || !owner) return;
     const id = `CAR-${Date.now().toString().slice(-6)}`;
     vehicles.unshift({ id, model, plate, owner, history: "系统已创建车辆档案，待后续订单和施工记录自动生成改装历史。" });
     state.userGarage.selectedVehicle = id;
     state.userGarage.createOpen = false;
+    state.userDialog = { type: "", orderId: "", sourceName: "" };
     state.userFeedback = `${model} 已添加到爱车列表。`;
     render();
   }
