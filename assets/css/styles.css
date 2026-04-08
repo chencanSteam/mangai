@@ -2236,11 +2236,19 @@ body.provider-screen-mode {
 .sub-tabs {
   display: flex;
   gap: 10px;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   margin-bottom: 14px;
   padding-bottom: 4px;
+  cursor: grab;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+.sub-tabs.dragging {
+  cursor: grabbing;
 }
 
 .sub-tabs::-webkit-scrollbar {
@@ -2250,6 +2258,7 @@ body.provider-screen-mode {
 .sub-tab {
   flex: 0 0 auto;
   padding: 9px 14px;
+  user-select: none;
   border-radius: 999px;
   color: #a3acb6;
   background: rgba(255, 255, 255, 0.04);

@@ -11,6 +11,39 @@
     user: { title: "用户端", tabs: ["home", "mall", "garage", "forum", "me"], labels: { home: "首页", mall: "商城", garage: "爱车", forum: "论坛", me: "我的" } },
   };
 
+  function priceToNumber(value) {
+    return Number(String(value || "").replace(/[^\d.]/g, "")) || 0;
+  }
+
+  function formatCurrency(value) {
+    return `¥ ${Number(value || 0).toLocaleString("zh-CN")}`;
+  }
+
+  function toDateTimeLocalValue(value) {
+    return String(value || "").replace(" ", "T").slice(0, 16);
+  }
+
+  function createProviderServicePricingEntry(item, index) {
+    const base = priceToNumber(item.price) || 3000;
+    const min = Math.max(1000, Math.floor(base * 0.9 / 100) * 100);
+    const max = Math.max(min + 500, Math.ceil(base * 1.15 / 100) * 100);
+    const suggested = Math.min(max, Math.max(min, Math.round(base / 100) * 100));
+    return {
+      enabled: item.status !== "停用" && index < 3,
+      quote: suggested,
+      suggested,
+      min,
+      max,
+    };
+  }
+
+  function buildProviderServicePricingState() {
+    return services.reduce((acc, item, index) => {
+      acc[item.code || item.name || `service-${index}`] = createProviderServicePricingEntry(item, index);
+      return acc;
+    }, {});
+  }
+
   const state = {
     tab: appConfigs[appType].tabs[0],
     subTab: {},
@@ -46,6 +79,14 @@
       mode: "",
       id: "",
     },
+    providerAfterSale: {
+      orderId: "",
+    },
+    providerMe: {
+      profileEditOpen: false,
+      settlementDetailId: settlements[0]?.id || "",
+    },
+    providerServicePricing: buildProviderServicePricingState(),
     providerDialog: {
       type: "",
       orderId: "",
@@ -192,6 +233,24 @@
       remark: "排气阀门联调已完成，等待平台确认视频和声浪说明。",
       arrival: "已完工待客户验收",
     },
+    "OD-240401-015": {
+      phone: "13800136015",
+      duration: "1 天",
+      bay: "3 号工位",
+      remark: "轮毂升级与定位数据已复核完成，客户已确认交付。",
+      arrival: "已完成交车并归档",
+    },
+    "OD-240330-012": {
+      phone: "13900132012",
+      duration: "1 天",
+      bay: "2 号工位",
+      remark: "客户反馈高速路段有轻微异响，已安排返店复查。",
+      arrival: "已预约 2026-04-09 10:00 返店售后",
+      afterSaleStatus: "售后处理中",
+      afterSaleType: "异响复查",
+      afterSaleTime: "2026-04-09 10:00",
+      afterSaleNote: "复查排气吊耳与连接卡箍，路试后再次回访客户。",
+    },
   };
 
   const providerOrderMocks = [
@@ -240,6 +299,36 @@
       appointment: "2026-04-02 13:30",
       intention: "擎速 Motorsport Lab",
     },
+    {
+      id: "OD-240401-015",
+      type: "服务订单",
+      user: "陆川",
+      vehicle: "宝马 G20 330i",
+      service: "BBS 轮毂升级 + 四轮定位",
+      provider: "擎速 Motorsport Lab",
+      city: "杭州",
+      quote: "¥ 18,800",
+      payment: "已支付",
+      status: "已完成",
+      progress: "客户已完成验收，订单已归档。",
+      appointment: "2026-04-01 11:00",
+      intention: "擎速 Motorsport Lab",
+    },
+    {
+      id: "OD-240330-012",
+      type: "服务订单",
+      user: "沈越",
+      vehicle: "保时捷 718 Cayman",
+      service: "Akrapovic 尾段排气升级",
+      provider: "擎速 Motorsport Lab",
+      city: "杭州",
+      quote: "¥ 26,500",
+      payment: "已支付",
+      status: "售后中",
+      progress: "已登记售后：异响复查，预约 2026-04-09 10:00 返店处理。",
+      appointment: "2026-03-30 14:30",
+      intention: "擎速 Motorsport Lab",
+    },
   ];
 
   const providerPurchaseRecords = getProviderPurchasableProducts().slice(0, 3).map((item, index) => ({
@@ -260,11 +349,11 @@
     if (typeof value !== "string") return value;
     return /�|锟|鏈|璁|闂|鎴|鐢/.test(value) ? fallbackValue : value;
   };
-  const tagType = (text) => ["正常营业", "已通过", "正常", "首页展示", "正常展示", "上架", "启用"].includes(text) ? "success" : ["待审核", "待分配", "待发货", "待验收", "待签收", "待补充", "审核中"].includes(text) ? "warning" : ["已驳回", "暂停接单", "已删除", "缺货", "停用"].includes(text) ? "danger" : ["施工中"].includes(text) ? "info" : "neutral";
+  const tagType = (text) => ["正常营业", "已通过", "正常", "首页展示", "正常展示", "上架", "启用", "已完成"].includes(text) ? "success" : ["待审核", "待分配", "待发货", "待验收", "待签收", "待补充", "审核中", "售后中"].includes(text) ? "warning" : ["已驳回", "暂停接单", "已删除", "缺货", "停用"].includes(text) ? "danger" : ["施工中"].includes(text) ? "info" : "neutral";
   const tag = (text) => `<span class="tag ${tagType(text)}">${text}</span>`;
   const nAudit = (v) => String(v || "").includes("通过") ? "已通过" : String(v || "").includes("驳") ? "已驳回" : String(v || "").includes("补") ? "待补充" : "待审核";
   const nProvider = (v) => String(v || "").includes("暂停") ? "暂停接单" : String(v || "").includes("驳") ? "已驳回" : "正常营业";
-  const nOrder = (v) => { const t = String(v || ""); if (t.includes("分配")) return "待分配"; if (t.includes("施工")) return "施工中"; if (t.includes("完成")) return "已完成"; if (t.includes("发货")) return "待发货"; if (t.includes("验收")) return "待验收"; if (t.includes("签收")) return "待签收"; return "处理中"; };
+  const nOrder = (v) => { const t = String(v || ""); if (t.includes("售后")) return "售后中"; if (t.includes("分配")) return "待分配"; if (t.includes("施工")) return "施工中"; if (t.includes("完成")) return "已完成"; if (t.includes("发货")) return "待发货"; if (t.includes("验收")) return "待验收"; if (t.includes("签收")) return "待签收"; return "处理中"; };
   const nCaseAudit = (v) => String(v || "").includes("通过") ? "已通过" : String(v || "").includes("驳") || String(v || "").includes("修改") ? "已驳回" : "待审核";
   const nCaseDisplay = (v) => String(v || "").includes("首页") || String(v || "").includes("推荐") ? "首页展示" : String(v || "").includes("正常") ? "正常展示" : "未展示";
   const nForum = (v) => String(v || "").includes("删除") ? "已删除" : "正常";
@@ -307,6 +396,14 @@
     screenEl.querySelectorAll("[data-provider-complete-form]").forEach((form) => form.addEventListener("submit", handleProviderCompleteSubmit));
     screenEl.querySelectorAll("[data-provider-purchase-form]").forEach((form) => form.addEventListener("submit", handleProviderPurchaseSubmit));
     screenEl.querySelectorAll("[data-provider-case-form]").forEach((form) => form.addEventListener("submit", handleProviderCaseSubmit));
+    screenEl.querySelectorAll("[data-provider-accept-form]").forEach((form) => form.addEventListener("submit", handleProviderAcceptSubmit));
+    screenEl.querySelectorAll("[data-provider-after-sale-form]").forEach((form) => form.addEventListener("submit", handleProviderAfterSaleSubmit));
+    screenEl.querySelectorAll("[data-provider-profile-form]").forEach((form) => form.addEventListener("submit", handleProviderProfileSubmit));
+    screenEl.querySelectorAll("[data-provider-pricing-form]").forEach((form) => {
+      form.addEventListener("submit", handleProviderPricingSubmit);
+      syncProviderPricingForm(form);
+      form.querySelectorAll("[data-provider-price-toggle]").forEach((input) => input.addEventListener("change", () => syncProviderPricingForm(form)));
+    });
     screenEl.querySelectorAll("[data-provider-chat-form]").forEach((form) => form.addEventListener("submit", handleProviderChatSubmit));
     screenEl.querySelectorAll("[data-provider-dialog-action]").forEach((b) => b.addEventListener("click", () => handleProviderDialogAction(b)));
     screenEl.querySelectorAll("[data-provider-reject-form]").forEach((form) => form.addEventListener("submit", handleProviderRejectSubmit));
@@ -330,6 +427,75 @@
     screenEl.querySelectorAll("[data-setting-key]").forEach((b) => b.addEventListener("click", () => { const key = b.dataset.settingKey; state.adminSettings[key] = !state.adminSettings[key]; render(); }));
     screenEl.querySelectorAll("[data-color-index]").forEach((b) => b.addEventListener("click", () => { state.garageColor = Number(b.dataset.colorIndex); updateGarageRender(); }));
     screenEl.querySelectorAll("[data-wheel-index]").forEach((b) => b.addEventListener("click", () => { state.garageWheel = Number(b.dataset.wheelIndex); updateGarageRender(); }));
+    bindScrollableSubTabs();
+  }
+
+  function bindScrollableSubTabs() {
+    screenEl.querySelectorAll(".sub-tabs").forEach((wrap) => {
+      let pointerActive = false;
+      let moved = false;
+      let startX = 0;
+      let startLeft = 0;
+      let dragMoved = false;
+
+      wrap.addEventListener("wheel", (event) => {
+        if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+        wrap.scrollLeft += event.deltaY;
+        event.preventDefault();
+      }, { passive: false });
+
+      wrap.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        pointerActive = true;
+        moved = false;
+        startX = event.clientX;
+        startLeft = wrap.scrollLeft;
+      });
+
+      wrap.addEventListener("pointermove", (event) => {
+        if (!pointerActive) return;
+        const delta = event.clientX - startX;
+        if (Math.abs(delta) > 6) {
+          moved = true;
+          wrap.classList.add("dragging");
+        }
+        wrap.scrollLeft = startLeft - delta;
+      });
+
+      const stopDragging = () => {
+        if (!pointerActive) return;
+        pointerActive = false;
+        wrap.classList.remove("dragging");
+        if (moved) {
+          dragMoved = true;
+          window.setTimeout(() => {
+            moved = false;
+            dragMoved = false;
+          }, 0);
+        }
+      };
+
+      wrap.addEventListener("pointerup", stopDragging);
+      wrap.addEventListener("pointercancel", stopDragging);
+      wrap.addEventListener("pointerleave", stopDragging);
+
+      wrap.addEventListener("click", (event) => {
+        if (!dragMoved) return;
+        if (event.target.closest(".sub-tab")) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      });
+    });
+  }
+
+  function syncProviderPricingForm(form) {
+    form.querySelectorAll("[data-provider-price-toggle]").forEach((toggle) => {
+      const code = toggle.dataset.providerPriceToggle;
+      const input = form.querySelector(`[data-provider-price-input="${code}"]`);
+      if (!input) return;
+      input.disabled = toggle.disabled || !toggle.checked;
+    });
   }
 
   const subTabs = (items) => `<div class="sub-tabs">${items.map((i) => `<button class="sub-tab ${(state.subTab[state.tab] || items[0].id) === i.id ? "active" : ""}" data-sub-tab="${i.id}" type="button">${i.label}</button>`).join("")}</div>`;
@@ -405,13 +571,24 @@
       active === "pending" ? getProviderPendingOrders() :
       active === "processing" ? getProviderProcessingOrders() :
       active === "acceptance" ? getProviderAcceptanceOrders() :
+      active === "completed" ? getProviderCompletedOrders() :
       getProviderAllOrders();
     const selected = rows.find((item) => item.id === state.providerSelected.orders) || rows[0];
-    return `${subTabs([{ id: "all", label: "全部订单" }, { id: "pending", label: "待接单" }, { id: "processing", label: "施工中" }, { id: "acceptance", label: "待验收" }])}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === item.id ? "active" : ""}" type="button" data-provider-pick data-provider-type="orders" data-provider-id="${item.id}"><div style="display:flex; justify-content:space-between; gap:12px;"><strong>${safe(item.vehicle, "车辆")}</strong>${tag(providerOrderViewStatus(item, active))}</div><div class="muted" style="margin-top:8px;">${safe(item.user, "用户")} / ${getProviderOrderMeta(item).phone}</div><div style="margin-top:8px;">${safe(item.service, "服务")}</div><div class="muted" style="margin-top:8px;">${safe(item.quote, "-")} / ${safe(item.appointment, "-")}</div><div class="muted" style="margin-top:6px;">${getProviderOrderMeta(item).arrival}</div></button>${selected?.id === item.id ? renderProviderOrderDetail(item) : ""}</div>`).join("") || `<article class="mobile-item"><strong>当前暂无订单</strong><div class="muted" style="margin-top:8px;">新的派单或施工单会出现在这里。</div></article>`}</div>`;
+    return `${subTabs([{ id: "all", label: "全部订单" }, { id: "pending", label: "待接单" }, { id: "processing", label: "施工中" }, { id: "acceptance", label: "待验收" }, { id: "completed", label: "已完成" }])}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === item.id ? "active" : ""}" type="button" data-provider-pick data-provider-type="orders" data-provider-id="${item.id}"><div style="display:flex; justify-content:space-between; gap:12px;"><strong>${safe(item.vehicle, "车辆")}</strong>${tag(providerOrderViewStatus(item, active))}</div><div class="muted" style="margin-top:8px;">${safe(item.user, "用户")} / ${getProviderOrderMeta(item).phone}</div><div style="margin-top:8px;">${safe(item.service, "服务")}</div><div class="muted" style="margin-top:8px;">${safe(item.quote, "-")} / ${safe(item.appointment, "-")}</div><div class="muted" style="margin-top:6px;">${getProviderOrderMeta(item).arrival}</div></button>${selected?.id === item.id ? renderProviderOrderDetail(item) : ""}</div>`).join("") || `<article class="mobile-item"><strong>当前暂无订单</strong><div class="muted" style="margin-top:8px;">新的派单或施工单会出现在这里。</div></article>`}</div>`;
   }
 
   function renderProviderOperations() {
     const active = state.subTab.operations || "purchase";
+    const tabs = [
+      { id: "purchase", label: "商品采购" },
+      { id: "record", label: "采购记录" },
+      { id: "pricing", label: "服务定价" },
+      { id: "cases", label: "案例管理" },
+      { id: "forum", label: "论坛管理" },
+    ];
+    if (active === "pricing") {
+      return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${renderProviderServicePricing()}`;
+    }
     const rows =
       active === "purchase" ? getProviderPurchasableProducts() :
       active === "record" ? getProviderPurchaseRecords() :
@@ -421,7 +598,7 @@
       active === "purchase" || active === "record"
         ? rows.find((item) => (item.sku || item.id) === state.providerSelected.products) || rows[0]
         : rows.find((item) => item.id === state.providerSelected[active]) || rows[0];
-    return `${subTabs([{ id: "purchase", label: "商品采购" }, { id: "record", label: "采购记录" }, { id: "cases", label: "案例管理" }, { id: "forum", label: "论坛管理" }])}${active === "cases" ? `<div class="admin-action-row" style="margin-bottom:12px;"><button class="btn btn-primary" type="button" data-provider-action="case-add">新增案例</button></div>${state.providerCaseForm.mode === "create" ? renderProviderCaseForm() : ""}` : ""}<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${(active === "purchase" || active === "record") ? (selected && (selected.sku || selected.id) === (item.sku || item.id) ? "active" : "") : (selected?.id === item.id ? "active" : "")}" type="button" data-provider-pick data-provider-type="${active === "purchase" || active === "record" ? "products" : active}" data-provider-id="${item.sku || item.id}">${active === "purchase" ? `<div class="provider-product-media"><div class="provider-product-visual" data-product-tone="${(item.brand || "").length % 3}"><span>${safe(item.category, "商品")}</span></div></div><strong>${safe(item.name, "商品")}</strong><div class="muted" style="margin-top:8px;">${safe(item.brand, "品牌")} / 型号 ${providerProductModel(item)}</div><div class="muted" style="margin-top:6px;">${safe(item.category, "类目")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">${safe(item.price, "-")}</span>${tag(nProduct(item.status))}</div>` : active === "record" ? `<strong>${safe(item.id, "采购记录")}</strong><div class="muted" style="margin-top:8px;">${safe(item.name, "商品")} / 型号 ${providerProductModel(item)}</div><div class="muted" style="margin-top:6px;">数量 ${item.quantity || 1} / ${safe(item.amount, "-")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nPurchaseStatus(item.status))}</div>` : active === "cases" ? `<strong>${safe(item.title, "案例")}</strong><div class="muted" style="margin-top:8px;">${safe(item.model, "车型")} / ${safe(item.cost, "-")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nCaseAudit(item.audit))}<span class="pill">${nCaseDisplay(item.display)}</span></div>` : `<strong>${safe(item.title, "帖子")}</strong><div class="muted" style="margin-top:8px;">回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</div><div style="margin-top:10px;">${tag(nForum(item.status))}</div>`}</button>${(active === "purchase" || active === "record") ? (selected && (selected.sku || selected.id) === (item.sku || item.id) ? renderProviderProductDetail(item, active) : "") : (selected?.id === item.id ? (active === "cases" ? renderProviderCaseDetail(item) : renderProviderForumDetail(item)) : "")}</div>`).join("")}</div>`;
+    return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "cases" ? `<div class="admin-action-row" style="margin-bottom:12px;"><button class="btn btn-primary" type="button" data-provider-action="case-add">新增案例</button></div>${state.providerCaseForm.mode === "create" ? renderProviderCaseForm() : ""}` : ""}<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${(active === "purchase" || active === "record") ? (selected && (selected.sku || selected.id) === (item.sku || item.id) ? "active" : "") : (selected?.id === item.id ? "active" : "")}" type="button" data-provider-pick data-provider-type="${active === "purchase" || active === "record" ? "products" : active}" data-provider-id="${item.sku || item.id}">${active === "purchase" ? `<div class="provider-product-media"><div class="provider-product-visual" data-product-tone="${(item.brand || "").length % 3}"><span>${safe(item.category, "商品")}</span></div></div><strong>${safe(item.name, "商品")}</strong><div class="muted" style="margin-top:8px;">${safe(item.brand, "品牌")} / 型号 ${providerProductModel(item)}</div><div class="muted" style="margin-top:6px;">${safe(item.category, "类目")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">${safe(item.price, "-")}</span>${tag(nProduct(item.status))}</div>` : active === "record" ? `<strong>${safe(item.id, "采购记录")}</strong><div class="muted" style="margin-top:8px;">${safe(item.name, "商品")} / 型号 ${providerProductModel(item)}</div><div class="muted" style="margin-top:6px;">数量 ${item.quantity || 1} / ${safe(item.amount, "-")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nPurchaseStatus(item.status))}</div>` : active === "cases" ? `<strong>${safe(item.title, "案例")}</strong><div class="muted" style="margin-top:8px;">${safe(item.model, "车型")} / ${safe(item.cost, "-")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nCaseAudit(item.audit))}<span class="pill">${nCaseDisplay(item.display)}</span></div>` : `<strong>${safe(item.title, "帖子")}</strong><div class="muted" style="margin-top:8px;">回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</div><div style="margin-top:10px;">${tag(nForum(item.status))}</div>`}</button>${(active === "purchase" || active === "record") ? (selected && (selected.sku || selected.id) === (item.sku || item.id) ? renderProviderProductDetail(item, active) : "") : (selected?.id === item.id ? (active === "cases" ? renderProviderCaseDetail(item) : renderProviderForumDetail(item)) : "")}</div>`).join("")}</div>`;
   }
 
   function renderProviderMessages() {
@@ -435,7 +612,7 @@
     const active = state.subTab.me || "settlements";
     const rows = getProviderSettlementRows();
     const selected = rows.find((item) => item.id === state.providerSelected.settlements) || rows[0];
-    return `${subTabs([{ id: "settlements", label: "结算管理" }, { id: "business", label: "营业情况" }, { id: "profile", label: "门店资料" }])}${active === "profile" ? `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Store Profile</div><h3>门店与账号信息</h3><div class="admin-kv-list"><div><span>门店名称</span><strong>${safe(getProviderStore().name, "高端改装门店")}</strong></div><div><span>联系人</span><strong>${safe(getProviderStore().contact, "-")}</strong></div><div><span>主营能力</span><strong>${safe(getProviderStore().specialties, "-")}</strong></div><div><span>工位数量</span><strong>${getProviderStore().bays || 0} 个</strong></div><div><span>门店状态</span><strong>${nProvider(getProviderStore().status)}</strong></div><div><span>账号角色</span><strong>门店管理员</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">更新门店资料</button><button class="btn btn-primary" type="button" data-provider-action="provider-profile-contact">联系平台客服</button></div></section></div>` : active === "business" ? renderProviderBusiness() : `<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === item.id ? "active" : ""}" type="button" data-provider-pick data-provider-type="settlements" data-provider-id="${item.id}"><strong>${item.id}</strong><div class="muted" style="margin-top:8px;">${safe(item.amount, "-")} / ${safe(item.provider, "当前门店")}</div><div style="margin-top:10px;">${tag(nSettlement(item.status))}</div></button>${selected?.id === item.id ? renderProviderSettlementDetail(item) : ""}</div>`).join("")}</div>`}`;
+    return `${subTabs([{ id: "settlements", label: "结算管理" }, { id: "business", label: "营业情况" }, { id: "profile", label: "门店资料" }])}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "profile" ? `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Store Profile</div><h3>门店与账号信息</h3><div class="admin-kv-list"><div><span>门店名称</span><strong>${safe(getProviderStore().name, "高端改装门店")}</strong></div><div><span>联系人</span><strong>${safe(getProviderStore().contact, "-")}</strong></div><div><span>门店地址</span><strong>${safe(getProviderStore().address || `${safe(getProviderStore().city, "-")}${safe(getProviderStore().district, "")}改装产业园 A3-201`, "-")}</strong></div><div><span>主营能力</span><strong>${safe(getProviderStore().specialties, "-")}</strong></div><div><span>门店状态</span><strong>${nProvider(getProviderStore().status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">${state.providerMe.profileEditOpen ? "收起资料表单" : "更新门店资料"}</button><button class="btn btn-primary" type="button" data-provider-action="provider-profile-contact">联系平台客服</button></div></section>${state.providerMe.profileEditOpen ? renderProviderProfileForm() : ""}</div>` : active === "business" ? renderProviderBusiness() : `<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === item.id ? "active" : ""}" type="button" data-provider-pick data-provider-type="settlements" data-provider-id="${item.id}"><strong>${item.id}</strong><div class="muted" style="margin-top:8px;">${safe(item.amount, "-")} / ${safe(item.provider, "当前门店")}</div><div style="margin-top:10px;">${tag(nSettlement(item.status))}</div></button>${selected?.id === item.id ? renderProviderSettlementDetail(item) : ""}</div>`).join("")}</div>`}`;
   }
 
   function renderProviderDialog() {
@@ -444,7 +621,7 @@
     const order = getProviderOrderById(orderId);
     if (!order) return "";
     if (type === "accept") {
-      return `<div class="modal visible"><div class="panel modal-card provider-dialog-card"><div class="eyebrow">Order Confirm</div><h3>确认接单</h3><p class="muted">确认后，该订单会进入施工中，并从待接单流转到施工流程。</p><div class="provider-dialog-summary"><strong>${orderId}</strong><span>${safe(order.vehicle, "车辆")} / ${safe(order.service, "服务")}</span></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-provider-dialog-action="confirm-accept" data-provider-id="${orderId}">确认接单</button><button class="btn btn-secondary" type="button" data-provider-dialog-action="close">取消</button></div></div></div>`;
+      return `<div class="modal visible"><div class="panel modal-card provider-dialog-card"><div class="eyebrow">Order Confirm</div><h3>确认接单并填写排期</h3><p class="muted">确认后，该订单会进入施工中，并按门店填写的排期时间进入施工安排。</p><form class="form-grid" data-provider-accept-form data-provider-id="${orderId}"><div class="provider-dialog-summary"><strong>${orderId}</strong><span>${safe(order.vehicle, "车辆")} / ${safe(order.service, "服务")}</span></div><div class="field-group"><label class="field-label" for="accept-schedule-${orderId}">排期时间</label><input class="input" id="accept-schedule-${orderId}" name="scheduleTime" type="datetime-local" value="${toDateTimeLocalValue(order.appointment) || "2026-04-09T10:00"}" required></div><div class="field-group"><label class="field-label" for="accept-note-${orderId}">排期说明</label><input class="input" id="accept-note-${orderId}" name="scheduleNote" type="text" value="已预留施工工位，建议客户提前 30 分钟到店" required></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">确认接单</button><button class="btn btn-secondary" type="button" data-provider-dialog-action="close">取消</button></div></form></div></div>`;
     }
     if (type === "reject") {
       return `<div class="modal visible"><div class="panel modal-card provider-dialog-card"><div class="eyebrow">Reject Order</div><h3>填写拒单原因</h3><p class="muted">拒单后，平台会依据原因重新分配订单。</p><form class="form-grid" data-provider-reject-form data-provider-id="${orderId}"><div class="provider-dialog-summary"><strong>${orderId}</strong><span>${safe(order.vehicle, "车辆")} / ${safe(order.service, "服务")}</span></div><div class="field-group"><label class="field-label" for="reject-reason-${orderId}">拒单原因</label><textarea class="textarea" id="reject-reason-${orderId}" name="rejectReason" placeholder="请填写无法接单的具体原因" required>当前施工位已满，建议平台重新分配。</textarea></div><div class="admin-action-row"><button class="btn btn-danger" type="submit">提交拒单</button><button class="btn btn-secondary" type="button" data-provider-dialog-action="close">取消</button></div></form></div></div>`;
@@ -493,9 +670,17 @@
     return getProviderAllOrders().filter((item) => nOrder(item.status) === "待验收");
   }
 
+  function getProviderCompletedOrders() {
+    return getProviderAllOrders().filter((item) => {
+      const status = nOrder(item.status);
+      return status === "已完成" || status === "售后中";
+    });
+  }
+
   function providerOrderViewStatus(item, active) {
     const status = nOrder(item.status);
     if (active === "pending" && status === "待分配") return "待接单";
+    if (status === "售后中") return "售后中";
     if (status === "施工中") return "施工中";
     if (status === "待验收") return "待验收";
     if (status === "已完成") return "已完成";
@@ -522,6 +707,8 @@
     const meta = getProviderOrderMeta(item);
     const actions = [];
     const completionOpen = state.providerCompletion.orderId === item.id;
+    const afterSaleOpen = state.providerAfterSale.orderId === item.id;
+    const afterSaleStatus = safe(meta.afterSaleStatus, status === "售后中" ? "售后处理中" : "未发起");
     if (status === "待分配" || status === "处理中") {
       actions.push(`<button class="btn btn-primary" type="button" data-provider-action="order-accept" data-provider-id="${item.id}">接单</button>`);
       actions.push(`<button class="btn btn-danger" type="button" data-provider-action="order-reject" data-provider-id="${item.id}">拒单</button>`);
@@ -529,12 +716,19 @@
       actions.push(`<button class="btn btn-primary" type="button" data-provider-action="${completionOpen ? "order-complete-cancel" : "order-complete"}" data-provider-id="${item.id}">${completionOpen ? "收起完工表单" : "提交完工"}</button>`);
     } else if (status === "待验收") {
       actions.push(`<button class="btn btn-secondary" type="button" data-provider-action="order-follow" data-provider-id="${item.id}">查看客户验收说明</button>`);
+    } else if (status === "已完成" || status === "售后中") {
+      actions.push(`<button class="btn btn-primary" type="button" data-provider-action="${afterSaleOpen ? "order-after-sale-cancel" : "order-after-sale"}" data-provider-id="${item.id}">${afterSaleOpen ? "收起售后表单" : meta.afterSaleType ? "更新售后记录" : status === "售后中" ? "继续处理售后" : "发起售后"}</button>`);
     }
-    return `<section class="admin-detail-card"><div class="eyebrow">Order Workbench</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>用户</span><strong>${safe(item.user, "-")}</strong></div><div><span>联系电话</span><strong>${meta.phone}</strong></div><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>服务项目</span><strong>${safe(item.service, "-")}</strong></div><div><span>报价</span><strong>${safe(item.quote, "-")}</strong></div><div><span>预约时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>到店信息</span><strong>${meta.arrival}</strong></div><div><span>预计工时</span><strong>${providerEstimateDuration(item)}</strong></div><div><span>客户意向</span><strong>${safe(item.intention, "未指定")}</strong></div><div><span>当前状态</span><strong>${providerOrderViewStatus(item, "all")}</strong></div></div><div class="admin-action-row">${actions.join("")}</div>${completionOpen ? renderProviderCompleteForm(item) : ""}<div class="admin-timeline"><div>${safe(item.progress, "等待处理")}</div><div>施工备注：${providerOrderRemark(item)}</div><div>门店视角：${status === "施工中" ? "施工进行中，请按节点提交完工。" : status === "待验收" ? "已提交完工资料，等待客户验收。" : "请尽快响应订单，提升接单转化。"}</div></div></section>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">Order Workbench</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>用户</span><strong>${safe(item.user, "-")}</strong></div><div><span>联系电话</span><strong>${meta.phone}</strong></div><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>服务项目</span><strong>${safe(item.service, "-")}</strong></div><div><span>报价</span><strong>${safe(item.quote, "-")}</strong></div><div><span>预约时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>到店信息</span><strong>${meta.arrival}</strong></div><div><span>预计工时</span><strong>${providerEstimateDuration(item)}</strong></div><div><span>客户意向</span><strong>${safe(item.intention, "未指定")}</strong></div><div><span>当前状态</span><strong>${providerOrderViewStatus(item, "all")}</strong></div>${status === "已完成" || status === "售后中" ? `<div><span>售后状态</span><strong>${afterSaleStatus}</strong></div>` : ""}</div><div class="admin-action-row">${actions.join("")}</div>${completionOpen ? renderProviderCompleteForm(item) : ""}${afterSaleOpen ? renderProviderAfterSaleForm(item) : ""}<div class="admin-timeline"><div>${safe(item.progress, "等待处理")}</div><div>施工备注：${providerOrderRemark(item)}</div>${meta.afterSaleType ? `<div>售后记录：${safe(meta.afterSaleType, "售后处理")} / ${safe(meta.afterSaleNote, "待补充说明")}</div>` : ""}<div>门店视角：${status === "施工中" ? "施工进行中，请按节点提交完工。" : status === "待验收" ? "已提交完工资料，等待客户验收。" : status === "售后中" ? "订单已进入售后处理，请按约定时间跟进复查和回访。" : status === "已完成" ? "订单已完成归档，可按客户反馈继续提供售后支持。" : "请尽快响应订单，提升接单转化。"}</div></div></section>`;
   }
 
   function renderProviderCompleteForm(item) {
     return `<form class="provider-complete-form" data-provider-complete-form data-provider-id="${item.id}"><div class="field-group"><label class="field-label" for="complete-note-${item.id}">完工说明</label><textarea class="textarea" id="complete-note-${item.id}" name="completeNote" placeholder="请填写施工完成情况、交付内容和客户注意事项" required>施工已完成，外观与功能已复检，交付前已与客户确认项目清单。</textarea></div><div class="form-grid"><div class="field-group"><label class="field-label" for="complete-images-${item.id}">上传图片</label><label class="upload-panel" for="complete-images-${item.id}"><input id="complete-images-${item.id}" class="upload-input" name="completeImages" type="file" accept="image/*" multiple><span class="upload-illustration"></span><strong>上传完工图片</strong><small>支持施工完成图、交付图、细节图，最多选择 9 张</small></label></div><div class="field-group"><label class="field-label" for="complete-check-${item.id}">提醒客户验收</label><input class="input" id="complete-check-${item.id}" name="acceptanceTips" type="text" value="请客户重点确认外观细节、功能联调与随车物品" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">确认提交完工</button><button class="btn btn-secondary" type="button" data-provider-action="order-complete-cancel" data-provider-id="${item.id}">取消</button></div></form>`;
+  }
+
+  function renderProviderAfterSaleForm(item) {
+    const meta = getProviderOrderMeta(item);
+    return `<form class="provider-complete-form" data-provider-after-sale-form data-provider-id="${item.id}"><div class="form-grid"><div class="field-group"><label class="field-label" for="after-sale-type-${item.id}">售后类型</label><select class="input" id="after-sale-type-${item.id}" name="afterSaleType" required><option value="异响复查" ${safe(meta.afterSaleType, "") === "异响复查" ? "selected" : ""}>异响复查</option><option value="安装复紧" ${safe(meta.afterSaleType, "") === "安装复紧" ? "selected" : ""}>安装复紧</option><option value="功能复检" ${safe(meta.afterSaleType, "") === "功能复检" ? "selected" : ""}>功能复检</option><option value="外观返修" ${safe(meta.afterSaleType, "") === "外观返修" ? "selected" : ""}>外观返修</option></select></div><div class="field-group"><label class="field-label" for="after-sale-time-${item.id}">售后预约时间</label><input class="input" id="after-sale-time-${item.id}" name="afterSaleTime" type="datetime-local" value="${toDateTimeLocalValue(meta.afterSaleTime || item.appointment) || "2026-04-10T10:00"}" required></div></div><div class="field-group"><label class="field-label" for="after-sale-note-${item.id}">售后处理说明</label><textarea class="textarea" id="after-sale-note-${item.id}" name="afterSaleNote" placeholder="请填写客户反馈、复查项目和处理安排" required>${safe(meta.afterSaleNote, "客户反馈高速路试后有轻微异响，已安排复查并预留工位。")}</textarea></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交售后处理</button><button class="btn btn-secondary" type="button" data-provider-action="order-after-sale-cancel" data-provider-id="${item.id}">取消</button></div></form>`;
   }
 
   function providerEstimateDuration(item) {
@@ -555,6 +749,7 @@
     if (status === "处理中") return "当前订单已拒单，等待平台根据拒单原因重新分配。";
     if (status === "施工中") return "请按施工节点拍照留档，便于后续完工验收。";
     if (status === "待验收") return "完工资料已提交，请保持电话畅通，等待客户验收反馈。";
+    if (status === "售后中") return "客户已反馈售后诉求，请按预约时间完成复查、返修或功能复检。";
     return "订单已进入稳定阶段，注意客户回访与售后记录。";
   }
 
@@ -575,7 +770,7 @@
       const purchaseOpen = state.providerPurchase.sku === item.sku;
       return `<section class="admin-detail-card"><div class="eyebrow">Purchase Action</div><div class="provider-product-hero"><div class="provider-product-visual large" data-product-tone="${(item.brand || "").length % 3}"><span>${safe(item.category, "商品")}</span></div><div><h3>${safe(item.name, "商品采购")}</h3><div class="muted" style="margin-top:8px;">${safe(item.description, "商品说明待补充")}</div></div></div><div class="admin-kv-list"><div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>型号</span><strong>${providerProductModel(item)}</strong></div><div><span>类目</span><strong>${safe(item.category, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>库存状态</span><strong>${nProduct(item.status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-provider-action="${purchaseOpen ? "product-purchase-cancel" : "product-purchase"}" data-provider-id="${item.sku}">${purchaseOpen ? "收起采购表单" : "采购"}</button></div>${purchaseOpen ? renderProviderPurchaseForm(item) : ""}</section>`;
     }
-    return `<section class="admin-detail-card"><div class="eyebrow">Purchase Record</div><h3>${safe(item.id, "采购记录")}</h3><div class="admin-kv-list"><div><span>商品</span><strong>${safe(item.name, "-")}</strong></div><div><span>型号</span><strong>${providerProductModel(item)}</strong></div><div><span>数量</span><strong>${item.quantity || 1}</strong></div><div><span>金额</span><strong>${safe(item.amount, "-")}</strong></div><div><span>状态</span><strong>${nPurchaseStatus(item.status)}</strong></div><div><span>进度说明</span><strong>${safe(item.note, "-")}</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="purchase-record-detail" data-provider-id="${item.id}">查看记录</button></div></section>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">Purchase Record</div><h3>${safe(item.id, "采购记录")}</h3><div class="admin-kv-list"><div><span>商品</span><strong>${safe(item.name, "-")}</strong></div><div><span>型号</span><strong>${providerProductModel(item)}</strong></div><div><span>数量</span><strong>${item.quantity || 1}</strong></div><div><span>金额</span><strong>${safe(item.amount, "-")}</strong></div><div><span>状态</span><strong>${nPurchaseStatus(item.status)}</strong></div><div><span>进度说明</span><strong>${safe(item.note, "-")}</strong></div></div><div class="admin-action-row">${nPurchaseStatus(item.status) !== "已签收" ? `<button class="btn btn-primary" type="button" data-provider-action="purchase-record-confirm" data-provider-id="${item.id}">确认收货</button>` : `<button class="btn btn-secondary" type="button" disabled>已确认收货</button>`}<button class="btn btn-secondary" type="button" data-provider-action="purchase-record-detail" data-provider-id="${item.id}">查看记录</button></div></section>`;
   }
 
   function renderProviderPurchaseForm(item) {
@@ -610,6 +805,21 @@
     return rows.length ? rows : settlements.slice(0, 3).map((item) => ({ ...item, provider: store.name }));
   }
 
+  function getProviderServicePricingRows() {
+    return services.map((item, index) => {
+      const key = item.code || item.name || `service-${index}`;
+      const current = state.providerServicePricing[key] || createProviderServicePricingEntry(item, index);
+      return { ...item, key, ...current };
+    });
+  }
+
+  function renderProviderServicePricing() {
+    const store = getProviderStore();
+    const rows = getProviderServicePricingRows();
+    const enabledCount = rows.filter((item) => item.enabled && item.status !== "停用").length;
+    return `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Service Pricing</div><h3>服务定价设置</h3><div class="admin-kv-list"><div><span>当前门店</span><strong>${safe(store.name, "当前门店")}</strong></div><div><span>已启用服务项</span><strong>${enabledCount} 项</strong></div><div><span>平台定价规则</span><strong>报价需在平台区间内</strong></div><div><span>报价用途</span><strong>用于咨询、派单与服务下单展示</strong></div></div><div class="admin-timeline"><div>先勾选门店可承接的服务项，再填写门店对外报价。</div><div>平台会限制每个服务项的报价范围，便于统一对外价格带。</div><div>停用服务项仅作规则展示，不参与当前门店报价。</div></div></section><form class="provider-complete-form" data-provider-pricing-form>${rows.map((item) => `<section class="mobile-item" style="margin-bottom:12px;"><div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;"><div><strong>${safe(item.name, "服务项目")}</strong><div class="muted" style="margin-top:8px;">${safe(item.desc, "服务说明待补充")}</div><div class="muted" style="margin-top:6px;">工时 ${safe(item.duration, "-")} / 服务编码 ${safe(item.code, "-")}</div></div><label style="display:inline-flex; align-items:center; gap:8px; white-space:nowrap; color:${item.status === "停用" ? "var(--text-muted)" : "#fff"};"><input type="checkbox" name="serviceEnabled-${item.key}" data-provider-price-toggle="${item.key}" ${item.enabled ? "checked" : ""} ${item.status === "停用" ? "disabled" : ""}>当前可接</label></div><div class="form-grid" style="margin-top:14px;"><div class="field-group"><label class="field-label" for="service-range-${item.key}">平台价格范围</label><input class="input" id="service-range-${item.key}" type="text" value="${formatCurrency(item.min)} - ${formatCurrency(item.max)}" disabled></div><div class="field-group"><label class="field-label" for="service-price-${item.key}">门店报价</label><input class="input" id="service-price-${item.key}" name="servicePrice-${item.key}" data-provider-price-input="${item.key}" type="number" min="${item.min}" max="${item.max}" step="100" value="${item.quote}" ${item.status === "停用" || !item.enabled ? "disabled" : ""} required></div></div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(item.status === "停用" ? "停用" : "启用")}<span class="pill">建议价 ${formatCurrency(item.suggested)}</span><span class="pill">${item.enabled && item.status !== "停用" ? "已纳入门店报价" : "未纳入门店报价"}</span></div></section>`).join("")}<div class="admin-action-row"><button class="btn btn-primary" type="submit">保存服务定价</button><button class="btn btn-secondary" type="button" data-provider-action="pricing-reset">恢复建议价</button></div></form></div>`;
+  }
+
   function renderProviderBusiness() {
     const store = getProviderStore();
     const allOrders = getProviderAllOrders();
@@ -625,7 +835,17 @@
   }
 
   function renderProviderSettlementDetail(item) {
-    return `<section class="admin-detail-card"><div class="eyebrow">Settlement</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>门店</span><strong>${safe(item.provider, "-")}</strong></div><div><span>结算金额</span><strong>${safe(item.amount, "-")}</strong></div><div><span>状态</span><strong>${nSettlement(item.status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-provider-action="settlement-apply" data-provider-id="${item.id}">发起结算申请</button><button class="btn btn-secondary" type="button" data-provider-action="settlement-detail" data-provider-id="${item.id}">查看详情</button></div></section>`;
+    const opened = state.providerMe.settlementDetailId === item.id;
+    const amount = priceToNumber(item.amount);
+    const serviceAmount = Math.round(amount * 0.82);
+    const platformFee = Math.round(amount * 0.12);
+    const freightFee = Math.round(amount * 0.06);
+    return `<section class="admin-detail-card"><div class="eyebrow">Settlement</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>门店</span><strong>${safe(item.provider, "-")}</strong></div><div><span>结算金额</span><strong>${safe(item.amount, "-")}</strong></div><div><span>状态</span><strong>${nSettlement(item.status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-provider-action="settlement-apply" data-provider-id="${item.id}">${nSettlement(item.status) === "审核中" ? "已发起申请" : "发起结算申请"}</button><button class="btn btn-secondary" type="button" data-provider-action="settlement-detail" data-provider-id="${item.id}">${opened ? "收起详情" : "查看详情"}</button></div>${opened ? `<div class="admin-timeline"><div>结算周期：近 ${item.orders || 0} 笔已完工并验收订单</div><div>服务收入：${formatCurrency(serviceAmount)}</div><div>平台服务费：${formatCurrency(platformFee)}</div><div>运费与辅料补贴：${formatCurrency(freightFee)}</div><div>申请时间：${safe(item.applyTime, "待提交")}</div></div>` : ""}</section>`;
+  }
+
+  function renderProviderProfileForm() {
+    const store = getProviderStore();
+    return `<form class="provider-complete-form" data-provider-profile-form><div class="form-grid"><div class="field-group"><label class="field-label" for="provider-contact-edit">联系人</label><input class="input" id="provider-contact-edit" name="providerContact" type="text" value="${safe(store.contact, "")}" required></div><div class="field-group"><label class="field-label" for="provider-address-edit">门店地址</label><input class="input" id="provider-address-edit" name="providerAddress" type="text" value="${safe(store.address || `${safe(store.city, "")}${safe(store.district, "")}改装产业园 A3-201`, "")}" required></div><div class="field-group"><label class="field-label" for="provider-specialties-edit">主营能力</label><input class="input" id="provider-specialties-edit" name="providerSpecialties" type="text" value="${safe(store.specialties, "")}" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">保存资料</button><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">取消</button></div></form>`;
   }
 
   function handleProviderAction(button) {
@@ -641,11 +861,17 @@
         state.providerDialog = { type: "reject", orderId: id };
       } else if (action === "order-complete") {
         state.providerCompletion.orderId = id;
+        state.providerAfterSale.orderId = "";
       } else if (action === "order-complete-cancel") {
         state.providerCompletion.orderId = "";
       } else if (action === "order-follow") {
         target.progress = "已与客户确认验收时间，等待客户完成验收";
         state.providerFeedback = `${id} 已更新客户验收跟进说明。`;
+      } else if (action === "order-after-sale") {
+        state.providerAfterSale.orderId = id;
+        state.providerCompletion.orderId = "";
+      } else if (action === "order-after-sale-cancel") {
+        state.providerAfterSale.orderId = "";
       }
       render();
       return;
@@ -655,6 +881,21 @@
         state.providerPurchase.sku = id;
       } else if (action === "product-purchase-cancel") {
         state.providerPurchase.sku = "";
+      }
+      render();
+      return;
+    }
+    if (action.startsWith("purchase-record-")) {
+      const target = providerPurchaseRecords.find((item) => item.id === id);
+      if (!target) {
+        render();
+        return;
+      }
+      if (action === "purchase-record-confirm") {
+        target.status = "已签收";
+        target.note = "门店已完成签收，可安排安装、入库或后续施工。";
+        state.providerSelected.products = id;
+        state.providerFeedback = `${id} 已确认收货，可继续安排安装或入库。`;
       }
       render();
       return;
@@ -682,6 +923,15 @@
       render();
       return;
     }
+    if (action.startsWith("pricing-")) {
+      if (action === "pricing-reset") {
+        state.providerServicePricing = buildProviderServicePricingState();
+        state.providerFeedback = "服务定价已恢复为平台建议价，可继续调整后保存。";
+        state.subTab.operations = "pricing";
+      }
+      render();
+      return;
+    }
     if (action.startsWith("forum-")) {
       const target = posts.find((item) => item.id === id);
       if (target && action === "forum-toggle") target.status = nForum(target.status) === "已删除" ? "正常" : "已删除";
@@ -690,7 +940,31 @@
     }
     if (action.startsWith("settlement-")) {
       const target = settlements.find((item) => item.id === id);
-      if (target && action === "settlement-apply") target.status = "审核中";
+      if (!target) {
+        render();
+        return;
+      }
+      state.subTab.me = "settlements";
+      state.providerSelected.settlements = id;
+      if (action === "settlement-apply") {
+        target.status = "审核中";
+        state.providerFeedback = `${id} 已发起结算申请，平台将在 1 个工作日内完成审核。`;
+      } else if (action === "settlement-detail") {
+        state.providerMe.settlementDetailId = state.providerMe.settlementDetailId === id ? "" : id;
+        state.providerFeedback = state.providerMe.settlementDetailId === id ? `${id} 结算明细已收起。` : `${id} 结算明细已展开，可核对金额组成。`;
+      }
+      render();
+      return;
+    }
+    if (action.startsWith("provider-profile-")) {
+      state.subTab.me = "profile";
+      if (action === "provider-profile-edit") {
+        state.providerMe.profileEditOpen = !state.providerMe.profileEditOpen;
+        if (!state.providerMe.profileEditOpen) state.providerFeedback = "已收起门店资料表单。";
+      } else if (action === "provider-profile-contact") {
+        state.tab = "messages";
+        state.providerSelected.messages = fallback.providerMessages.find((item) => item.id === "msg-4")?.id || fallback.providerMessages[0]?.id || "";
+      }
       render();
       return;
     }
@@ -789,6 +1063,116 @@
     }
     state.providerCaseForm = { mode: "", id: "" };
     state.subTab.operations = "cases";
+    render();
+  }
+
+  function handleProviderPricingSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    let enabledCount = 0;
+    let adjustCount = 0;
+    getProviderServicePricingRows().forEach((item) => {
+      const toggle = form.querySelector(`[data-provider-price-toggle="${item.key}"]`);
+      const input = form.querySelector(`[data-provider-price-input="${item.key}"]`);
+      if (!toggle || !input) return;
+      if (item.status === "停用") {
+        state.providerServicePricing[item.key] = {
+          enabled: false,
+          quote: item.suggested,
+          suggested: item.suggested,
+          min: item.min,
+          max: item.max,
+        };
+        return;
+      }
+      let quote = Math.round((Number(input.value || item.quote) || item.suggested) / 100) * 100;
+      if (quote < item.min) {
+        quote = item.min;
+        adjustCount += 1;
+      }
+      if (quote > item.max) {
+        quote = item.max;
+        adjustCount += 1;
+      }
+      state.providerServicePricing[item.key] = {
+        enabled: !!toggle.checked,
+        quote,
+        suggested: item.suggested,
+        min: item.min,
+        max: item.max,
+      };
+      if (toggle.checked) enabledCount += 1;
+    });
+    state.providerFeedback = adjustCount ? `已保存 ${enabledCount} 个服务项定价，${adjustCount} 项超出平台范围并已自动调整。` : `已保存 ${enabledCount} 个服务项定价，可用于咨询和平台派单展示。`;
+    state.subTab.operations = "pricing";
+    render();
+  }
+
+  function handleProviderAcceptSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const id = form.dataset.providerId || "";
+    const target = getProviderOrderById(id);
+    if (!target) return;
+    const formData = new FormData(form);
+    const scheduleTime = String(formData.get("scheduleTime") || "").trim();
+    const scheduleNote = String(formData.get("scheduleNote") || "").trim();
+    if (!scheduleTime || !scheduleNote) return;
+    const appointment = scheduleTime.replace("T", " ");
+    target.status = "施工中";
+    target.appointment = appointment;
+    target.progress = `门店已接单，排期 ${appointment} 入场施工`;
+    const extra = providerOrderExtras[id] || (providerOrderExtras[id] = {});
+    extra.arrival = `已排期 ${appointment} 到店施工`;
+    extra.remark = scheduleNote;
+    state.providerDialog = { type: "", orderId: "" };
+    state.providerSelected.orders = id;
+    state.providerFeedback = `${id} 已接单，排期时间已更新为 ${appointment}。`;
+    render();
+  }
+
+  function handleProviderAfterSaleSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const id = form.dataset.providerId || "";
+    const target = getProviderOrderById(id);
+    if (!target) return;
+    const formData = new FormData(form);
+    const afterSaleType = String(formData.get("afterSaleType") || "").trim();
+    const afterSaleTime = String(formData.get("afterSaleTime") || "").trim();
+    const afterSaleNote = String(formData.get("afterSaleNote") || "").trim();
+    if (!afterSaleType || !afterSaleTime || !afterSaleNote) return;
+    const appointment = afterSaleTime.replace("T", " ");
+    target.status = "已完成";
+    target.progress = `售后处理已记录：${afterSaleType}，计划 ${appointment} 进行复查或回访。`;
+    const extra = providerOrderExtras[id] || (providerOrderExtras[id] = {});
+    extra.afterSaleStatus = "售后已处理";
+    extra.afterSaleType = afterSaleType;
+    extra.afterSaleTime = appointment;
+    extra.afterSaleNote = afterSaleNote;
+    extra.arrival = `已预约 ${appointment} 返店售后`;
+    state.providerAfterSale.orderId = "";
+    state.providerSelected.orders = id;
+    state.subTab.orders = "completed";
+    state.providerFeedback = `${id} 售后处理已提交，订单状态已更新为已完成。`;
+    render();
+  }
+
+  function handleProviderProfileSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const store = getProviderStore();
+    const formData = new FormData(form);
+    const contact = String(formData.get("providerContact") || "").trim();
+    const address = String(formData.get("providerAddress") || "").trim();
+    const specialties = String(formData.get("providerSpecialties") || "").trim();
+    if (!contact || !address || !specialties) return;
+    store.contact = contact;
+    store.address = address;
+    store.specialties = specialties;
+    state.subTab.me = "profile";
+    state.providerMe.profileEditOpen = false;
+    state.providerFeedback = "门店资料已更新，平台展示信息同步完成。";
     render();
   }
 
