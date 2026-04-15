@@ -842,6 +842,415 @@ select {
   gap: 12px;
 }
 
+.case-layout {
+  align-items: start;
+}
+
+.case-board {
+  display: grid;
+}
+
+.case-feed {
+  display: grid;
+  gap: 16px;
+}
+
+.case-card {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.case-card:hover,
+.case-card.active {
+  border-color: rgba(255, 106, 0, 0.28);
+  background: linear-gradient(160deg, rgba(255, 106, 0, 0.08), rgba(255, 255, 255, 0.03));
+  transform: translateY(-1px);
+}
+
+.case-card-body {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.case-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.case-card-top h3 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.4;
+}
+
+.case-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.case-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.case-card-body p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.case-cover-preview {
+  min-height: 210px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  background:
+    radial-gradient(circle at 78% 22%, rgba(255, 106, 0, 0.28), transparent 24%),
+    linear-gradient(140deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015)),
+    linear-gradient(160deg, #11161c, #2a3139);
+}
+
+.case-cover-preview strong {
+  display: block;
+  margin: auto 0 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.35;
+}
+
+.case-cover-preview.has-image {
+  background-size: cover !important;
+  background-position: center !important;
+}
+
+.case-cover-preview small {
+  color: rgba(255, 255, 255, 0.62);
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.case-cover-preview-compact {
+  min-height: 148px;
+  padding: 14px;
+  border-radius: 18px;
+}
+
+.case-cover-preview-compact strong {
+  font-size: 18px;
+}
+
+.case-cover-preview-tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.case-detail-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.case-detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.case-detail-card {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.case-detail-card span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.case-detail-card strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.case-detail-section {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.case-detail-section h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.case-detail-section p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.8;
+}
+
+.case-rich-content {
+  display: grid;
+  gap: 14px;
+  color: var(--text-muted);
+}
+
+.case-rich-content p,
+.case-rich-content h3,
+.case-rich-content figure {
+  margin: 0;
+}
+
+.case-rich-content h3 {
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+.case-rich-content p {
+  line-height: 1.9;
+}
+
+.case-rich-media {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.case-rich-media img,
+.case-rich-media video {
+  width: 100%;
+  border-radius: 12px;
+  display: block;
+  background: #0c1015;
+}
+
+.case-rich-media figcaption {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.case-editor-modal {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.case-editor-modal > .panel-header,
+.case-editor-modal > div:last-child {
+  grid-column: 1 / -1;
+}
+
+.case-editor-preview {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+}
+
+.case-editor-preview-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.case-editor-preview-copy h3 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.4;
+}
+
+.case-editor-preview-copy p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.8;
+}
+
+.case-editor-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.case-editor-preview-meta span {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.case-editor-section {
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  align-self: start;
+}
+
+.case-editor-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.case-editor-section-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.case-editor-section-head span {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.case-upload-panel {
+  min-height: 132px;
+}
+
+.case-rich-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.case-rich-upload {
+  position: relative;
+  overflow: hidden;
+}
+
+.case-rich-editor {
+  min-height: 260px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  line-height: 1.9;
+  outline: none;
+}
+
+.case-rich-editor:empty::before {
+  content: "请输入案例说明，可插入图片与视频";
+  color: var(--text-muted);
+}
+
+.case-rich-editor h3 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+.case-rich-editor p {
+  margin: 0 0 12px;
+}
+
+.case-rich-editor .case-rich-media {
+  margin: 14px 0;
+}
+
+.case-editor-section .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.case-editor-section .field-group-full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1100px) {
+  .modal-card:has(.case-editor-modal) {
+    width: min(860px, 100%);
+    padding: 24px;
+  }
+
+  .case-editor-modal {
+    grid-template-columns: 1fr;
+  }
+}
+
+.case-display-toggle {
+  display: grid;
+  gap: 12px;
+}
+
+.case-display-option {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 12, 16, 0.34);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.case-display-option:hover,
+.case-display-option.active {
+  border-color: rgba(255, 106, 0, 0.28);
+  background: rgba(255, 106, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.case-display-option strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.case-display-option span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .material-preview-card {
   display: grid;
   gap: 16px;
@@ -1128,6 +1537,11 @@ select {
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   scrollbar-gutter: stable;
+}
+
+.modal-card:has(.case-editor-modal) {
+  width: min(1180px, 100%);
+  padding: 30px;
 }
 
 .action-grid {
@@ -1589,6 +2003,64 @@ body.provider-screen-mode {
 .doc-item strong {
   display: block;
   margin-bottom: 8px;
+}
+
+.signing-photo-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.signing-photo-placeholder {
+  width: 116px;
+  height: 84px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(160deg, rgba(11, 14, 18, 0.96), rgba(27, 33, 41, 0.92));
+  position: relative;
+  overflow: hidden;
+}
+
+.signing-photo-placeholder::before {
+  content: "";
+  position: absolute;
+  right: -16px;
+  top: -18px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 106, 0, 0.16);
+}
+
+.signing-photo-placeholder span {
+  position: absolute;
+  inset: 14px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+}
+
+.signing-photo-placeholder span::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  width: 52px;
+  height: 26px;
+  clip-path: polygon(0 100%, 28% 40%, 52% 72%, 70% 18%, 100% 100%);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.signing-photo-placeholder span::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 14px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .check-grid {

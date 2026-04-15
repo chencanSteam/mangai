@@ -550,6 +550,133 @@
     return { type: "simple", title, description, rows, keys, labels };
   }
 
+  function getCaseProviderOptions(currentProvider = "") {
+    return [...new Set([...providers.map((item) => item.name), ...cases.map((item) => item.provider), currentProvider].filter(Boolean))];
+  }
+
+  function getCaseStyleOptions(currentStyle = "") {
+    return [...new Set(["黑武士街道风", "赛道性能风", "豪华夜幕风", "轻改姿态风", "质感通勤风", ...cases.map((item) => item.style), currentStyle].filter(Boolean))];
+  }
+
+  function getCaseDisplayHint(display) {
+    const hintMap = {
+      "首页展示": "会进入首页优先展示位，建议使用更强视觉的标题和封面图。",
+      "正常展示": "在案例列表正常展示，适合沉淀标准内容与成交案例。",
+      "未展示": "仅保留后台留档，不在前台列表展示。",
+    };
+    return hintMap[display] || "请选择案例展示状态。";
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function normalizeCaseRichContent(content) {
+    const source = String(content || "").trim();
+    if (!source) return "";
+    if (/<[a-z][\s\S]*>/i.test(source)) return source;
+    return source
+      .split(/\n+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => `<p>${escapeHtml(item)}</p>`)
+      .join("");
+  }
+
+  function getCaseContentSummary(content) {
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = normalizeCaseRichContent(content);
+    const text = wrapper.textContent.replace(/\s+/g, " ").trim();
+    return text || "案例说明将显示在这里，建议突出改装亮点、施工重点和最终效果。";
+  }
+
+  function renderCaseRichContent(content) {
+    const html = normalizeCaseRichContent(content);
+    return html ? `<div class="case-rich-content">${html}</div>` : `<div class="case-rich-content"><p>暂无案例说明</p></div>`;
+  }
+
+  function getCaseImageMeta(image, imagePreview = "") {
+    if (image && typeof image === "object") {
+      return {
+        name: image.name || "未填写封面图",
+        preview: image.url || imagePreview || "",
+      };
+    }
+    return {
+      name: image || "未填写封面图",
+      preview: imagePreview || "",
+    };
+  }
+
+  function renderCaseCoverPreview(image, title, compact = false, imagePreview = "") {
+    const safeTitle = title || "未填写案例标题";
+    const imageMeta = getCaseImageMeta(image, imagePreview);
+    const safeImage = imageMeta.name;
+    return `
+      <div class="case-cover-preview ${compact ? "case-cover-preview-compact" : ""} ${imageMeta.preview ? "has-image" : ""}" ${imageMeta.preview ? `style="background-image:linear-gradient(180deg, rgba(10,12,16,0.14), rgba(10,12,16,0.82)), url('${imageMeta.preview}');"` : ""}>
+        <span class="case-cover-preview-tag">${compact ? "CASE" : "案例封面"}</span>
+        <strong>${safeTitle}</strong>
+        <small>${safeImage}</small>
+      </div>
+    `;
+  }
+
+  function renderCaseDetailPanel(row) {
+    return `
+      <div class="panel-header">
+        <div>
+          <h2 class="section-title">${row.title}</h2>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+        ${[row.audit, row.display, row.provider].filter(Boolean).map((item) => formatTag(item)).join("")}
+      </div>
+      <div class="case-detail-shell">
+        ${renderCaseCoverPreview(row.image, row.title, false, row.imagePreview || "")}
+        <div class="case-detail-metrics">
+          ${[
+            ["案例编号", row.id],
+            ["服务商", row.provider],
+            ["车型", row.model],
+            ["风格", row.style],
+            ["费用", row.cost],
+            ["审核状态", row.audit],
+            ["展示状态", row.display],
+          ]
+            .map(
+              ([label, value]) => `
+                <div class="case-detail-card">
+                  <span>${label}</span>
+                  <strong>${value || "-"}</strong>
+                </div>
+              `
+            )
+            .join("")}
+        </div>
+        <div class="case-detail-section">
+          <h3>案例说明</h3>
+          ${renderCaseRichContent(row.content)}
+        </div>
+        <div class="case-detail-section">
+          <h3>处理轨迹</h3>
+          <div class="timeline">
+            ${(row.timeline || ["暂无处理轨迹"]).map((item) => `<div class="timeline-item">${item}</div>`).join("")}
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-secondary" type="button" data-case-list-action="edit">编辑案例</button>
+          <button class="btn btn-primary" type="button" data-case-list-action="display">展示设置</button>
+          <button class="btn btn-danger" type="button" data-case-list-action="delete">删除案例</button>
+        </div>
+      </div>
+    `;
+  }
+
   function getVehicleModelStats() {
     return [
       metric("车型档案数", String(vehicleModels.length)),
@@ -1303,6 +1430,10 @@
         renderForumManagePage(def);
         return;
       }
+      if (state.activePage === "caseList") {
+        renderCaseListPage(def);
+        return;
+      }
       renderTablePage(def);
       return;
     }
@@ -1640,6 +1771,77 @@
     bindTableEvents(def, selected);
   }
 
+  function renderCaseListPage(def) {
+    const rows = filterRows(def.rows, def.filterBy);
+    const selected = rows[state.selectedIndex] || rows[0];
+
+    contentEl.innerHTML = `
+      <section class="page-heading">
+        <h1>${def.title}</h1>
+      </section>
+      <section class="table-layout case-layout" style="margin-top:22px;">
+        <article class="panel table-card case-board">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              ${(def.filters || ["全部"])
+                .map(
+                  (item) => `
+                    <button class="filter-chip ${state.activeFilter === item ? "active" : ""}" type="button" data-filter="${item}">
+                      ${item}
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>
+            <div class="toolbar-right">
+              <button class="btn btn-secondary" type="button" data-case-toolbar="create">新增案例</button>
+              <button class="btn btn-primary" type="button" data-case-toolbar="edit" ${selected ? "" : "disabled"}>编辑案例</button>
+              <button class="btn btn-danger" type="button" data-case-toolbar="delete" ${selected ? "" : "disabled"}>删除案例</button>
+            </div>
+          </div>
+          <div class="case-feed">
+            ${
+              rows.length
+                ? rows
+                    .map(
+                      (row, index) => `
+                        <article class="case-card ${index === state.selectedIndex ? "active" : ""}" data-row-index="${index}">
+                          ${renderCaseCoverPreview(row.image, row.title, true, row.imagePreview || "")}
+                          <div class="case-card-body">
+                            <div class="case-card-top">
+                              <div>
+                                <h3>${row.title}</h3>
+                                <div class="case-card-meta">
+                                  <span>${row.provider}</span>
+                                  <span>${row.model}</span>
+                                </div>
+                              </div>
+                              ${formatTag(row.display)}
+                            </div>
+                            <div class="case-card-tags">
+                              ${formatTag(row.audit)}
+                              <span class="pill">${row.style}</span>
+                              <span class="pill">${row.cost}</span>
+                            </div>
+                            <p>${getCaseContentSummary(row.content)}</p>
+                          </div>
+                        </article>
+                      `
+                    )
+                    .join("")
+                : `<div class="page-heading"><h1 style="font-size:24px;">暂无案例内容</h1></div>`
+            }
+          </div>
+        </article>
+        <aside class="panel drawer-card">
+          ${selected ? renderCaseDetailPanel(selected) : `<div class="page-heading"><h1 style="font-size:24px;">暂无详情</h1></div>`}
+        </aside>
+      </section>
+    `;
+
+    bindTableEvents(def, selected);
+  }
+
   function renderForumDetail(detail) {
     return `
       <div class="panel-header">
@@ -1956,6 +2158,10 @@
           renderForumManagePage(def);
           return;
         }
+        if (state.activePage === "caseList") {
+          renderCaseListPage(def);
+          return;
+        }
         renderTablePage(def);
       });
     });
@@ -1965,6 +2171,10 @@
         state.selectedIndex = Number(row.dataset.rowIndex);
         if (state.activePage === "forumManage") {
           renderForumManagePage(def);
+          return;
+        }
+        if (state.activePage === "caseList") {
+          renderCaseListPage(def);
           return;
         }
         renderTablePage(def);
@@ -2636,6 +2846,73 @@
         submitCaseDisplay(button.dataset.caseId, button.dataset.caseDisplay);
       });
     });
+
+    const caseEditorRoot = modalCardEl.querySelector("[data-case-editor]");
+    if (caseEditorRoot) {
+      modalCardEl.querySelectorAll("[data-case-field]").forEach((field) => {
+        const eventName = field.tagName === "SELECT" ? "change" : "input";
+        field.addEventListener(eventName, syncCaseEditorPreview);
+      });
+      const caseRichEditor = modalCardEl.querySelector("[data-case-rich-editor]");
+      if (caseRichEditor) {
+        caseRichEditor.addEventListener("input", syncCaseRichEditorField);
+      }
+      modalCardEl.querySelectorAll("[data-case-rich-command]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const editor = modalCardEl.querySelector("[data-case-rich-editor]");
+          if (!editor) return;
+          editor.focus();
+          const command = button.dataset.caseRichCommand;
+          if (command === "heading") {
+            document.execCommand("formatBlock", false, "h3");
+          } else if (command === "paragraph") {
+            document.execCommand("formatBlock", false, "p");
+          } else if (command === "bold") {
+            document.execCommand("bold");
+          }
+          syncCaseRichEditorField();
+        });
+      });
+      const caseRichImageInput = modalCardEl.querySelector("[data-case-rich-image]");
+      if (caseRichImageInput) {
+        caseRichImageInput.addEventListener("change", () => {
+          const file = caseRichImageInput.files?.[0];
+          if (!file) return;
+          appendCaseRichMedia("image", file);
+          caseRichImageInput.value = "";
+        });
+      }
+      const caseRichVideoInput = modalCardEl.querySelector("[data-case-rich-video]");
+      if (caseRichVideoInput) {
+        caseRichVideoInput.addEventListener("change", () => {
+          const file = caseRichVideoInput.files?.[0];
+          if (!file) return;
+          appendCaseRichMedia("video", file);
+          caseRichVideoInput.value = "";
+        });
+      }
+      const caseUploadInput = modalCardEl.querySelector("[data-case-upload]");
+      if (caseUploadInput) {
+        caseUploadInput.addEventListener("change", () => {
+          const file = caseUploadInput.files?.[0];
+          if (!file) return;
+          const imageField = modalCardEl.querySelector('[data-case-field="image"]');
+          const imagePreviewField = modalCardEl.querySelector('[data-case-field="imagePreview"]');
+          if (imageField) imageField.value = file.name;
+          if (imagePreviewField) imagePreviewField.value = URL.createObjectURL(file);
+          syncCaseEditorPreview();
+        });
+      }
+      modalCardEl.querySelectorAll("[data-case-display-option]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const displayInput = modalCardEl.querySelector('[data-case-field="display"]');
+          if (displayInput) displayInput.value = button.dataset.caseDisplayOption;
+          syncCaseEditorPreview();
+        });
+      });
+      syncCaseRichEditorField();
+      syncCaseEditorPreview();
+    }
 
     const saveCaseBtn = modalCardEl.querySelector("[data-save-case]");
     if (saveCaseBtn) {
@@ -3627,6 +3904,23 @@
     });
   }
 
+  function renderSigningPhotoPlaceholders(photos) {
+    if (!photos?.length) return "无";
+    return `
+      <div class="signing-photo-list">
+        ${photos
+          .map(
+            (_, index) => `
+              <div class="signing-photo-placeholder" aria-label="异常照片 ${index + 1}">
+                <span></span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
   function openSigningConfirmModal(row) {
     openModal(`
       <div class="panel-header">
@@ -3672,7 +3966,7 @@
       facts: [
         ["签收人", row.customer],
         ["签收时间", row.signTime],
-        ["异常照片", row.anomalyPhotos?.length ? row.anomalyPhotos.join(" / ") : "无"],
+        ["异常照片", renderSigningPhotoPlaceholders(row.anomalyPhotos)],
         ["备注", row.note],
       ],
       timeline: [
@@ -4062,13 +4356,14 @@
       style: getValue("style"),
       cost: getValue("cost"),
       image: getValue("image"),
+      imagePreview: getValue("imagePreview"),
       content: getValue("content"),
       display: getValue("display"),
       audit: "待审核",
       timeline: [`2026-04-03 16:20 平台${mode === "edit" ? "更新" : "新增"}案例：${getValue("title")}`],
     };
-    if (!payload.title || !payload.provider || !payload.model || !payload.image || !payload.content) {
-      openFeedbackModal("信息不完整", "请填写案例标题、服务商、车型、封面图和案例说明。");
+    if (!payload.title || !payload.provider || !payload.model || !payload.style || !payload.cost || !payload.image || !payload.content || !payload.display) {
+      openFeedbackModal("信息不完整", "请填写案例标题、服务商、车型、风格、费用、封面图、案例说明和展示状态。");
       return;
     }
     if (mode === "edit") {
@@ -4700,66 +4995,225 @@
     `);
   }
 
+  function syncCaseEditorPreview() {
+    const getValue = (field) => modalCardEl.querySelector(`[data-case-field="${field}"]`)?.value.trim() || "";
+    const audit = modalCardEl.querySelector("[data-case-editor]")?.dataset.audit || "待审核";
+    const display = getValue("display") || "正常展示";
+    const title = getValue("title") || "未填写案例标题";
+    const provider = getValue("provider") || "未选择服务商";
+    const model = getValue("model") || "未填写车型";
+    const style = getValue("style") || "未填写风格";
+    const cost = getValue("cost") || "未填写费用";
+    const image = getValue("image") || "未填写封面图";
+    const imagePreview = getValue("imagePreview");
+    const content = getValue("content");
+    const contentSummary = getCaseContentSummary(content);
+
+    const previewEl = modalCardEl.querySelector("[data-case-editor-preview]");
+    if (previewEl) {
+      previewEl.querySelector(".case-cover-preview")?.replaceWith(
+        (() => {
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = renderCaseCoverPreview(image, title, false, imagePreview);
+          return wrapper.firstElementChild;
+        })()
+      );
+    }
+
+    const titleEl = modalCardEl.querySelector("[data-case-preview-title]");
+    if (titleEl) titleEl.textContent = title;
+    const summaryEl = modalCardEl.querySelector("[data-case-preview-summary]");
+    if (summaryEl) summaryEl.textContent = contentSummary;
+    const modelEl = modalCardEl.querySelector("[data-case-preview-model]");
+    if (modelEl) modelEl.textContent = model;
+    const styleEl = modalCardEl.querySelector("[data-case-preview-style]");
+    if (styleEl) styleEl.textContent = style;
+    const costEl = modalCardEl.querySelector("[data-case-preview-cost]");
+    if (costEl) costEl.textContent = cost;
+
+    const tagsEl = modalCardEl.querySelector("[data-case-editor-tags]");
+    if (tagsEl) {
+      tagsEl.innerHTML = `
+        ${formatTag(audit)}
+        ${formatTag(display)}
+        <span class="pill">${provider}</span>
+      `;
+    }
+
+    const hintEl = modalCardEl.querySelector("[data-case-display-hint]");
+    if (hintEl) hintEl.textContent = getCaseDisplayHint(display);
+
+    modalCardEl.querySelectorAll("[data-case-display-option]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.caseDisplayOption === display);
+    });
+  }
+
+  function syncCaseRichEditorField() {
+    const editor = modalCardEl.querySelector("[data-case-rich-editor]");
+    const contentField = modalCardEl.querySelector('[data-case-field="content"]');
+    if (!editor || !contentField) return;
+    contentField.value = editor.innerHTML.trim();
+    syncCaseEditorPreview();
+  }
+
+  function appendCaseRichMedia(type, file) {
+    const editor = modalCardEl.querySelector("[data-case-rich-editor]");
+    if (!editor || !file) return;
+    const mediaUrl = URL.createObjectURL(file);
+    const safeName = escapeHtml(file.name || (type === "video" ? "视频素材" : "图片素材"));
+    const block =
+      type === "video"
+        ? `
+          <figure class="case-rich-media">
+            <video controls src="${mediaUrl}"></video>
+            <figcaption>${safeName}</figcaption>
+          </figure>
+        `
+        : `
+          <figure class="case-rich-media">
+            <img src="${mediaUrl}" alt="${safeName}" />
+            <figcaption>${safeName}</figcaption>
+          </figure>
+        `;
+    editor.insertAdjacentHTML("beforeend", block);
+    syncCaseRichEditorField();
+  }
+
   function openCaseEditorModal(mode, row) {
     const isEdit = mode === "edit";
     const source = row || {
       id: `CA-${Date.now().toString().slice(-6)}`,
       title: "",
-      provider: providers[0]?.name || "御驰 Performance Studio",
+      provider: providers.find((item) => item.auditStatus === "已通过")?.name || providers[0]?.name || "御驰 Performance Studio",
       model: "宝马 G20 330i",
       style: "黑武士街道风",
       cost: "¥ 26,800",
       image: "case-new-cover.jpg",
+      imagePreview: "",
       content: "",
       display: "正常展示",
+      audit: "待审核",
     };
+    const providerOptions = getCaseProviderOptions(source.provider)
+      .map((item) => `<option value="${item}" ${item === source.provider ? "selected" : ""}>${item}</option>`)
+      .join("");
+    const styleOptions = getCaseStyleOptions(source.style)
+      .map((item) => `<option value="${item}" ${item === source.style ? "selected" : ""}>${item}</option>`)
+      .join("");
     openModal(`
-      <div class="panel-header">
-        <div>
-          <span class="eyebrow">Case Editor</span>
-          <h2 class="section-title">${isEdit ? "编辑案例" : "新增案例"}</h2>
-          <p class="section-subtitle">${source.id} / ${isEdit ? source.title : "创建新的平台案例"}</p>
+      <div class="case-editor-modal" data-case-editor data-audit="${source.audit || "待审核"}">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Case Editor</span>
+            <h2 class="section-title">${isEdit ? "编辑案例" : "新增案例"}</h2>
+            <p class="section-subtitle">${source.id} / ${isEdit ? source.title : "创建新的平台案例"}</p>
+          </div>
         </div>
-      </div>
-      <div class="form-grid">
-        <div class="field-group">
-          <div class="field-label">案例标题</div>
-          <input class="input" data-case-field="title" value="${source.title}" />
+        <div class="case-editor-preview" data-case-editor-preview>
+          ${renderCaseCoverPreview(source.image, source.title || "未填写案例标题", false, source.imagePreview || "")}
+          <div class="case-editor-preview-copy">
+            <div class="case-card-tags" data-case-editor-tags>
+              ${formatTag(source.audit || "待审核")}
+              ${formatTag(source.display)}
+              <span class="pill">${source.provider}</span>
+            </div>
+            <h3 data-case-preview-title>${source.title || "未填写案例标题"}</h3>
+            <p data-case-preview-summary>${getCaseContentSummary(source.content)}</p>
+            <div class="case-editor-preview-meta">
+              <span data-case-preview-model>${source.model}</span>
+              <span data-case-preview-style>${source.style}</span>
+              <span data-case-preview-cost>${source.cost}</span>
+            </div>
+          </div>
         </div>
-        <div class="field-group">
-          <div class="field-label">服务商</div>
-          <input class="input" data-case-field="provider" value="${source.provider}" />
+        <div class="case-editor-section">
+          <div class="case-editor-section-head">
+            <h3>基础信息</h3>
+            <span>${source.id}</span>
+          </div>
+          <div class="form-grid">
+            <div class="field-group field-group-full">
+              <div class="field-label">案例标题</div>
+              <input class="input" data-case-field="title" placeholder="请输入案例标题" value="${source.title}" />
+            </div>
+            <div class="field-group">
+              <div class="field-label">服务商</div>
+              <select class="select" data-case-field="provider">${providerOptions}</select>
+            </div>
+            <div class="field-group">
+              <div class="field-label">车型</div>
+              <input class="input" data-case-field="model" placeholder="请输入车型" value="${source.model}" />
+            </div>
+            <div class="field-group">
+              <div class="field-label">风格</div>
+              <select class="select" data-case-field="style">${styleOptions}</select>
+            </div>
+            <div class="field-group">
+              <div class="field-label">费用</div>
+              <input class="input" data-case-field="cost" placeholder="例如 ¥ 26,800" value="${source.cost}" />
+            </div>
+          </div>
         </div>
-        <div class="field-group">
-          <div class="field-label">车型</div>
-          <input class="input" data-case-field="model" value="${source.model}" />
+        <div class="case-editor-section">
+          <div class="case-editor-section-head">
+            <h3>展示设置</h3>
+            <span data-case-display-hint>${getCaseDisplayHint(source.display)}</span>
+          </div>
+          <input type="hidden" data-case-field="display" value="${source.display}" />
+          <div class="case-display-toggle">
+            ${["首页展示", "正常展示", "未展示"]
+              .map(
+                (item) => `
+                  <button class="case-display-option ${item === source.display ? "active" : ""}" type="button" data-case-display-option="${item}">
+                    <strong>${item}</strong>
+                    <span>${getCaseDisplayHint(item)}</span>
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
         </div>
-        <div class="field-group">
-          <div class="field-label">风格</div>
-          <input class="input" data-case-field="style" value="${source.style}" />
+        <div class="case-editor-section">
+          <div class="case-editor-section-head">
+            <h3>内容素材</h3>
+            <span>支持本地上传封面并实时预览</span>
+          </div>
+          <div class="form-grid">
+            <div class="field-group field-group-full">
+              <div class="field-label">封面图</div>
+              <input type="hidden" data-case-field="imagePreview" value="${source.imagePreview || ""}" />
+              <label class="upload-panel case-upload-panel">
+                <input class="upload-input" data-case-upload type="file" accept="image/*" />
+                <span class="upload-illustration"></span>
+                <strong>上传封面</strong>
+                <small>选择图片后自动回填文件名，并同步更新右侧预览。</small>
+              </label>
+              <input class="input" data-case-field="image" placeholder="上传后自动回填封面图名称" value="${typeof source.image === "object" ? source.image.name || "" : source.image || ""}" readonly />
+            </div>
+            <div class="field-group field-group-full">
+              <div class="field-label">案例说明</div>
+              <div class="case-rich-toolbar">
+                <button class="btn btn-secondary" type="button" data-case-rich-command="paragraph">正文</button>
+                <button class="btn btn-secondary" type="button" data-case-rich-command="heading">标题</button>
+                <button class="btn btn-secondary" type="button" data-case-rich-command="bold">加粗</button>
+                <label class="btn btn-secondary case-rich-upload">
+                  <input class="upload-input" data-case-rich-image type="file" accept="image/*" />
+                  插入图片
+                </label>
+                <label class="btn btn-secondary case-rich-upload">
+                  <input class="upload-input" data-case-rich-video type="file" accept="video/*" />
+                  插入视频
+                </label>
+              </div>
+              <input type="hidden" data-case-field="content" value="${escapeHtml(normalizeCaseRichContent(source.content || ""))}" />
+              <div class="case-rich-editor" data-case-rich-editor contenteditable="true">${normalizeCaseRichContent(source.content || "")}</div>
+            </div>
+          </div>
         </div>
-        <div class="field-group">
-          <div class="field-label">费用</div>
-          <input class="input" data-case-field="cost" value="${source.cost}" />
+        <div style="display:flex; gap:12px; margin-top:18px;">
+          <button class="btn btn-primary" type="button" data-save-case data-mode="${mode}" data-case-id="${source.id}">${isEdit ? "保存修改" : "确认新增"}</button>
+          <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
         </div>
-        <div class="field-group">
-          <div class="field-label">展示状态</div>
-          <select class="select" data-case-field="display">
-            ${["首页展示", "正常展示", "未展示"].map((item) => `<option value="${item}" ${item === source.display ? "selected" : ""}>${item}</option>`).join("")}
-          </select>
-        </div>
-        <div class="field-group field-group-full">
-          <div class="field-label">封面图</div>
-          <input class="input" data-case-field="image" value="${source.image || ""}" />
-        </div>
-        <div class="field-group field-group-full">
-          <div class="field-label">案例说明</div>
-          <textarea class="textarea" data-case-field="content">${source.content || ""}</textarea>
-        </div>
-      </div>
-      <div style="display:flex; gap:12px; margin-top:18px;">
-        <button class="btn btn-primary" type="button" data-save-case data-mode="${mode}" data-case-id="${source.id}">${isEdit ? "保存修改" : "确认新增"}</button>
-        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
       </div>
     `);
   }
