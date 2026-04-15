@@ -5,6 +5,7 @@
     platform,
     providers,
     users,
+    vehicleModels,
     vehicles,
     products,
     categories,
@@ -20,6 +21,7 @@
     materials,
     system,
   } = window.MockData;
+  const providerAccounts = system.providerAccounts || [];
 
   const sidebarEl = document.getElementById("platformSidebar");
   const contentEl = document.getElementById("platformContent");
@@ -35,6 +37,7 @@
       children: [
         { id: "providerAudit", label: "入驻审核", badge: providers.filter((item) => item.auditStatus === "待审核").length },
         { id: "providerList", label: "服务商列表" },
+        { id: "providerAccounts", label: "服务商账号" },
       ],
     },
     {
@@ -51,6 +54,7 @@
       children: [
         { id: "productList", label: "商品列表" },
         { id: "productCategories", label: "商品分类" },
+        { id: "vehicleModelManage", label: "车型管理" },
       ],
     },
     {
@@ -90,7 +94,10 @@
       id: "forum",
       label: "论坛管理",
       children: [
-        { id: "forumManage", label: "论坛管理" },
+        { id: "forumBoards", label: "版面维护" },
+        { id: "forumTopics", label: "话题维护" },
+        { id: "forumModerators", label: "版主申请" },
+        { id: "forumManage", label: "内容管理" },
       ],
     },
     {
@@ -126,6 +133,24 @@
     expandedGroups: Object.fromEntries(menu.filter((item) => item.children).map((item) => [item.id, true])),
   };
 
+  const forumBoards = [
+    { id: "BOARD-01", name: "性能改装", summary: "围绕动力、制动、底盘等深度改装内容维护。", moderatorLimit: 3, status: "启用" },
+    { id: "BOARD-02", name: "姿态玩家", summary: "围绕轮组、车身姿态和街道风格交流。", moderatorLimit: 2, status: "启用" },
+    { id: "BOARD-03", name: "新能源升级", summary: "聚焦新能源车型外观、轮组和精品升级。", moderatorLimit: 2, status: "停用" },
+  ];
+
+  const forumTopics = [
+    { id: "TOPIC-01", name: "轮毂数据避让", board: "性能改装", sort: 10, cover: "轮毂与制动细节图", status: "启用" },
+    { id: "TOPIC-02", name: "城市姿态案例", board: "姿态玩家", sort: 20, cover: "街道夜景案例图", status: "启用" },
+    { id: "TOPIC-03", name: "电车低风阻方案", board: "新能源升级", sort: 30, cover: "新能源轮组主图", status: "启用" },
+  ];
+
+  const forumModerators = [
+    { id: "MOD-APPLY-01", account: "御驰 Performance Studio", accountType: "服务商账号", board: "性能改装", reason: "门店长期发布性能升级案例，希望维护板块内容秩序。", status: "待审核" },
+    { id: "MOD-APPLY-02", account: "平台巡检", accountType: "平台账号", board: "姿态玩家", reason: "需要协助日常内容审核与活动维护。", status: "已通过" },
+    { id: "MOD-APPLY-03", account: "擎速 Motorsport Lab", accountType: "服务商账号", board: "新能源升级", reason: "希望参与新能源案例话题运营与答疑。", status: "已驳回" },
+  ];
+
   const tagType = (text) => {
     if (!text) return "neutral";
     if (["正常营业", "已通过", "启用", "上架", "正常", "已完成", "已签收", "生效中", "首页展示", "正常展示"].includes(text)) return "success";
@@ -136,6 +161,27 @@
   };
 
   const formatTag = (text) => `<span class="tag ${tagType(text)}">${text}</span>`;
+
+  providers.forEach((item) => {
+    item.contractNo = item.contractNo || `HT-2026-${item.id.slice(-4)}`;
+    item.contractStatus = item.contractStatus || (item.auditStatus === "已通过" ? "履约中" : "待签约");
+    item.contractStart = item.contractStart || "2026-01-01";
+    item.contractEnd = item.contractEnd || "2026-12-31";
+    item.locationProvince = item.locationProvince || `${item.city}${item.city.endsWith("市") ? "" : "市"}`;
+    item.locationCity = item.locationCity || `${item.city}${item.city.endsWith("市") ? "" : "市"}`;
+    item.locationCounty = item.locationCounty || `${item.district}${item.district.endsWith("区") ? "" : "区"}`;
+    item.locationAddress = item.locationAddress || item.address;
+  });
+
+  orders.forEach((item) => {
+    item.displayType = item.displayType || (item.type === "商品订单" ? "自提" : "改装服务");
+    item.paymentMethod = item.paymentMethod || (item.payment === "待支付" ? "微信支付" : "支付宝");
+  });
+
+  signing.forEach((item) => {
+    item.anomalyPhotos = item.anomalyPhotos || [];
+    item.anomalyPhotoCount = item.anomalyPhotos.length ? `${item.anomalyPhotos.length} 张` : "-";
+  });
 
   const serviceRegionOptions = {
     全国: {
@@ -504,6 +550,80 @@
     return { type: "simple", title, description, rows, keys, labels };
   }
 
+  function getVehicleModelStats() {
+    return [
+      metric("车型档案数", String(vehicleModels.length)),
+      metric("已启用车型", String(vehicleModels.filter((item) => item.status === "启用").length)),
+      metric("待补充车型", String(vehicleModels.filter((item) => item.status === "停用").length)),
+      metric("覆盖品牌", String(new Set(vehicleModels.map((item) => item.brand)).size)),
+    ];
+  }
+
+  function getVehicleModelCode(item) {
+    return item?.id || [item?.brand, item?.series, item?.model].filter(Boolean).join("-");
+  }
+
+  function parseProductFitmentValue(value) {
+    return String(value || "")
+      .split("/")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  function getEnabledProductFitmentOptions() {
+    return vehicleModels
+      .filter((item) => item.status === "启用")
+      .map((item) => getVehicleModelCode(item));
+  }
+
+  function getProductFitmentSelection(pickerEl) {
+    return String(pickerEl?.dataset.selected || "")
+      .split("||")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  function renderProductFitmentPickerState(pickerEl) {
+    if (!pickerEl) return;
+    const options = getEnabledProductFitmentOptions();
+    const query = String(pickerEl.querySelector("[data-product-fitment-search]")?.value || "")
+      .trim()
+      .toLowerCase();
+    const selected = getProductFitmentSelection(pickerEl).filter((item) => options.includes(item));
+    pickerEl.dataset.selected = selected.join("||");
+
+    const selectedEl = pickerEl.querySelector("[data-product-fitment-selected]");
+    const optionsEl = pickerEl.querySelector("[data-product-fitment-options]");
+    if (selectedEl) {
+      selectedEl.innerHTML = selected.length
+        ? selected
+            .map(
+              (item) => `
+                <button class="pill product-fitment-chip" type="button" data-product-fitment-remove="${item}">
+                  ${item} ×
+                </button>
+              `
+            )
+            .join("")
+        : `<div class="muted">请选择适配车型，可多选。</div>`;
+    }
+
+    if (optionsEl) {
+      const filtered = options.filter((item) => item.toLowerCase().includes(query) && !selected.includes(item));
+      optionsEl.innerHTML = filtered.length
+        ? filtered
+            .map(
+              (item) => `
+                <button class="product-fitment-option" type="button" data-product-fitment-add="${item}">
+                  ${item}
+                </button>
+              `
+            )
+            .join("")
+        : `<div class="muted">没有可选车型</div>`;
+    }
+  }
+
   const defs = {
     home: {
       type: "dashboard",
@@ -525,12 +645,15 @@
       filterBy: "auditStatus",
       detail: (row) => ({
         title: row.name,
-        badges: [row.auditStatus, row.status, row.level ? `${row.level} 级` : ""].filter(Boolean),
+        badges: [...new Set([row.auditStatus, row.auditStatus === "待审核" ? "" : row.status].filter(Boolean))],
         facts: [
           ["联系人", row.contact],
-          ["城市", `${row.city} / ${row.district}`],
+          ["位置", `${row.locationProvince} / ${row.locationCity} / ${row.locationCounty}`],
+          ["详细地址", row.locationAddress],
           ["工位数量", `${row.bays} 个`],
           ["营业执照", row.license],
+          ["合同编号", row.contractNo],
+          ["合同状态", row.contractStatus],
           ["服务能力", row.specialties],
           ["月订单量", `${row.monthOrders} 单`],
         ],
@@ -549,15 +672,18 @@
         { key: "monthOrders", label: "月订单" },
         { key: "status", label: "经营状态", tag: true },
       ],
-      rows: providers,
+      rows: providers.filter((item) => item.auditStatus === "已通过"),
       filterBy: "status",
       detail: (row) => ({
         title: row.name,
-        badges: [row.status, `${row.score} 分`, row.level ? `${row.level} 级` : ""].filter(Boolean),
+        badges: [row.status, `${row.score} 分`].filter(Boolean),
         facts: [
           ["门店编号", row.id],
-          ["地区", `${row.city} / ${row.district}`],
+          ["地区", `${row.locationProvince} / ${row.locationCity} / ${row.locationCounty}`],
+          ["门店地址", row.locationAddress],
           ["联系人", row.contact],
+          ["合同编号", row.contractNo],
+          ["合同状态", row.contractStatus],
           ["擅长", row.specialties],
           ["月订单", `${row.monthOrders} 单`],
           ["营业资质", row.license],
@@ -567,9 +693,45 @@
           ["近30日订单", `${row.monthOrders} 单`],
           ["近90日平均评分", `${row.score} 分`],
           ["近30日客单均值", row.monthOrders >= 35 ? "¥ 18,600" : row.monthOrders >= 25 ? "¥ 15,200" : "¥ 11,800"],
-          ["历史状态变化", row.status === "暂停接单" ? "3月设备维护后暂停接单" : "持续正常营业"],
+          ["历史状态变化", row.auditStatus === "已驳回" ? "审核未通过，未进入营业状态" : row.status === "暂停接单" ? "3月设备维护后暂停接单" : "持续正常营业"],
         ],
         actions: "providerList",
+      }),
+    }),
+    providerAccounts: makeTableDef({
+      title: "服务商账号",
+      description: "维护服务商平台账号、角色、状态和最近登录信息。",
+      filters: ["全部", "启用", "停用"],
+      stats: [
+        metric("账号总数", String(providerAccounts.length)),
+        metric("启用账号", String(providerAccounts.filter((item) => item.status === "启用").length)),
+        metric("停用账号", String(providerAccounts.filter((item) => item.status === "停用").length)),
+        metric("覆盖服务商", String(new Set(providerAccounts.map((item) => item.provider)).size)),
+      ],
+      columns: [
+        { key: "provider", label: "所属服务商" },
+        { key: "account", label: "登录账号" },
+        { key: "name", label: "姓名" },
+        { key: "role", label: "角色" },
+        { key: "lastLogin", label: "最近登录" },
+        { key: "status", label: "账号状态", tag: true },
+      ],
+      rows: providerAccounts,
+      filterBy: "status",
+      detail: (row) => ({
+        title: row.account,
+        badges: [row.status, row.role].filter(Boolean),
+        facts: [
+          ["所属服务商", row.provider],
+          ["登录账号", row.account],
+          ["姓名", row.name],
+          ["手机号", row.phone],
+          ["角色", row.role],
+          ["最近登录", row.lastLogin || "-"],
+          ["备注", row.note || "-"],
+        ],
+        timeline: row.timeline || ["暂无处理轨迹"],
+        actions: "providerAccounts",
       }),
     }),
     userList: makeTableDef({
@@ -670,6 +832,44 @@
       }),
     }),
     productCategories: simpleListDef("商品分类", "商品分类与层级维护。", categories, ["name", "sort", "status"], ["分类名称", "排序", "状态"]),
+    vehicleModelManage: makeTableDef({
+      title: "车型管理",
+      description: "维护商品适配车型档案，补充底盘型号、年份与动力等汽车属性。",
+      filters: ["全部", "启用", "停用"],
+      stats: getVehicleModelStats(),
+      columns: [
+        { key: "id", label: "车型编码" },
+        { key: "brand", label: "品牌" },
+        { key: "series", label: "车系" },
+        { key: "model", label: "车型" },
+        { key: "chassis", label: "底盘型号" },
+        { key: "year", label: "年份" },
+        { key: "status", label: "适配状态", tag: true },
+      ],
+      rows: vehicleModels,
+      filterBy: "status",
+      detail: (row) => ({
+        title: `${row.brand} ${row.series} ${row.model}`,
+        badges: [row.status, row.energyType, row.driveType].filter(Boolean),
+        facts: [
+          ["车型编码", row.id],
+          ["品牌", row.brand],
+          ["车系", row.series],
+          ["车型", row.model],
+          ["底盘型号", row.chassis],
+          ["年份", row.year],
+          ["款型/版本", row.trim || "-"],
+          ["能源类型", row.energyType],
+          ["驱动形式", row.driveType],
+          ["发动机/电机参数", row.powerSpec || "-"],
+          ["变速箱", row.transmission || "-"],
+          ["车身形式", row.bodyStyle || "-"],
+          ["轴距", row.wheelbase || "-"],
+        ],
+        timeline: row.timeline || ["暂无处理轨迹"],
+        actions: "vehicleModelManage",
+      }),
+    }),
     serviceList: simpleListDef("服务项目列表", "可供用户下单选择的服务项目。", services, ["code", "name", "area", "basePrice", "floatRatio", "desc", "status"], ["编码", "项目名称", "区域", "基准价", "价格浮动比例", "说明", "状态"]),
     consultationConfig: simpleListDef("咨询方案配置", "用户提交服务订单时的常用需求模板。", consultationTemplates, ["title", "fields", "uses", "status"], ["模板名称", "字段", "使用次数", "状态"]),
     orderList: makeTableDef({
@@ -679,20 +879,23 @@
       stats: [metric("今日订单", "128"), metric("服务订单占比", "76%"), metric("平均客单价", "¥ 18,620"), metric("异常订单", "4")],
       columns: [
         { key: "id", label: "订单号" },
-        { key: "type", label: "类型" },
+        { key: "displayType", label: "订单类型" },
         { key: "user", label: "用户" },
         { key: "vehicle", label: "车辆" },
+        { key: "paymentMethod", label: "支付方式" },
         { key: "status", label: "订单状态", tag: true },
       ],
       rows: orders,
       filterBy: "status",
       detail: (row) => ({
         title: row.id,
-        badges: [row.status, row.payment, row.type],
+        badges: [row.status, row.payment, row.displayType],
         facts: [
           ["用户", row.user],
           ["车辆", row.vehicle],
           ["项目", row.service],
+          ["订单类型", row.displayType],
+          ["支付方式", row.paymentMethod],
           ["服务商", row.provider],
           ["预约时间", row.appointment],
           ["报价", row.quote],
@@ -735,7 +938,7 @@
       }),
     }),
     shipping: simpleListDef("发货管理", "商品订单发货信息录入与物流单维护。", shipping, ["id", "orderId", "company", "number", "status"], ["发货单", "订单号", "物流公司", "物流单号", "状态"]),
-    signing: simpleListDef("签收管理", "维护订单签收状态与异常备注。", signing, ["orderId", "customer", "signTime", "status", "note"], ["订单号", "签收人", "签收时间", "状态", "备注"]),
+    signing: simpleListDef("签收管理", "维护订单签收状态、异常备注与异常照片。", signing, ["orderId", "customer", "signTime", "status", "anomalyPhotoCount", "note"], ["订单号", "签收人", "签收时间", "状态", "异常照片", "备注"]),
     settlements: makeTableDef({
       title: "结算管理",
       description: "统一查看结算申请、审核状态与订单汇总信息。",
@@ -798,8 +1001,8 @@
       }),
     }),
     caseList: makeTableDef({
-      title: "案例列表",
-      description: "查看全平台案例数据与推荐状态。",
+      title: "案例维护",
+      description: "平台侧维护全平台案例数据，支持新增、编辑、删除和展示状态设置。",
       filters: ["全部", "首页展示", "正常展示", "未展示"],
       stats: [metric("案例总数", "68"), metric("首页展示", "12"), metric("待优化内容", "5"), metric("本周新增", "9")],
       columns: [
@@ -829,8 +1032,38 @@
         actions: "caseList",
       }),
     }),
+    forumBoards: simpleListDef("版面维护", "维护论坛版面名称、说明、状态和版主人数上限。", forumBoards, ["name", "moderatorLimit", "status"], ["版面名称", "版主人数上限", "状态"]),
+    forumTopics: simpleListDef("话题维护", "维护论坛话题名称、所属版面、排序和封面说明。", forumTopics, ["name", "board", "sort", "status"], ["话题名称", "所属版面", "排序", "状态"]),
+    forumModerators: makeTableDef({
+      title: "版主申请",
+      description: "服务商账号与平台账号可申请成为版主，并对各自板块进行维护。",
+      filters: ["全部", "待审核", "已通过", "已驳回"],
+      stats: [metric("待审核", "5"), metric("已通过", "12"), metric("平台账号申请", "4"), metric("服务商申请", "9")],
+      columns: [
+        { key: "id", label: "申请编号" },
+        { key: "account", label: "申请账号" },
+        { key: "accountType", label: "账号类型" },
+        { key: "board", label: "申请版面" },
+        { key: "status", label: "审核状态", tag: true },
+      ],
+      rows: forumModerators,
+      filterBy: "status",
+      detail: (row) => ({
+        title: row.account,
+        badges: [row.status, row.accountType, row.board],
+        facts: [
+          ["申请编号", row.id],
+          ["申请账号", row.account],
+          ["账号类型", row.accountType],
+          ["申请版面", row.board],
+          ["申请理由", row.reason],
+        ],
+        timeline: [`申请提交：${row.id}`, `目标版面：${row.board}`, `当前状态：${row.status}`],
+        actions: "forumModerators",
+      }),
+    }),
     forumManage: makeTableDef({
-      title: "论坛管理",
+      title: "论坛内容管理",
       description: "按正常论坛信息流展示帖子内容，点击帖子查看详情与评论，并支持发后管理。",
       filters: ["全部", "正常", "已删除"],
       stats: [metric("帖子总数", "318"), metric("正常展示", "296"), metric("已删除", "22"), metric("今日新增", "18")],
@@ -1079,68 +1312,50 @@
 
   function renderDashboard() {
     return `
-      <section class="page-heading">
-        <span class="eyebrow">Platform Overview</span>
+      <section class="page-heading platform-page-heading">
         <h1>首页</h1>
-        <p class="muted">围绕订单、审核、施工、物流与结算构建的全局运营视角。</p>
       </section>
-      <section class="stats-grid">
-        ${platform.kpis
-          .map(
-            (item) => `
-              <article class="panel stat-card">
-                <span class="label">${item.label}</span>
-                <strong>${item.value}</strong>
-                <span class="trend">${item.trend}</span>
-              </article>
-            `
-          )
-          .join("")}
-      </section>
-      <section class="mini-grid">
-        ${platform.todo
-          .map(
-            (item) => `
-              <article class="panel mini-card">
-                <span class="label">${item.title}</span>
-                <strong>${item.value}</strong>
-                <span class="muted">${item.note}</span>
-              </article>
-            `
-          )
-          .join("")}
-      </section>
-      <section class="panel dashboard-card" style="margin-top:22px;">
-        <div class="panel-header">
-          <div>
-            <h2 class="section-title">快捷入口</h2>
-            <p class="section-subtitle">将高频审核与派单动作集中到首页，减少跨菜单查找成本。</p>
-          </div>
-        </div>
-        <div class="shortcut-grid">
-          ${shortcuts
-            .map(
-              (item) => `
-                <button class="shortcut-card" type="button" data-shortcut-page="${item.page}">
-                  <span class="shortcut-mark">${item.icon}</span>
-                  <strong>${item.title}</strong>
-                  <p>${item.desc}</p>
-                </button>
-              `
-            )
-            .join("")}
-        </div>
-      </section>
-      <section class="dashboard-grid">
-        <article class="panel dashboard-card">
-          <div class="panel-header">
+      <section class="platform-home-hero">
+        <article class="panel platform-home-stage">
+          <div class="platform-home-stage-head">
             <div>
-              <h2 class="section-title">近六个月订单结构</h2>
-              <p class="section-subtitle">服务订单与商品订单整体增长稳定，高端服务需求持续提升。</p>
+              <div class="platform-home-kicker">Control Center</div>
+              <h2>平台控制台</h2>
             </div>
-            <span class="pill">实时刷新</span>
+            <div class="platform-home-glow"></div>
           </div>
-          <div class="trend-chart">
+          <div class="platform-home-kpi-grid">
+            ${platform.kpis
+              .map(
+                (item, index) => `
+                  <article class="platform-home-kpi" data-tone="${(index % 4) + 1}">
+                    <span>${item.label}</span>
+                    <strong>${item.value}</strong>
+                  </article>
+                `
+              )
+              .join("")}
+          </div>
+        </article>
+      </section>
+      <section class="platform-home-command-grid">
+        ${shortcuts
+          .map(
+            (item) => `
+              <button class="platform-home-command" type="button" data-shortcut-page="${item.page}">
+                <span class="platform-home-command-mark">${item.icon}</span>
+                <strong>${item.title}</strong>
+              </button>
+            `
+          )
+          .join("")}
+      </section>
+      <section class="platform-home-grid">
+        <article class="panel dashboard-card platform-home-panel">
+          <div class="panel-header">
+            <div><h2 class="section-title">订单结构</h2></div>
+          </div>
+          <div class="trend-chart platform-home-chart">
             ${platform.trend
               .map(
                 (item) => `
@@ -1156,35 +1371,28 @@
               .join("")}
           </div>
         </article>
-        <article class="panel dashboard-card">
+        <article class="panel dashboard-card platform-home-panel">
           <div class="panel-header">
-            <div>
-              <h2 class="section-title">城市热度分布</h2>
-              <p class="section-subtitle">高端改装需求集中在一线与新一线核心城区。</p>
-            </div>
+            <div><h2 class="section-title">待处理事项</h2></div>
           </div>
-          <div class="regional-list">
-            ${platform.regions
+          <div class="platform-home-queue">
+            ${platform.todo
               .map(
-                (item) => `
-                  <div class="regional-item">
-                    <strong>${item.name}</strong>
-                    <div class="progress"><span style="width:${item.value}%"></span></div>
-                    <span class="muted">${item.value}</span>
-                  </div>
+                (item, index) => `
+                  <button class="platform-home-queue-item" type="button" data-shortcut-page="${shortcuts[index]?.page || "orderAssign"}">
+                    <span>${item.title}</span>
+                    <strong>${item.value}</strong>
+                  </button>
                 `
               )
               .join("")}
           </div>
         </article>
       </section>
-      <section class="dashboard-grid">
-        <article class="panel dashboard-card">
+      <section class="platform-home-grid">
+        <article class="panel dashboard-card platform-home-panel">
           <div class="panel-header">
-            <div>
-              <h2 class="section-title">重点告警</h2>
-              <p class="section-subtitle">聚焦派单超时、审核异常和资料不完整的业务问题。</p>
-            </div>
+            <div><h2 class="section-title">重点告警</h2></div>
           </div>
           <table class="alert-table">
             <thead>
@@ -1207,26 +1415,38 @@
             </tbody>
           </table>
         </article>
-        <article class="panel dashboard-card">
+        <article class="panel dashboard-card platform-home-panel">
           <div class="panel-header">
-            <div>
-              <h2 class="section-title">推荐门店</h2>
-              <p class="section-subtitle">近期订单表现、评分与高端项目成交率综合排名。</p>
-            </div>
+            <div><h2 class="section-title">核心门店</h2></div>
           </div>
-          <div class="simple-list">
+          <div class="platform-home-provider-list">
             ${providers
               .slice(0, 4)
               .map(
                 (item, index) => `
-                  <div class="simple-list-item">
-                    <strong>#${index + 1} ${item.name}</strong>
-                    <div class="muted">${item.city} 路 ${item.specialties}</div>
-                    <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-                      ${formatTag(item.status)}
-                      <span class="pill">评分 ${item.score}</span>
-                      <span class="pill">月订单 ${item.monthOrders}</span>
+                  <article class="platform-home-provider">
+                    <div class="platform-home-provider-rank">0${index + 1}</div>
+                    <div class="platform-home-provider-main">
+                      <strong>${item.name}</strong>
+                      <div class="platform-home-provider-meta">
+                        <span>${item.city}</span>
+                        <span>${item.score}</span>
+                        <span>${item.monthOrders}</span>
+                      </div>
                     </div>
+                  </article>
+                `
+              )
+              .join("")}
+          </div>
+          <div class="regional-list platform-home-region-list">
+            ${platform.regions
+              .map(
+                (item) => `
+                  <div class="regional-item">
+                    <strong>${item.name}</strong>
+                    <div class="progress"><span style="width:${item.value}%"></span></div>
+                    <span class="muted">${item.value}</span>
                   </div>
                 `
               )
@@ -1254,6 +1474,20 @@
           <button class="btn btn-secondary" type="button" data-product-toolbar="create">新增商品</button>
           <button class="btn btn-primary" type="button" data-product-toolbar="edit" ${selected ? "" : "disabled"}>编辑商品</button>
         `
+        : state.activePage === "providerAccounts"
+          ? `
+            <button class="btn btn-secondary" type="button" data-provider-account-toolbar="create">新增账号</button>
+          `
+        : state.activePage === "vehicleModelManage"
+          ? `
+            <button class="btn btn-secondary" type="button" data-vehicle-model-toolbar="create">新增车型</button>
+          `
+        : state.activePage === "caseList"
+          ? `
+            <button class="btn btn-secondary" type="button" data-case-toolbar="create">新增案例</button>
+            <button class="btn btn-primary" type="button" data-case-toolbar="edit" ${selected ? "" : "disabled"}>编辑案例</button>
+            <button class="btn btn-danger" type="button" data-case-toolbar="delete" ${selected ? "" : "disabled"}>删除案例</button>
+          `
         : state.activePage === "roles"
           ? `
             <button class="btn btn-secondary" type="button" data-role-toolbar="create">新增角色</button>
@@ -1271,9 +1505,7 @@
 
     contentEl.innerHTML = `
       <section class="page-heading">
-        <span class="eyebrow">Platform Module</span>
         <h1>${def.title}</h1>
-        <p class="muted">${def.description}</p>
       </section>
       ${
         state.activePage === "productList"
@@ -1306,12 +1538,11 @@
                   `
                 )
                 .join("")}
-            </div>
-            <div class="toolbar-right">
-              <span class="pill">当前结果 ${rows.length}</span>
-              ${toolbarActions}
-            </div>
           </div>
+          <div class="toolbar-right">
+              ${toolbarActions}
+          </div>
+        </div>
           <table class="data-table">
             <thead>
               <tr>${def.columns.map((col) => `<th>${col.label}</th>`).join("")}</tr>
@@ -1334,7 +1565,7 @@
           </table>
         </article>
         <aside class="panel drawer-card">
-          ${selected ? renderDrawer(def.detail(selected)) : `<div class="page-heading"><h1 style="font-size:24px;">暂无详情</h1><p class="muted">请调整筛选或搜索条件。</p></div>`}
+          ${selected ? renderDrawer(def.detail(selected)) : `<div class="page-heading"><h1 style="font-size:24px;">暂无详情</h1></div>`}
         </aside>
       </section>
     `;
@@ -1349,9 +1580,7 @@
 
     contentEl.innerHTML = `
       <section class="page-heading">
-        <span class="eyebrow">Forum Management</span>
         <h1>${def.title}</h1>
-        <p class="muted">${def.description}</p>
       </section>
       <section class="table-layout forum-layout" style="margin-top:22px;">
         <article class="panel table-card forum-card">
@@ -1368,7 +1597,6 @@
                 .join("")}
             </div>
             <div class="toolbar-right">
-              <span class="pill">当前结果 ${rows.length}</span>
             </div>
           </div>
           <div class="forum-feed">
@@ -1399,12 +1627,12 @@
                       `
                     )
                     .join("")
-                : `<div class="page-heading"><h1 style="font-size:24px;">暂无内容</h1><p class="muted">请调整筛选或搜索条件。</p></div>`
+                : `<div class="page-heading"><h1 style="font-size:24px;">暂无内容</h1></div>`
             }
           </div>
         </article>
         <aside class="panel drawer-card">
-          ${detail ? renderForumDetail(detail) : `<div class="page-heading"><h1 style="font-size:24px;">暂无详情</h1><p class="muted">请调整筛选或搜索条件。</p></div>`}
+          ${detail ? renderForumDetail(detail) : `<div class="page-heading"><h1 style="font-size:24px;">暂无详情</h1></div>`}
         </aside>
       </section>
     `;
@@ -1417,7 +1645,6 @@
       <div class="panel-header">
         <div>
           <h2 class="section-title">${detail.title}</h2>
-          <p class="section-subtitle">帖子详情与评论内容</p>
         </div>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
@@ -1491,6 +1718,18 @@
           <button class="btn btn-primary" type="button" data-category-toolbar="edit" ${selected ? "" : "disabled"}>编辑</button>
           <button class="btn btn-danger" type="button" data-category-toolbar="delete" ${selected ? "" : "disabled"}>删除</button>
         `
+        : state.activePage === "forumBoards"
+          ? `
+            <button class="btn btn-secondary" type="button" data-forum-board-toolbar="create">新增</button>
+            <button class="btn btn-primary" type="button" data-forum-board-toolbar="edit" ${selected ? "" : "disabled"}>编辑</button>
+            <button class="btn btn-danger" type="button" data-forum-board-toolbar="delete" ${selected ? "" : "disabled"}>删除</button>
+          `
+        : state.activePage === "forumTopics"
+          ? `
+            <button class="btn btn-secondary" type="button" data-forum-topic-toolbar="create">新增</button>
+            <button class="btn btn-primary" type="button" data-forum-topic-toolbar="edit" ${selected ? "" : "disabled"}>编辑</button>
+            <button class="btn btn-danger" type="button" data-forum-topic-toolbar="delete" ${selected ? "" : "disabled"}>删除</button>
+          `
         : state.activePage === "serviceList"
           ? `
             <button class="btn btn-secondary" type="button" data-service-toolbar="create">新增</button>
@@ -1520,14 +1759,11 @@
 
     contentEl.innerHTML = `
       <section class="page-heading">
-        <span class="eyebrow">Platform Module</span>
         <h1>${def.title}</h1>
-        <p class="muted">${def.description}</p>
       </section>
       <article class="panel table-card">
         <div class="toolbar">
           <div class="toolbar-left">
-            <span class="pill">共 ${def.rows.length} 项</span>
           </div>
           <div class="toolbar-right">
             ${toolbarActions}
@@ -1567,7 +1803,6 @@
       <div class="panel-header">
         <div>
           <h2 class="section-title">${detail.title}</h2>
-          <p class="section-subtitle">详情视图与处理建议</p>
         </div>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
@@ -1628,6 +1863,13 @@
                   <button class="btn btn-primary" type="button" data-provider-list-action="toggle">${detail.badges.includes("暂停接单") ? "切换为正常营业" : "切换为暂停接单"}</button>
                   <button class="btn btn-secondary" type="button" data-provider-list-action="materials">查看详情</button>
                 `
+              : detail.actions === "providerAccounts"
+                ? `
+                  <button class="btn btn-primary" type="button" data-provider-account-action="toggle">${detail.badges.includes("停用") ? "启用账号" : "停用账号"}</button>
+                  <button class="btn btn-secondary" type="button" data-provider-account-action="edit">编辑账号</button>
+                  <button class="btn btn-danger" type="button" data-provider-account-action="delete">删除账号</button>
+                  <button class="btn btn-secondary" type="button" data-provider-account-action="reset">重置密码</button>
+                `
               : detail.actions === "userList"
                   ? `
                     <button class="btn btn-primary" type="button" data-user-list-action="toggle">${detail.badges.includes("停用") ? "切换为正常" : "切换为停用"}</button>
@@ -1655,7 +1897,14 @@
                   `
                 : detail.actions === "caseList"
                   ? `
+                    <button class="btn btn-secondary" type="button" data-case-list-action="edit">编辑案例</button>
                     <button class="btn btn-primary" type="button" data-case-list-action="display">展示设置</button>
+                    <button class="btn btn-danger" type="button" data-case-list-action="delete">删除案例</button>
+                  `
+                : detail.actions === "forumModerators"
+                  ? `
+                    <button class="btn btn-primary" type="button" data-moderator-action="approve">审核通过</button>
+                    <button class="btn btn-danger" type="button" data-moderator-action="reject">驳回申请</button>
                   `
                 : detail.actions === "forumManage"
                   ? `
@@ -1666,6 +1915,12 @@
                     <button class="btn btn-primary" type="button" data-material-action="toggle">${detail.badges.includes("停用") ? "启用素材" : "停用素材"}</button>
                     <button class="btn btn-secondary" type="button" data-material-action="preview">预览素材</button>
                     <button class="btn btn-secondary" type="button" data-material-action="edit">编辑素材</button>
+                  `
+                : detail.actions === "vehicleModelManage"
+                  ? `
+                    <button class="btn btn-primary" type="button" data-vehicle-model-action="detail">查看详情</button>
+                    <button class="btn btn-secondary" type="button" data-vehicle-model-action="edit">编辑车型</button>
+                    <button class="btn btn-danger" type="button" data-vehicle-model-action="delete">删除车型</button>
                   `
                 : detail.actions === "wheelMaterials"
                   ? `
@@ -1724,6 +1979,59 @@
             return;
           }
           if (selected) openProductEditorModal("edit", selected);
+        });
+      });
+    }
+
+    if (state.activePage === "vehicleModelManage") {
+      contentEl.querySelectorAll("[data-vehicle-model-toolbar]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.vehicleModelToolbar;
+          if (action === "create") {
+            openVehicleModelEditorModal("create");
+            return;
+          }
+          if (!selected) return;
+          if (action === "edit") {
+            openVehicleModelEditorModal("edit", selected);
+            return;
+          }
+          openVehicleModelDeleteModal(selected);
+        });
+      });
+
+      if (selected) {
+        contentEl.querySelectorAll("[data-vehicle-model-action]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const action = button.dataset.vehicleModelAction;
+            if (action === "detail") {
+              openGenericDetailModal(def.detail(selected));
+              return;
+            }
+            if (action === "edit") {
+              openVehicleModelEditorModal("edit", selected);
+              return;
+            }
+            openVehicleModelDeleteModal(selected);
+          });
+        });
+      }
+    }
+
+    if (state.activePage === "caseList") {
+      contentEl.querySelectorAll("[data-case-toolbar]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.caseToolbar;
+          if (action === "create") {
+            openCaseEditorModal("create");
+            return;
+          }
+          if (!selected) return;
+          if (action === "edit") {
+            openCaseEditorModal("edit", selected);
+            return;
+          }
+          openCaseDeleteModal(selected);
         });
       });
     }
@@ -1794,6 +2102,36 @@
           toggleProviderStatus(selected.id);
         });
       });
+    }
+
+    if (state.activePage === "providerAccounts") {
+      contentEl.querySelectorAll("[data-provider-account-toolbar]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.providerAccountToolbar;
+          if (action === "create") openProviderAccountEditorModal("create");
+        });
+      });
+
+      if (selected) {
+        contentEl.querySelectorAll("[data-provider-account-action]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const action = button.dataset.providerAccountAction;
+            if (action === "edit") {
+              openProviderAccountEditorModal("edit", selected);
+              return;
+            }
+            if (action === "delete") {
+              openProviderAccountDeleteModal(selected);
+              return;
+            }
+            if (action === "reset") {
+              resetProviderAccountPassword(selected.id);
+              return;
+            }
+            toggleProviderAccountStatus(selected.id);
+          });
+        });
+      }
     }
 
     if (state.activePage === "userList" && selected) {
@@ -1879,7 +2217,24 @@
     if (state.activePage === "caseList" && selected) {
       contentEl.querySelectorAll("[data-case-list-action]").forEach((button) => {
         button.addEventListener("click", () => {
+          const action = button.dataset.caseListAction;
+          if (action === "edit") {
+            openCaseEditorModal("edit", selected);
+            return;
+          }
+          if (action === "delete") {
+            openCaseDeleteModal(selected);
+            return;
+          }
           openCaseDisplayModal(selected);
+        });
+      });
+    }
+
+    if (state.activePage === "forumModerators" && selected) {
+      contentEl.querySelectorAll("[data-moderator-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          submitModeratorApply(selected.id, button.dataset.moderatorAction);
         });
       });
     }
@@ -1943,6 +2298,42 @@
             return;
           }
           openCategoryDeleteModal(selected);
+        });
+      });
+    }
+
+    if (state.activePage === "forumBoards") {
+      contentEl.querySelectorAll("[data-forum-board-toolbar]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.forumBoardToolbar;
+          if (action === "create") {
+            openForumBoardEditorModal("create");
+            return;
+          }
+          if (!selected) return;
+          if (action === "edit") {
+            openForumBoardEditorModal("edit", selected);
+            return;
+          }
+          openForumBoardDeleteModal(selected);
+        });
+      });
+    }
+
+    if (state.activePage === "forumTopics") {
+      contentEl.querySelectorAll("[data-forum-topic-toolbar]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.forumTopicToolbar;
+          if (action === "create") {
+            openForumTopicEditorModal("create");
+            return;
+          }
+          if (!selected) return;
+          if (action === "edit") {
+            openForumTopicEditorModal("edit", selected);
+            return;
+          }
+          openForumTopicDeleteModal(selected);
         });
       });
     }
@@ -2088,6 +2479,34 @@
       });
     }
 
+    const saveForumBoardBtn = modalCardEl.querySelector("[data-save-forum-board]");
+    if (saveForumBoardBtn) {
+      saveForumBoardBtn.addEventListener("click", () => {
+        saveForumBoard(saveForumBoardBtn.dataset.mode, saveForumBoardBtn.dataset.id);
+      });
+    }
+
+    const deleteForumBoardBtn = modalCardEl.querySelector("[data-delete-forum-board]");
+    if (deleteForumBoardBtn) {
+      deleteForumBoardBtn.addEventListener("click", () => {
+        deleteForumBoard(deleteForumBoardBtn.dataset.id);
+      });
+    }
+
+    const saveForumTopicBtn = modalCardEl.querySelector("[data-save-forum-topic]");
+    if (saveForumTopicBtn) {
+      saveForumTopicBtn.addEventListener("click", () => {
+        saveForumTopic(saveForumTopicBtn.dataset.mode, saveForumTopicBtn.dataset.id);
+      });
+    }
+
+    const deleteForumTopicBtn = modalCardEl.querySelector("[data-delete-forum-topic]");
+    if (deleteForumTopicBtn) {
+      deleteForumTopicBtn.addEventListener("click", () => {
+        deleteForumTopic(deleteForumTopicBtn.dataset.id);
+      });
+    }
+
     const saveServiceBtn = modalCardEl.querySelector("[data-save-service]");
     if (saveServiceBtn) {
       saveServiceBtn.addEventListener("click", () => {
@@ -2218,6 +2637,20 @@
       });
     });
 
+    const saveCaseBtn = modalCardEl.querySelector("[data-save-case]");
+    if (saveCaseBtn) {
+      saveCaseBtn.addEventListener("click", () => {
+        saveCase(saveCaseBtn.dataset.mode, saveCaseBtn.dataset.caseId);
+      });
+    }
+
+    const deleteCaseBtn = modalCardEl.querySelector("[data-delete-case]");
+    if (deleteCaseBtn) {
+      deleteCaseBtn.addEventListener("click", () => {
+        deleteCase(deleteCaseBtn.dataset.caseId);
+      });
+    }
+
     const submitPostDeleteBtn = modalCardEl.querySelector("[data-submit-post-delete]");
     if (submitPostDeleteBtn) {
       submitPostDeleteBtn.addEventListener("click", () => {
@@ -2245,6 +2678,61 @@
     if (submitCommentRestoreBtn) {
       submitCommentRestoreBtn.addEventListener("click", () => {
         submitCommentManage(submitCommentRestoreBtn.dataset.commentId, "restore");
+      });
+    }
+
+    const saveVehicleModelBtn = modalCardEl.querySelector("[data-save-vehicle-model]");
+    if (saveVehicleModelBtn) {
+      saveVehicleModelBtn.addEventListener("click", () => {
+        saveVehicleModel(saveVehicleModelBtn.dataset.mode, saveVehicleModelBtn.dataset.id);
+      });
+    }
+
+    const deleteVehicleModelBtn = modalCardEl.querySelector("[data-delete-vehicle-model]");
+    if (deleteVehicleModelBtn) {
+      deleteVehicleModelBtn.addEventListener("click", () => {
+        deleteVehicleModel(deleteVehicleModelBtn.dataset.id);
+      });
+    }
+
+    const saveProviderAccountBtn = modalCardEl.querySelector("[data-save-provider-account]");
+    if (saveProviderAccountBtn) {
+      saveProviderAccountBtn.addEventListener("click", () => {
+        saveProviderAccount(saveProviderAccountBtn.dataset.mode, saveProviderAccountBtn.dataset.id);
+      });
+    }
+
+    const deleteProviderAccountBtn = modalCardEl.querySelector("[data-delete-provider-account]");
+    if (deleteProviderAccountBtn) {
+      deleteProviderAccountBtn.addEventListener("click", () => {
+        deleteProviderAccount(deleteProviderAccountBtn.dataset.id);
+      });
+    }
+
+    const fitmentPicker = modalCardEl.querySelector("[data-product-fitment-picker]");
+    if (fitmentPicker) {
+      renderProductFitmentPickerState(fitmentPicker);
+      const searchInput = fitmentPicker.querySelector("[data-product-fitment-search]");
+      if (searchInput) {
+        searchInput.addEventListener("input", () => {
+          renderProductFitmentPickerState(fitmentPicker);
+        });
+      }
+      fitmentPicker.addEventListener("click", (event) => {
+        const addBtn = event.target.closest("[data-product-fitment-add]");
+        if (addBtn) {
+          const selected = new Set(getProductFitmentSelection(fitmentPicker));
+          selected.add(addBtn.dataset.productFitmentAdd);
+          fitmentPicker.dataset.selected = Array.from(selected).join("||");
+          renderProductFitmentPickerState(fitmentPicker);
+          return;
+        }
+        const removeBtn = event.target.closest("[data-product-fitment-remove]");
+        if (removeBtn) {
+          const selected = getProductFitmentSelection(fitmentPicker).filter((item) => item !== removeBtn.dataset.productFitmentRemove);
+          fitmentPicker.dataset.selected = selected.join("||");
+          renderProductFitmentPickerState(fitmentPicker);
+        }
       });
     }
 
@@ -2292,10 +2780,20 @@
         const orderId = saveSigningBtn.dataset.orderId;
         const status = modalCardEl.querySelector("[data-signing-field=\"status\"]")?.value || "已签收";
         const note = modalCardEl.querySelector("[data-signing-field=\"note\"]")?.value.trim() || "";
+        const photoCount = modalCardEl.querySelector("[data-signing-field=\"photos\"]")?.files?.length || 0;
         const target = signing.find((item) => item.orderId === orderId);
         if (!target) return;
+        if (status === "异常签收" && (!note || photoCount === 0)) {
+          openFeedbackModal("信息不完整", "异常签收必须填写备注并上传异常照片。");
+          return;
+        }
         target.status = status;
         target.note = note;
+        target.anomalyPhotos =
+          status === "异常签收"
+            ? Array.from({ length: photoCount }, (_, index) => `${orderId}-anomaly-${index + 1}.jpg`)
+            : [];
+        target.anomalyPhotoCount = target.anomalyPhotos.length ? `${target.anomalyPhotos.length} 张` : "-";
         target.signTime = "2026-04-02 18:15";
         openFeedbackModal("签收已更新", `${target.orderId} 已保存为 ${status}。`);
       });
@@ -2332,66 +2830,250 @@
   }
 
   function openProviderAuditMaterialsModal(row) {
-    const docs = [
-      { title: "营业执照", desc: row.license },
-      { title: "联系人资料", desc: row.contact },
-      { title: "门店基础信息", desc: `${row.city} / ${row.district} / ${row.bays} 个施工工位` },
-      { title: "主营能力说明", desc: row.specialties },
-      { title: "门店图片包", desc: "门头照 / 夜景照 / 接待区 / 施工位 / 完工交付区" },
-      { title: "行业资质材料", desc: "品牌授权、技师认证、高端项目施工资质" },
-    ];
+    openModal(renderProviderMaterialsModal(row, {
+      eyebrow: "Raw Materials",
+      subtitle: `${row.name} 提交的门店入驻原始资料`,
+    }));
+  }
 
+  function openProviderListMaterialsModal(row) {
+    openModal(renderProviderMaterialsModal(row, {
+      eyebrow: "Provider Profile",
+      subtitle: `${row.name} 的平台留档详情`,
+    }));
+  }
+
+  function openProviderAccountEditorModal(mode, row) {
+    const isEdit = mode === "edit";
+    const source = isEdit
+      ? row
+      : {
+          provider: providers.find((item) => item.auditStatus === "已通过")?.name || "擎速 Motorsport Lab",
+          account: "provider_new_account",
+          name: "新账号姓名",
+          phone: "138****0000",
+          role: "管理员",
+          lastLogin: "",
+          status: "启用",
+          note: "负责服务商后台日常操作。",
+        };
+    const providerOptions = providers
+      .filter((item) => item.auditStatus === "已通过")
+      .map((item) => `<option value="${item.name}" ${item.name === source.provider ? "selected" : ""}>${item.name}</option>`)
+      .join("");
     openModal(`
       <div class="panel-header">
         <div>
-          <span class="eyebrow">Raw Materials</span>
-          <h2 class="section-title">查看详情</h2>
-          <p class="section-subtitle">${row.name} 提交的门店入驻原始材料清单</p>
+          <span class="eyebrow">Provider Account Editor</span>
+          <h2 class="section-title">${isEdit ? "编辑服务商账号" : "新增服务商账号"}</h2>
+          <p class="section-subtitle">${isEdit ? `正在编辑 ${row.account}` : "创建新的服务商后台账号"}</p>
         </div>
       </div>
-      <div class="doc-list">
-        ${docs
-          .map(
-            (doc) => `
-              <div class="doc-item">
-                <strong>${doc.title}</strong>
-                <div class="muted">${doc.desc}</div>
-              </div>
-            `
-          )
-          .join("")}
+      <div class="form-grid">
+        <div class="field-group">
+          <div class="field-label">所属服务商</div>
+          <select class="select" data-provider-account-field="provider">${providerOptions}</select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">登录账号</div>
+          <input class="input" data-provider-account-field="account" value="${source.account}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">姓名</div>
+          <input class="input" data-provider-account-field="name" value="${source.name}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">手机号</div>
+          <input class="input" data-provider-account-field="phone" value="${source.phone}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">角色</div>
+          <select class="select" data-provider-account-field="role">
+            ${["管理员", "员工"].map((item) => `<option value="${item}" ${item === source.role ? "selected" : ""}>${item}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">账号状态</div>
+          <select class="select" data-provider-account-field="status">
+            ${["启用", "停用"].map((item) => `<option value="${item}" ${item === source.status ? "selected" : ""}>${item}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">最近登录时间</div>
+          <input class="input" data-provider-account-field="lastLogin" value="${source.lastLogin || ""}" placeholder="例如 2026-04-15 09:18" />
+        </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">备注</div>
+          <textarea class="textarea" data-provider-account-field="note">${source.note || ""}</textarea>
+        </div>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
-        <button class="btn btn-primary" type="button" data-close-modal>关闭</button>
+        <button class="btn btn-primary" type="button" data-save-provider-account data-mode="${mode}" ${isEdit ? `data-id="${row.id}"` : ""}>${isEdit ? "保存修改" : "确认新增"}</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
       </div>
     `);
   }
 
-  function openProviderListMaterialsModal(row) {
-    const docs = [
-      { title: "服务商基础档案", desc: `${row.name} / ${row.id} / ${row.city} / ${row.district}` },
-      { title: "联系人资料", desc: row.contact },
-      { title: "营业执照", desc: row.license },
-      { title: "主营能力", desc: row.specialties },
-      { title: "门店工位", desc: `${row.bays} 个工位，最近月订单 ${row.monthOrders} 单` },
-      { title: "平台留档", desc: "门头图、施工区照片、案例图、合作授权文件、历史运营记录" },
-    ];
-
+  function openProviderAccountDeleteModal(row) {
     openModal(`
       <div class="panel-header">
         <div>
-          <span class="eyebrow">Provider Profile</span>
-          <h2 class="section-title">查看详情</h2>
-          <p class="section-subtitle">${row.name} 的平台留档原始资料</p>
+          <span class="eyebrow">Provider Account Delete</span>
+          <h2 class="section-title">删除服务商账号</h2>
+          <p class="section-subtitle">确认删除账号“${row.account}”吗？此操作仅影响当前 mock 展示数据。</p>
         </div>
       </div>
-      <div class="doc-list">
-        ${docs.map((doc) => `<div class="doc-item"><strong>${doc.title}</strong><div class="muted">${doc.desc}</div></div>`).join("")}
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-danger" type="button" data-delete-provider-account data-id="${row.id}">确认删除</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
+  function renderProviderMaterialsModal(row, options = {}) {
+    const address = row.address || `${row.locationProvince || ""}${row.locationCity || ""}${row.locationCounty || ""}${row.locationAddress || ""}`;
+    const gallery = [
+      { title: "门头主视图", desc: "展示门店招牌、主入口和停车落客区", tone: "orange" },
+      { title: "接待区", desc: "展示接待台、客户休息区和洽谈区", tone: "blue" },
+      { title: "施工环境", desc: "展示施工区域、工具墙和作业动线", tone: "teal" },
+      { title: "完工交付区", desc: "展示交付车位、灯光和交车氛围", tone: "gold" },
+    ];
+    const contracts = [
+      { title: "合作合同首页", meta: `合同编号 ${row.contractNo}` },
+      { title: "盖章签署页", meta: `状态 ${row.contractStatus}` },
+      { title: "补充协议附件", meta: `${row.contractStart || "待补充"} 至 ${row.contractEnd || "待补充"}` },
+    ];
+    const credentials = [
+      { title: "营业执照", meta: row.license },
+      { title: "品牌授权文件", meta: "轮毂、制动、车衣等合作授权" },
+      { title: "技师认证", meta: "高级技师认证 / 施工规范承诺" },
+    ];
+
+    return `
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">${options.eyebrow || "Provider Profile"}</span>
+          <h2 class="section-title">查看详情</h2>
+          <p class="section-subtitle">${options.subtitle || `${row.name} 的平台留档详情`}</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+        ${[...new Set([row.auditStatus, row.auditStatus === "待审核" ? "" : row.status, row.score ? `${row.score} 分` : ""].filter(Boolean))].map((item) => formatTag(item)).join("")}
+      </div>
+      <div class="provider-material-layout">
+        <section class="provider-material-section">
+          <div class="panel-header" style="margin-bottom:12px;">
+            <div><h3 class="section-title" style="font-size:18px;">基础信息</h3></div>
+          </div>
+          <div class="provider-material-grid">
+            ${[
+              ["门店编号", row.id],
+              ["门店名称", row.name],
+              ["联系人", row.contact],
+              ["主营能力", row.specialties],
+              ["近30日订单", `${row.monthOrders} 单`],
+            ].map(([label, value]) => `<div class="provider-material-card"><span>${label}</span><strong>${value || "-"}</strong></div>`).join("")}
+          </div>
+        </section>
+        <section class="provider-material-section">
+          <div class="panel-header" style="margin-bottom:12px;">
+            <div><h3 class="section-title" style="font-size:18px;">位置信息</h3></div>
+          </div>
+          <div class="provider-material-grid provider-material-grid-wide">
+            <div class="provider-material-card">
+              <span>所在地区</span>
+              <strong>${[row.locationProvince, row.locationCity, row.locationCounty].filter(Boolean).join(" / ") || `${row.city} / ${row.district}`}</strong>
+            </div>
+            <div class="provider-material-card">
+              <span>详细地址</span>
+              <strong>${address}</strong>
+            </div>
+          </div>
+          <div class="provider-material-visual provider-material-map">
+            <div class="provider-material-map-pin"></div>
+            <div>
+              <div class="eyebrow">Location Preview</div>
+              <strong>${row.name}</strong>
+              <p>${address}</p>
+            </div>
+          </div>
+        </section>
+        <section class="provider-material-section">
+          <div class="panel-header" style="margin-bottom:12px;">
+            <div><h3 class="section-title" style="font-size:18px;">合同信息</h3></div>
+          </div>
+          <div class="provider-material-grid">
+            ${[
+              ["合同编号", row.contractNo],
+              ["合同状态", row.contractStatus],
+              ["合同开始时间", row.contractStart || "待补充"],
+              ["合同结束时间", row.contractEnd || "待补充"],
+            ].map(([label, value]) => `<div class="provider-material-card"><span>${label}</span><strong>${value || "-"}</strong></div>`).join("")}
+          </div>
+          <div class="provider-material-doc-grid">
+            ${contracts.map((item, index) => `
+              <article class="provider-material-doc provider-material-doc-${index + 1}">
+                <div class="eyebrow">Contract File</div>
+                <strong>${item.title}</strong>
+                <p>${item.meta}</p>
+              </article>
+            `).join("")}
+          </div>
+        </section>
+        <section class="provider-material-section">
+          <div class="panel-header" style="margin-bottom:12px;">
+            <div><h3 class="section-title" style="font-size:18px;">图片留档</h3></div>
+          </div>
+          <div class="provider-material-gallery">
+            ${gallery.map((item) => `
+              <article class="provider-material-shot" data-tone="${item.tone}">
+                <div class="provider-material-shot-media">${item.title}</div>
+                <strong>${item.title}</strong>
+                <p>${item.desc}</p>
+              </article>
+            `).join("")}
+          </div>
+        </section>
+        <section class="provider-material-section">
+          <div class="panel-header" style="margin-bottom:12px;">
+            <div><h3 class="section-title" style="font-size:18px;">资质文件</h3></div>
+          </div>
+          <div class="provider-material-doc-grid">
+            ${credentials.map((item, index) => `
+              <article class="provider-material-doc provider-material-credential-${index + 1}">
+                <div class="eyebrow">Credential</div>
+                <strong>${item.title}</strong>
+                <p>${item.meta}</p>
+              </article>
+            `).join("")}
+          </div>
+        </section>
+        <section class="provider-material-section">
+          <div class="panel-header" style="margin-bottom:12px;">
+            <div><h3 class="section-title" style="font-size:18px;">经营信息</h3></div>
+          </div>
+          <div class="provider-material-grid">
+            ${[
+              ["累计订单", `${row.totalOrders || 0} 单`],
+              ["当前营收", row.currentRevenue || "-"],
+              ["未结算金额", row.unsettledAmount || "-"],
+              ["已结算金额", row.settledAmount || "-"],
+            ].map(([label, value]) => `<div class="provider-material-card"><span>${label}</span><strong>${value}</strong></div>`).join("")}
+          </div>
+        </section>
+        <section class="provider-material-section">
+          <div class="panel-header" style="margin-bottom:12px;">
+            <div><h3 class="section-title" style="font-size:18px;">处理轨迹</h3></div>
+          </div>
+          <div class="timeline">
+            ${(row.timeline || []).map((item) => `<div class="timeline-item">${item}</div>`).join("")}
+          </div>
+        </section>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-primary" type="button" data-close-modal>关闭</button>
       </div>
-    `);
+    `;
   }
 
   function openUserMaterialsModal(row) {
@@ -2533,11 +3215,9 @@
             (item, index) => `
               <div class="doc-item">
                 <strong>#${index + 1} ${item.name}</strong>
-                <div class="muted">${item.city} 路 ${item.specialties}</div>
+                <div class="muted">${item.city} 路 ${item.specialties}${row.intention === item.name ? " 路 客户意向门店" : ""}</div>
                 <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
                   ${formatTag(item.status)}
-                  <span class="pill">评分 ${item.score}</span>
-                  ${row.intention === item.name ? '<span class="pill">客户意向门店</span>' : ""}
                   <button class="btn btn-primary" type="button" data-assign-provider="${item.id}">派给此门店</button>
                 </div>
               </div>
@@ -2631,6 +3311,120 @@
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-danger" type="button" data-delete-category data-name="${row.name}">确认删除</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
+  function openForumBoardEditorModal(mode, row) {
+    const isEdit = mode === "edit";
+    const source = row || { id: `BOARD-${Date.now().toString().slice(-4)}`, name: "", summary: "", moderatorLimit: 2, status: "启用" };
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Forum Board</span>
+          <h2 class="section-title">${isEdit ? "编辑版面" : "新增版面"}</h2>
+          <p class="section-subtitle">${source.id} / ${isEdit ? source.name : "创建新的论坛版面"}</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <div class="field-label">版面名称</div>
+          <input class="input" data-forum-board-field="name" value="${source.name}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">版主人数上限</div>
+          <input class="input" data-forum-board-field="moderatorLimit" value="${source.moderatorLimit}" />
+        </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">版面说明</div>
+          <textarea class="textarea" data-forum-board-field="summary">${source.summary || ""}</textarea>
+        </div>
+        <div class="field-group">
+          <div class="field-label">状态</div>
+          <select class="select" data-forum-board-field="status">
+            ${["启用", "停用"].map((item) => `<option value="${item}" ${item === source.status ? "selected" : ""}>${item}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-save-forum-board data-mode="${mode}" data-id="${source.id}">${isEdit ? "保存修改" : "确认新增"}</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
+  function openForumBoardDeleteModal(row) {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Forum Board</span>
+          <h2 class="section-title">删除版面</h2>
+          <p class="section-subtitle">确认删除版面“${row.name}”吗？</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-danger" type="button" data-delete-forum-board data-id="${row.id}">确认删除</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
+  function openForumTopicEditorModal(mode, row) {
+    const isEdit = mode === "edit";
+    const source = row || { id: `TOPIC-${Date.now().toString().slice(-4)}`, name: "", board: forumBoards[0]?.name || "", sort: forumTopics.length + 1, cover: "", status: "启用" };
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Forum Topic</span>
+          <h2 class="section-title">${isEdit ? "编辑话题" : "新增话题"}</h2>
+          <p class="section-subtitle">${source.id} / ${isEdit ? source.name : "创建新的论坛话题"}</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <div class="field-label">话题名称</div>
+          <input class="input" data-forum-topic-field="name" value="${source.name}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">所属版面</div>
+          <select class="select" data-forum-topic-field="board">
+            ${forumBoards.map((item) => `<option value="${item.name}" ${item.name === source.board ? "selected" : ""}>${item.name}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">排序</div>
+          <input class="input" data-forum-topic-field="sort" value="${source.sort}" />
+        </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">封面说明</div>
+          <input class="input" data-forum-topic-field="cover" value="${source.cover || ""}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">状态</div>
+          <select class="select" data-forum-topic-field="status">
+            ${["启用", "停用"].map((item) => `<option value="${item}" ${item === source.status ? "selected" : ""}>${item}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-save-forum-topic data-mode="${mode}" data-id="${source.id}">${isEdit ? "保存修改" : "确认新增"}</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
+  function openForumTopicDeleteModal(row) {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Forum Topic</span>
+          <h2 class="section-title">删除话题</h2>
+          <p class="section-subtitle">确认删除话题“${row.name}”吗？</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-danger" type="button" data-delete-forum-topic data-id="${row.id}">确认删除</button>
         <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
       </div>
     `);
@@ -2847,6 +3641,15 @@
           <div class="field-label">签收备注</div>
           <textarea class="textarea" data-signing-field="note">${row.note || ""}</textarea>
         </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">异常照片</div>
+          <label class="upload-panel">
+            <input class="upload-input" data-signing-field="photos" type="file" accept="image/*" multiple />
+            <span class="upload-illustration"></span>
+            <strong>上传异常签收照片</strong>
+            <small>当状态为异常签收时至少上传 1 张异常照片，作为后台留证。</small>
+          </label>
+        </div>
         <div class="field-group">
           <div class="field-label">状态</div>
           <select class="select" data-signing-field="status">
@@ -2869,11 +3672,13 @@
       facts: [
         ["签收人", row.customer],
         ["签收时间", row.signTime],
+        ["异常照片", row.anomalyPhotos?.length ? row.anomalyPhotos.join(" / ") : "无"],
         ["备注", row.note],
       ],
       timeline: [
         `订单号：${row.orderId}`,
         `签收状态：${row.status}`,
+        `异常照片：${row.anomalyPhotos?.length ? `${row.anomalyPhotos.length} 张` : "无"}`,
         `签收备注：${row.note}`,
       ],
     });
@@ -2881,6 +3686,7 @@
 
   function openProductEditorModal(mode, row) {
     const isEdit = mode === "edit";
+    const selectedFitments = parseProductFitmentValue(isEdit ? row.fitment : "宝马-3系-330i / 奔驰-C级-C260L");
     const categoryOptions = categories
       .map((item) => {
         const indent = item.level === 1 ? "└ " : "";
@@ -2921,9 +3727,13 @@
           <div class="field-label">库存</div>
           <input class="input" data-product-field="stock" placeholder="请输入库存数量" value="${isEdit ? row.stock : "12"}" />
         </div>
-        <div class="field-group">
+        <div class="field-group field-group-full">
           <div class="field-label">适配车型</div>
-          <input class="input" data-product-field="fitment" placeholder="请输入适配车型" value="${isEdit ? row.fitment : "宝马 3系 / 奔驰 C级 / 奥迪 A4L"}" />
+          <div class="product-fitment-picker" data-product-fitment-picker data-selected="${selectedFitments.join("||")}">
+            <input class="input" data-product-fitment-search type="search" placeholder="搜索品牌 / 车系 / 车型">
+            <div class="product-fitment-selected" data-product-fitment-selected></div>
+            <div class="product-fitment-dropdown" data-product-fitment-options></div>
+          </div>
         </div>
         <div class="field-group">
           <div class="field-label">状态</div>
@@ -2943,6 +3753,118 @@
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-primary" type="button" data-save-product data-mode="${mode}" ${isEdit ? `data-sku="${row.sku}"` : ""}>${isEdit ? "保存修改" : "确认新增"}</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
+  function openVehicleModelEditorModal(mode, row) {
+    const isEdit = mode === "edit";
+    const source = isEdit
+      ? row
+      : {
+          id: `CAR-${String(vehicleModels.length + 1001).padStart(4, "0")}`,
+          brand: "宝马",
+          series: "3系",
+          model: "330i",
+          chassis: "G20",
+          year: "2024",
+          trim: "M运动曜夜套装",
+          energyType: "燃油",
+          driveType: "后驱",
+          powerSpec: "2.0T / B48 / 245Ps",
+          transmission: "8AT",
+          bodyStyle: "四门轿车",
+          wheelbase: "2851mm",
+          status: "启用",
+        };
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Vehicle Model Editor</span>
+          <h2 class="section-title">${isEdit ? "编辑车型" : "新增车型"}</h2>
+          <p class="section-subtitle">${isEdit ? `正在编辑 ${row.brand} ${row.series} ${row.model}` : "创建新的商品适配车型档案"}</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <div class="field-label">车型编码</div>
+          <input class="input" data-vehicle-model-field="id" value="${source.id}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">品牌</div>
+          <input class="input" data-vehicle-model-field="brand" value="${source.brand}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">车系</div>
+          <input class="input" data-vehicle-model-field="series" value="${source.series}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">车型</div>
+          <input class="input" data-vehicle-model-field="model" value="${source.model}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">底盘型号</div>
+          <input class="input" data-vehicle-model-field="chassis" value="${source.chassis}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">年份</div>
+          <input class="input" data-vehicle-model-field="year" value="${source.year}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">款型/版本</div>
+          <input class="input" data-vehicle-model-field="trim" value="${source.trim || ""}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">能源类型</div>
+          <input class="input" data-vehicle-model-field="energyType" value="${source.energyType}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">驱动形式</div>
+          <input class="input" data-vehicle-model-field="driveType" value="${source.driveType}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">发动机/电机参数</div>
+          <input class="input" data-vehicle-model-field="powerSpec" value="${source.powerSpec || ""}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">变速箱</div>
+          <input class="input" data-vehicle-model-field="transmission" value="${source.transmission || ""}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">车身形式</div>
+          <input class="input" data-vehicle-model-field="bodyStyle" value="${source.bodyStyle || ""}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">轴距</div>
+          <input class="input" data-vehicle-model-field="wheelbase" value="${source.wheelbase || ""}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">适配状态</div>
+          <select class="select" data-vehicle-model-field="status">
+            <option value="启用" ${source.status === "启用" ? "selected" : ""}>启用</option>
+            <option value="停用" ${source.status === "停用" ? "selected" : ""}>停用</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-save-vehicle-model data-mode="${mode}" ${isEdit ? `data-id="${row.id}"` : ""}>${isEdit ? "保存修改" : "确认新增"}</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
+  function openVehicleModelDeleteModal(row) {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Vehicle Model Delete</span>
+          <h2 class="section-title">删除车型</h2>
+          <p class="section-subtitle">确认删除车型“${row.brand} ${row.series} ${row.model}”吗？此操作仅影响当前 mock 展示数据。</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-danger" type="button" data-delete-vehicle-model data-id="${row.id}">确认删除</button>
         <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
       </div>
     `);
@@ -3128,6 +4050,52 @@
     target.display = display;
     target.timeline.unshift(`2026-04-03 16:10 平台将案例展示状态更新为：${display}`);
     openFeedbackModal("展示状态已更新", `${target.id} 已切换为${display}。`);
+  }
+
+  function saveCase(mode, caseId) {
+    const getValue = (field) => modalCardEl.querySelector(`[data-case-field="${field}"]`)?.value.trim() || "";
+    const payload = {
+      id: caseId,
+      title: getValue("title"),
+      provider: getValue("provider"),
+      model: getValue("model"),
+      style: getValue("style"),
+      cost: getValue("cost"),
+      image: getValue("image"),
+      content: getValue("content"),
+      display: getValue("display"),
+      audit: "待审核",
+      timeline: [`2026-04-03 16:20 平台${mode === "edit" ? "更新" : "新增"}案例：${getValue("title")}`],
+    };
+    if (!payload.title || !payload.provider || !payload.model || !payload.image || !payload.content) {
+      openFeedbackModal("信息不完整", "请填写案例标题、服务商、车型、封面图和案例说明。");
+      return;
+    }
+    if (mode === "edit") {
+      const target = cases.find((item) => item.id === caseId);
+      if (!target) return;
+      Object.assign(target, payload, { audit: target.audit, timeline: target.timeline });
+      target.timeline.unshift(`2026-04-03 16:20 平台更新案例信息：${target.title}`);
+      openFeedbackModal("案例已更新", `${target.title} 的案例信息已保存。`);
+      return;
+    }
+    cases.unshift(payload);
+    state.selectedIndex = 0;
+    openFeedbackModal("案例已新增", `${payload.title} 已加入案例维护列表。`);
+  }
+
+  function deleteCase(caseId) {
+    const index = cases.findIndex((item) => item.id === caseId);
+    if (index === -1) return;
+    const [removed] = cases.splice(index, 1);
+    openFeedbackModal("案例已删除", `${removed.title} 已从案例维护中移除。`);
+  }
+
+  function submitModeratorApply(id, decision) {
+    const target = forumModerators.find((item) => item.id === id);
+    if (!target) return;
+    target.status = decision === "approve" ? "已通过" : "已驳回";
+    openFeedbackModal(decision === "approve" ? "申请已通过" : "申请已驳回", `${target.account} 的版主申请已更新为${target.status}。`);
   }
 
   function submitPostManage(postId, action, reason = "") {
@@ -3336,6 +4304,25 @@
     openFeedbackModal("服务商状态已更新", `${target.name} 当前状态：${target.status}。`);
   }
 
+  function toggleProviderAccountStatus(accountId) {
+    const target = providerAccounts.find((item) => item.id === accountId);
+    if (!target) return;
+    target.status = target.status === "停用" ? "启用" : "停用";
+    target.timeline = target.timeline || [];
+    target.timeline.unshift(`2026-04-15 10:40 平台更新账号状态为：${target.status}`);
+    renderPage();
+    openFeedbackModal("账号状态已更新", `${target.account} 当前状态：${target.status}。`);
+  }
+
+  function resetProviderAccountPassword(accountId) {
+    const target = providerAccounts.find((item) => item.id === accountId);
+    if (!target) return;
+    target.timeline = target.timeline || [];
+    target.timeline.unshift("2026-04-15 10:45 平台执行重置密码操作");
+    renderPage();
+    openFeedbackModal("密码已重置", `${target.account} 的登录密码已重置为 mock 初始密码。`);
+  }
+
   function toggleUserStatus(userId) {
     const target = users.find((item) => item.id === userId);
     if (!target) return;
@@ -3349,6 +4336,7 @@
       const el = modalCardEl.querySelector(`[data-product-field="${field}"]`);
       return el ? el.value.trim() : "";
     };
+    const fitment = getProductFitmentSelection(modalCardEl.querySelector("[data-product-fitment-picker]")).join(" / ");
 
     const payload = {
       sku: getValue("sku"),
@@ -3357,14 +4345,14 @@
       category: getValue("category"),
       price: getValue("price"),
       stock: Number(getValue("stock")) || 0,
-      fitment: getValue("fitment"),
+      fitment,
       image: getValue("image"),
       description: getValue("description"),
       status: getValue("status"),
     };
 
-    if (!payload.sku || !payload.name || !payload.brand) {
-      openFeedbackModal("信息不完整", "请至少填写 SKU、商品名称和品牌后再提交。");
+    if (!payload.sku || !payload.name || !payload.brand || !payload.fitment) {
+      openFeedbackModal("信息不完整", "请至少填写 SKU、商品名称、品牌，并选择一个适配车型后再提交。");
       return;
     }
 
@@ -3378,6 +4366,106 @@
 
     products.unshift(payload);
     openFeedbackModal("商品已新增", `${payload.name} 已加入商品列表。`);
+  }
+
+  function saveProviderAccount(mode, sourceId) {
+    const getValue = (field) => modalCardEl.querySelector(`[data-provider-account-field="${field}"]`)?.value.trim() || "";
+    const payload = {
+      provider: getValue("provider"),
+      account: getValue("account"),
+      name: getValue("name"),
+      phone: getValue("phone"),
+      role: getValue("role"),
+      lastLogin: getValue("lastLogin"),
+      status: getValue("status"),
+      note: getValue("note"),
+    };
+
+    if (!payload.provider || !payload.account || !payload.name || !payload.phone || !payload.role || !payload.status) {
+      openFeedbackModal("信息不完整", "请填写所属服务商、登录账号、姓名、手机号、角色和账号状态。");
+      return;
+    }
+
+    if (mode === "edit") {
+      const target = providerAccounts.find((item) => item.id === sourceId);
+      if (!target) return;
+      Object.assign(target, payload);
+      target.timeline = target.timeline || [];
+      target.timeline.unshift(`2026-04-15 10:30 平台更新服务商账号：${payload.account}`);
+      renderPage();
+      openFeedbackModal("服务商账号已更新", `${payload.account} 的账号信息已保存。`);
+      return;
+    }
+
+    payload.id = `PA-${String(providerAccounts.length + 1001).padStart(4, "0")}`;
+    payload.timeline = [`2026-04-15 10:30 平台新增服务商账号：${payload.account}`, `账号状态：${payload.status}`];
+    providerAccounts.unshift(payload);
+    state.selectedIndex = 0;
+    renderPage();
+    openFeedbackModal("服务商账号已新增", `${payload.account} 已加入服务商账号列表。`);
+  }
+
+  function deleteProviderAccount(accountId) {
+    const index = providerAccounts.findIndex((item) => item.id === accountId);
+    if (index === -1) return;
+    const [removed] = providerAccounts.splice(index, 1);
+    state.selectedIndex = Math.max(0, state.selectedIndex - (state.selectedIndex >= providerAccounts.length ? 1 : 0));
+    renderPage();
+    openFeedbackModal("服务商账号已删除", `${removed.account} 已从服务商账号列表中移除。`);
+  }
+
+  function saveVehicleModel(mode, sourceId) {
+    const getValue = (field) => modalCardEl.querySelector(`[data-vehicle-model-field="${field}"]`)?.value.trim() || "";
+    const payload = {
+      id: getValue("id"),
+      brand: getValue("brand"),
+      series: getValue("series"),
+      model: getValue("model"),
+      chassis: getValue("chassis"),
+      year: getValue("year"),
+      trim: getValue("trim"),
+      energyType: getValue("energyType"),
+      driveType: getValue("driveType"),
+      powerSpec: getValue("powerSpec"),
+      transmission: getValue("transmission"),
+      bodyStyle: getValue("bodyStyle"),
+      wheelbase: getValue("wheelbase"),
+      status: getValue("status"),
+    };
+
+    if (!payload.id || !payload.brand || !payload.series || !payload.model || !payload.chassis || !payload.year || !payload.energyType || !payload.driveType || !payload.status) {
+      openFeedbackModal("信息不完整", "请填写车型编码、品牌、车系、车型、底盘型号、年份、能源类型、驱动形式和适配状态。");
+      return;
+    }
+
+    if (mode === "edit") {
+      const target = vehicleModels.find((item) => item.id === sourceId);
+      if (!target) return;
+      Object.assign(target, payload);
+      target.timeline = target.timeline || [];
+      target.timeline.unshift(`2026-04-15 10:20 平台更新车型档案：${payload.brand} ${payload.series} ${payload.model}`);
+      defs.vehicleModelManage.stats = getVehicleModelStats();
+      renderPage();
+      openFeedbackModal("车型已更新", `${payload.brand} ${payload.series} ${payload.model} 的车型信息已保存。`);
+      return;
+    }
+
+    payload.timeline = [`2026-04-15 10:20 平台新增车型档案：${payload.brand} ${payload.series} ${payload.model}`, `当前适配状态：${payload.status}`];
+    vehicleModels.unshift(payload);
+    state.selectedIndex = 0;
+    defs.vehicleModelManage.stats = getVehicleModelStats();
+    renderPage();
+    openFeedbackModal("车型已新增", `${payload.brand} ${payload.series} ${payload.model} 已加入车型管理列表。`);
+  }
+
+  function deleteVehicleModel(id) {
+    const index = vehicleModels.findIndex((item) => item.id === id);
+    if (index === -1) return;
+    const [removed] = vehicleModels.splice(index, 1);
+    state.selectedIndex = Math.max(0, state.selectedIndex - (state.selectedIndex >= vehicleModels.length ? 1 : 0));
+    defs.vehicleModelManage.stats = getVehicleModelStats();
+    renderPage();
+    openFeedbackModal("车型已删除", `${removed.brand} ${removed.series} ${removed.model} 已从车型管理中移除。`);
   }
 
   function saveCategory(mode, sourceName) {
@@ -3410,6 +4498,71 @@
     categories.unshift(payload);
     state.selectedIndex = 0;
     openFeedbackModal("分类已新增", `${payload.name} 已加入商品分类列表。`);
+  }
+
+  function saveForumBoard(mode, sourceId) {
+    const getValue = (field) => modalCardEl.querySelector(`[data-forum-board-field="${field}"]`)?.value.trim() || "";
+    const payload = {
+      id: sourceId,
+      name: getValue("name"),
+      summary: getValue("summary"),
+      moderatorLimit: Number(getValue("moderatorLimit")) || 0,
+      status: getValue("status"),
+    };
+    if (!payload.name || !payload.summary || !payload.moderatorLimit) {
+      openFeedbackModal("信息不完整", "请填写版面名称、版面说明和版主人数上限。");
+      return;
+    }
+    if (mode === "edit") {
+      const target = forumBoards.find((item) => item.id === sourceId);
+      if (!target) return;
+      Object.assign(target, payload);
+      openFeedbackModal("版面已更新", `${payload.name} 的版面信息已保存。`);
+      return;
+    }
+    forumBoards.unshift(payload);
+    state.selectedIndex = 0;
+    openFeedbackModal("版面已新增", `${payload.name} 已加入版面维护列表。`);
+  }
+
+  function deleteForumBoard(id) {
+    const index = forumBoards.findIndex((item) => item.id === id);
+    if (index === -1) return;
+    const [removed] = forumBoards.splice(index, 1);
+    openFeedbackModal("版面已删除", `${removed.name} 已从论坛版面中移除。`);
+  }
+
+  function saveForumTopic(mode, sourceId) {
+    const getValue = (field) => modalCardEl.querySelector(`[data-forum-topic-field="${field}"]`)?.value.trim() || "";
+    const payload = {
+      id: sourceId,
+      name: getValue("name"),
+      board: getValue("board"),
+      sort: Number(getValue("sort")) || 0,
+      cover: getValue("cover"),
+      status: getValue("status"),
+    };
+    if (!payload.name || !payload.board || !payload.sort) {
+      openFeedbackModal("信息不完整", "请填写话题名称、所属版面和排序。");
+      return;
+    }
+    if (mode === "edit") {
+      const target = forumTopics.find((item) => item.id === sourceId);
+      if (!target) return;
+      Object.assign(target, payload);
+      openFeedbackModal("话题已更新", `${payload.name} 的话题信息已保存。`);
+      return;
+    }
+    forumTopics.unshift(payload);
+    state.selectedIndex = 0;
+    openFeedbackModal("话题已新增", `${payload.name} 已加入话题维护列表。`);
+  }
+
+  function deleteForumTopic(id) {
+    const index = forumTopics.findIndex((item) => item.id === id);
+    if (index === -1) return;
+    const [removed] = forumTopics.splice(index, 1);
+    openFeedbackModal("话题已删除", `${removed.name} 已从话题维护中移除。`);
   }
 
   function saveService(mode, sourceCode) {
@@ -3543,6 +4696,86 @@
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-primary" type="button" data-submit-case-reject data-case-id="${target.id}">确认驳回</button>
         <button class="btn btn-secondary" type="button" data-close-modal>返回</button>
+      </div>
+    `);
+  }
+
+  function openCaseEditorModal(mode, row) {
+    const isEdit = mode === "edit";
+    const source = row || {
+      id: `CA-${Date.now().toString().slice(-6)}`,
+      title: "",
+      provider: providers[0]?.name || "御驰 Performance Studio",
+      model: "宝马 G20 330i",
+      style: "黑武士街道风",
+      cost: "¥ 26,800",
+      image: "case-new-cover.jpg",
+      content: "",
+      display: "正常展示",
+    };
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Case Editor</span>
+          <h2 class="section-title">${isEdit ? "编辑案例" : "新增案例"}</h2>
+          <p class="section-subtitle">${source.id} / ${isEdit ? source.title : "创建新的平台案例"}</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <div class="field-label">案例标题</div>
+          <input class="input" data-case-field="title" value="${source.title}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">服务商</div>
+          <input class="input" data-case-field="provider" value="${source.provider}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">车型</div>
+          <input class="input" data-case-field="model" value="${source.model}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">风格</div>
+          <input class="input" data-case-field="style" value="${source.style}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">费用</div>
+          <input class="input" data-case-field="cost" value="${source.cost}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">展示状态</div>
+          <select class="select" data-case-field="display">
+            ${["首页展示", "正常展示", "未展示"].map((item) => `<option value="${item}" ${item === source.display ? "selected" : ""}>${item}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">封面图</div>
+          <input class="input" data-case-field="image" value="${source.image || ""}" />
+        </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">案例说明</div>
+          <textarea class="textarea" data-case-field="content">${source.content || ""}</textarea>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-save-case data-mode="${mode}" data-case-id="${source.id}">${isEdit ? "保存修改" : "确认新增"}</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
+  function openCaseDeleteModal(row) {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Case Delete</span>
+          <h2 class="section-title">删除案例</h2>
+          <p class="section-subtitle">确认删除案例“${row.title}”吗？</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-danger" type="button" data-delete-case data-case-id="${row.id}">确认删除</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
       </div>
     `);
   }
