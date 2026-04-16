@@ -11,6 +11,9 @@
     user: { title: "用户端", tabs: ["home", "mall", "garage", "forum", "me"], labels: { home: "首页", mall: "商城", garage: "爱车", forum: "论坛", me: "我的" } },
   };
 
+  const CART_STORAGE_KEY = "mockUserCart";
+  const ORDER_STORAGE_KEY = "mockUserOrders";
+
   function priceToNumber(value) {
     return Number(String(value || "").replace(/[^\d.]/g, "")) || 0;
   }
@@ -42,6 +45,10 @@
       acc[item.code || item.name || `service-${index}`] = createProviderServicePricingEntry(item, index);
       return acc;
     }, {});
+  }
+
+  function getVehicleBrandLabel(model) {
+    return String(model || "").trim().split(/\s+/)[0] || "";
   }
 
   const locationOptions = {
@@ -115,6 +122,11 @@
       service: services[0]?.id || services[0]?.name || "",
     },
     userMallPage: "",
+    userMall: {
+      keyword: "",
+      brand: getVehicleBrandLabel(vehicles[0]?.model),
+      model: vehicles[0]?.model || "",
+    },
     userOrderForm: {
       type: "",
       id: "",
@@ -150,14 +162,21 @@
   if (appType === "user" && typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);
     if (window.location.pathname.endsWith("/pages/user-app.html")) {
-      const orderSku = params.get("orderSku") || "";
+      const targetTab = params.get("tab") || "";
       const mallPage = params.get("mallPage") || "";
-      if (orderSku) {
-        state.tab = "mall";
-        state.userMallPage = mallPage || (orderSku === "PR-8801" ? "wheel" : orderSku === "PR-8802" ? "exhaust" : orderSku === "PR-8805" ? "interior" : "exterior");
-        state.userSelected.goods = orderSku;
-        state.userOrderForm = { type: "goods", id: orderSku };
+      const meTab = params.get("meTab") || "";
+      const orderId = params.get("orderId") || "";
+      const feedback = params.get("feedback") || "";
+      if (targetTab && appConfigs.user.tabs.includes(targetTab)) {
+        state.tab = targetTab;
       }
+      if (mallPage) {
+        state.tab = "mall";
+        state.userMallPage = mallPage;
+      }
+      if (meTab) state.subTab.me = meTab;
+      if (orderId) state.userMe.selectedOrder = orderId;
+      if (feedback) state.userFeedback = feedback;
     }
   }
 
@@ -465,6 +484,8 @@
     }));
     screenEl.querySelectorAll("[data-user-action]").forEach((b) => b.addEventListener("click", () => handleUserAction(b)));
     screenEl.querySelectorAll("select[data-user-action='user-vehicle-select']").forEach((s) => s.addEventListener("change", () => handleUserAction(s)));
+    screenEl.querySelectorAll("select[data-user-mall-filter]").forEach((s) => s.addEventListener("change", () => handleUserMallFilterChange(s)));
+    screenEl.querySelectorAll("[data-user-mall-search-form]").forEach((form) => form.addEventListener("submit", handleUserMallSearchSubmit));
     screenEl.querySelectorAll("[data-user-order-form]").forEach((form) => form.addEventListener("submit", handleUserOrderSubmit));
     screenEl.querySelectorAll("[data-user-vehicle-form]").forEach((form) => form.addEventListener("submit", handleUserVehicleSubmit));
     screenEl.querySelectorAll("[data-user-forum-form]").forEach((form) => form.addEventListener("submit", handleUserForumSubmit));
@@ -1525,29 +1546,51 @@
     const primaryCase = featuredCases[0];
     const secondaryCase = featuredCases[1];
     if (!selectedVehicle) {
-      return `<div class="stack user-home-v2">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-home-board user-home-board-empty"><div class="user-home-hero-copy"><div class="user-home-overline">Garage First</div><h2>先绑定爱车，再开始改装</h2><p>首页会围绕你的车辆、订单和改装履历展示内容，先把爱车档案建起来。</p><div class="user-home-chip-row"><span class="user-home-chip">真实订单流转</span><span class="user-home-chip">案例灵感推荐</span></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-tab="garage">立即绑定</button><button class="btn btn-secondary" type="button" data-tab="mall">先逛商城</button></div></div><div class="user-home-hero-stage"><div class="user-home-car-scene"><div class="user-home-car-shape"></div></div></div></section><section class="user-home-quick-grid"><button class="user-home-quick-card" type="button" data-tab="mall"><span>01</span><strong>改装商城</strong><small>直接进入配件列表</small></button><button class="user-home-quick-card" type="button" data-tab="forum"><span>02</span><strong>社区案例</strong><small>看帖子和施工分享</small></button><button class="user-home-quick-card" type="button" data-user-action="user-home-orders"><span>03</span><strong>订单中心</strong><small>查看服务进度</small></button><button class="user-home-quick-card" type="button" data-tab="garage"><span>04</span><strong>爱车档案</strong><small>绑定车辆和定位</small></button></section><section class="user-home-editorial-grid">${primaryCase ? `<a class="user-home-spotlight" href="user-case-detail.html"><div class="user-home-spotlight-media" data-tone="1"></div><div class="user-home-spotlight-body"><div class="user-home-panel-head"><div><div class="user-home-overline">Featured Case</div><h3>${safe(primaryCase.title, "精选案例")}</h3></div><span class="pill">${safe(primaryCase.style, "改装风格")}</span></div><p>${safe(primaryCase.model, "适配车型")} / ${safe(primaryCase.provider, "服务商")}</p></div></a>` : ""}<div class="user-home-product-stack">${featuredProducts.map((item, index) => `<article class="user-home-product-card"><div class="user-home-product-visual" data-tone="${index + 1}"></div><div><strong>${safe(item.name, "商品")}</strong><div class="muted" style="margin-top:6px;">${safe(item.price, "-")} / ${safe(item.brand, "品牌")}</div></div><div class="admin-action-row"><a class="btn btn-secondary" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(item.sku === "PR-8801" ? "wheel" : item.sku === "PR-8802" ? "exhaust" : item.sku === "PR-8805" ? "interior" : "exterior")}">商品详情</a><button class="btn btn-primary" type="button" data-user-action="user-order-open" data-user-id="${item.sku}" data-user-type="goods">立即下单</button></div>${state.userOrderForm.type === "goods" && state.userOrderForm.id === item.sku ? renderUserOrderForm(item, "goods") : ""}</article>`).join("")}</div></section></div>`;
+      return `<div class="stack user-home-v2">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-home-board user-home-board-empty"><div class="user-home-hero-shell"><div class="user-home-hero-stage"><div class="user-home-car-scene"><div class="user-home-car-shape"></div></div></div><div class="user-home-hero-copy"><div class="user-home-overline">爱车首页</div><h2>先绑定爱车，再开始改装</h2><p>绑定车辆后，首页会围绕你的爱车、订单进度和改装内容做展示。</p><div class="user-home-chip-row"><span class="user-home-chip">订单进度集中查看</span><span class="user-home-chip">案例与商品联动推荐</span></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-tab="garage">立即绑定</button><button class="btn btn-secondary" type="button" data-tab="mall">先逛商城</button></div></div><div class="user-home-stage-card"><div class="user-home-stage-head"><div><div class="user-home-overline">准备开始</div><strong>建立你的爱车档案</strong></div><span class="pill">待绑定</span></div><div class="user-home-stage-summary"><div><span>首页内容</span><strong>车辆、订单、履历与案例推荐</strong></div><div><span>下一步</span><strong>先去爱车页完成车辆绑定</strong></div></div></div></div></section><section class="user-home-quick-grid"><button class="user-home-quick-card" type="button" data-tab="mall"><span class="user-home-quick-mark">商城</span><strong>改装商城</strong><small>直接进入配件与精品列表</small></button><a class="user-home-quick-card" href="user-case-detail.html"><span class="user-home-quick-mark">案例</span><strong>精选案例</strong><small>浏览改装方案和完工效果</small></a><button class="user-home-quick-card" type="button" data-user-action="user-home-orders"><span class="user-home-quick-mark">订单</span><strong>订单中心</strong><small>查看服务进度和历史记录</small></button><button class="user-home-quick-card" type="button" data-tab="garage"><span class="user-home-quick-mark">爱车</span><strong>爱车档案</strong><small>绑定车辆与常用定位信息</small></button></section><section class="user-home-editorial-grid">${primaryCase ? `<a class="user-home-spotlight" href="user-case-detail.html"><div class="user-home-spotlight-media" data-tone="1"></div><div class="user-home-spotlight-body"><div class="user-home-panel-head"><div><div class="user-home-overline">精选案例</div><h3>${safe(primaryCase.title, "精选案例")}</h3></div><span class="pill">${safe(primaryCase.style, "改装风格")}</span></div><p>${safe(primaryCase.model, "适配车型")} / ${safe(primaryCase.provider, "服务商")}</p></div></a>` : ""}<div class="user-home-product-stack">${featuredProducts.map((item, index) => `<article class="user-home-product-card"><div class="user-home-product-visual" data-tone="${index + 1}"></div><div><strong>${safe(item.name, "商品")}</strong><div class="muted" style="margin-top:6px;">${safe(item.price, "-")} / ${safe(item.brand, "品牌")}</div></div><div class="admin-action-row"><a class="btn btn-secondary" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(item.sku === "PR-8801" ? "wheel" : item.sku === "PR-8802" ? "exhaust" : item.sku === "PR-8805" ? "interior" : "exterior")}">商品详情</a><a class="btn btn-primary" href="${buildUserGoodsOrderLink(item)}">立即下单</a></div></article>`).join("")}</div></section></div>`;
     }
-    return `<div class="stack user-home-v2">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-home-board user-home-hero-v2"><div class="user-home-hero-copy"><div class="user-home-overline">Garage / Today</div><h2>${safe(selectedVehicle.model, "当前爱车")}</h2><p>${safe(selectedVehicle.plate, "-")} / ${safe(selectedVehicle.color, "-")} / 车主 ${safe(selectedVehicle.owner, "-")}</p><div class="user-home-chip-row"><span class="user-home-chip">定位 ${getGarageLocationSummary()}</span><span class="user-home-chip">意向服务商 ${providersText}</span></div><div class="user-home-metric-row"><article class="user-home-metric"><span>进行中订单</span><strong>${activeOrders.length}</strong></article><article class="user-home-metric"><span>改装履历</span><strong>${historyEntries.length}</strong></article><article class="user-home-metric"><span>常用服务商</span><strong>${providerEntries.length}</strong></article></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-tab="garage">查看爱车页</button><button class="btn btn-primary" type="button" data-user-action="user-home-orders">查看订单</button></div></div><div class="user-home-hero-stage"><div class="user-home-car-scene"><div class="user-home-car-shape"></div></div><div class="user-home-stage-card">${currentOrder ? `<div class="user-home-stage-head"><div><div class="user-home-overline">Current Service</div><strong>${safe(currentOrder.service, "订单服务")}</strong></div>${tag(nOrder(currentOrder.status))}</div><p>${safe(currentOrder.progress, "平台正在推进订单处理。")}</p><div class="user-home-stage-meta"><span>${safe(currentOrder.appointment, "-")}</span><span>${safe(currentOrder.paymentMethod, "线上支付")}</span></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="user-home-order-detail" data-user-id="${currentOrder.id}">查看详情</button><button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${currentOrder.id}">联系服务商</button></div>` : `<div class="user-home-stage-head"><div><div class="user-home-overline">Service Status</div><strong>当前暂无进行中服务</strong></div><span class="pill">可直接下单</span></div><p>可以去商城选商品，或者先浏览案例，再发起预约。</p><div class="admin-action-row"><button class="btn btn-primary" type="button" data-tab="mall">去商城</button><a class="btn btn-secondary" href="user-case-detail.html">看案例</a></div>`}</div></div></section><section class="user-home-quick-grid"><button class="user-home-quick-card" type="button" data-tab="mall"><span>01</span><strong>改装商城</strong><small>轮毂、排气、制动与精品</small></button><a class="user-home-quick-card" href="user-case-detail.html"><span>02</span><strong>案例灵感</strong><small>看适配当前车型的方案</small></a><button class="user-home-quick-card" type="button" data-tab="forum"><span>03</span><strong>社区动态</strong><small>查看帖子和互动内容</small></button></section><section class="user-home-content-grid"><article class="user-home-panel"><div class="user-home-panel-head"><div><div class="user-home-overline">Modification Log</div><h3>改装履历</h3></div><button class="btn btn-secondary" type="button" data-tab="garage">查看全部</button></div><div class="user-home-history-list">${historyEntries.slice(0, 3).map((entry, index) => `<div class="user-home-history-row"><span class="user-home-history-index">${String(index + 1).padStart(2, "0")}</span><div><strong>${entry}</strong><small>${providersText}</small></div></div>`).join("")}</div></article><article class="user-home-panel"><div class="user-home-panel-head"><div><div class="user-home-overline">Service Snapshot</div><h3>服务摘要</h3></div><button class="btn btn-secondary" type="button" data-user-action="user-home-orders">订单中心</button></div><div class="user-home-order-list">${currentOrder ? `<div class="user-home-order-row"><span>服务项目</span><strong>${safe(currentOrder.service, "-")}</strong></div><div class="user-home-order-row"><span>服务商</span><strong>${safe(currentOrder.provider || currentOrder.intention, "-")}</strong></div><div class="user-home-order-row"><span>支付方式</span><strong>${safe(currentOrder.paymentMethod, "线上支付")}</strong></div><div class="user-home-order-row"><span>订单金额</span><strong>${safe(currentOrder.quote, "-")}</strong></div>` : `<div class="user-home-order-row"><span>当前状态</span><strong>暂无订单</strong></div><div class="user-home-order-row"><span>建议动作</span><strong>去商城或案例页发起需求</strong></div>`}</div></article></section><section class="user-home-editorial-grid">${primaryCase ? `<a class="user-home-spotlight" href="user-case-detail.html"><div class="user-home-spotlight-media" data-tone="1"></div><div class="user-home-spotlight-body"><div class="user-home-panel-head"><div><div class="user-home-overline">Featured Case</div><h3>${safe(primaryCase.title, "精选案例")}</h3></div><span class="pill">${safe(primaryCase.style, "改装风格")}</span></div><p>${safe(primaryCase.model, "适配车型")} / ${safe(primaryCase.provider, "服务商")}</p></div></a>` : ""}<div class="user-home-product-stack">${secondaryCase ? `<a class="user-home-mini-case" href="user-case-detail.html"><div class="user-home-mini-case-media" data-tone="2"></div><div><div class="user-home-overline">Style Pick</div><strong>${safe(secondaryCase.title, "推荐案例")}</strong><p>${safe(secondaryCase.model, "车型")} / ${safe(secondaryCase.style, "风格")}</p></div></a>` : ""}${featuredProducts.map((item, index) => `<article class="user-home-product-card"><div class="user-home-product-visual" data-tone="${index + 1}"></div><div><strong>${safe(item.name, "商品")}</strong><div class="muted" style="margin-top:6px;">${safe(item.price, "-")} / ${safe(item.brand, "品牌")}</div></div><div class="admin-action-row"><a class="btn btn-secondary" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(item.sku === "PR-8801" ? "wheel" : item.sku === "PR-8802" ? "exhaust" : item.sku === "PR-8805" ? "interior" : "exterior")}">商品详情</a><button class="btn btn-primary" type="button" data-user-action="user-order-open" data-user-id="${item.sku}" data-user-type="goods">立即下单</button></div>${state.userOrderForm.type === "goods" && state.userOrderForm.id === item.sku ? renderUserOrderForm(item, "goods") : ""}</article>`).join("")}</div></section></div>`;
+    return `<div class="stack user-home-v2">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-home-board user-home-hero-v2"><div class="user-home-hero-shell"><div class="user-home-location-bar"><div><span class="user-home-location-label">当前定位</span><strong>${getGarageLocationSummary()}</strong></div><button class="btn btn-secondary user-home-location-trigger" type="button" data-user-action="${state.userGarage.locationEditing ? "user-location-cancel" : "user-location-edit"}">${state.userGarage.locationEditing ? "收起" : "切换定位"}</button></div>${state.userGarage.locationEditing ? renderUserHomeLocationPicker() : ""}<div class="user-home-hero-stage"><div class="user-home-car-scene"><div class="user-home-car-shape"></div></div></div><div class="user-home-hero-copy"><h2>${safe(selectedVehicle.model, "当前爱车")}</h2><p>${safe(selectedVehicle.plate, "-")} / ${safe(selectedVehicle.color, "-")} / 车主 ${safe(selectedVehicle.owner, "-")}</p><div class="user-home-status-bar"><article class="user-home-status-item"><span>意向服务商</span><strong>${providersText}</strong></article></div><div class="user-home-metric-row"><article class="user-home-metric"><span>进行中订单</span><strong>${activeOrders.length}</strong></article><article class="user-home-metric"><span>改装履历</span><strong>${historyEntries.length}</strong></article><article class="user-home-metric"><span>常用服务商</span><strong>${providerEntries.length}</strong></article></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-tab="garage">查看爱车页</button><button class="btn btn-primary" type="button" data-user-action="user-home-orders">查看订单</button></div></div><div class="user-home-stage-card">${currentOrder ? `<div class="user-home-stage-head"><div><div class="user-home-overline">当前服务</div><strong>${safe(currentOrder.service, "订单服务")}</strong></div>${tag(nOrder(currentOrder.status))}</div><div class="user-home-stage-summary"><div><span>预约时间</span><strong>${safe(currentOrder.appointment, "-")}</strong></div><div><span>服务商</span><strong>${safe(currentOrder.provider || currentOrder.intention, "-")}</strong></div><div><span>订单金额</span><strong>${safe(currentOrder.quote, "-")}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="user-home-order-detail" data-user-id="${currentOrder.id}">查看详情</button><button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${currentOrder.id}">联系服务商</button></div>` : `<div class="user-home-stage-head"><div><div class="user-home-overline">当前服务</div><strong>当前暂无进行中服务</strong></div><span class="pill">可直接下单</span></div><div class="user-home-stage-summary"><div><span>推荐动作</span><strong>先去商城选商品，或浏览案例再预约</strong></div><div><span>常用服务商</span><strong>${providersText}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-tab="mall">去商城</button><a class="btn btn-secondary" href="user-case-detail.html">看案例</a></div>`}</div></div></section><section class="user-home-quick-grid"><button class="user-home-quick-card" type="button" data-tab="mall"><span class="user-home-quick-mark">商城</span><strong>改装商城</strong><small>轮毂、排气、制动与精品件</small></button><a class="user-home-quick-card" href="user-case-detail.html"><span class="user-home-quick-mark">案例</span><strong>案例灵感</strong><small>看适配当前车型的方案</small></a><button class="user-home-quick-card" type="button" data-tab="forum"><span class="user-home-quick-mark">社区</span><strong>社区动态</strong><small>查看帖子与互动内容</small></button><button class="user-home-quick-card" type="button" data-user-action="user-home-orders"><span class="user-home-quick-mark">订单</span><strong>订单中心</strong><small>集中查看服务进度</small></button></section><section class="user-home-content-grid"><article class="user-home-panel"><div class="user-home-panel-head"><div><div class="user-home-overline">改装履历</div><h3>最近改装记录</h3></div><button class="btn btn-secondary" type="button" data-tab="garage">查看全部</button></div><div class="user-home-history-list">${historyEntries.slice(0, 3).map((entry, index) => `<div class="user-home-history-row"><span class="user-home-history-index">${String(index + 1).padStart(2, "0")}</span><div><strong>${entry}</strong><small>${providersText}</small></div></div>`).join("")}</div></article><article class="user-home-panel"><div class="user-home-panel-head"><div><div class="user-home-overline">服务摘要</div><h3>当前订单信息</h3></div><button class="btn btn-secondary" type="button" data-user-action="user-home-orders">订单中心</button></div><div class="user-home-order-list">${currentOrder ? `<div class="user-home-order-row"><span>服务项目</span><strong>${safe(currentOrder.service, "-")}</strong></div><div class="user-home-order-row"><span>服务商</span><strong>${safe(currentOrder.provider || currentOrder.intention, "-")}</strong></div><div class="user-home-order-row"><span>支付方式</span><strong>${safe(currentOrder.paymentMethod, "线上支付")}</strong></div><div class="user-home-order-row"><span>订单金额</span><strong>${safe(currentOrder.quote, "-")}</strong></div>` : `<div class="user-home-order-row"><span>当前状态</span><strong>暂无订单</strong></div><div class="user-home-order-row"><span>建议动作</span><strong>去商城或案例页发起需求</strong></div>`}</div></article></section><section class="user-home-editorial-grid">${primaryCase ? `<a class="user-home-spotlight" href="user-case-detail.html"><div class="user-home-spotlight-media" data-tone="1"></div><div class="user-home-spotlight-body"><div class="user-home-panel-head"><div><div class="user-home-overline">精选案例</div><h3>${safe(primaryCase.title, "精选案例")}</h3></div><span class="pill">${safe(primaryCase.style, "改装风格")}</span></div><p>${safe(primaryCase.model, "适配车型")} / ${safe(primaryCase.provider, "服务商")}</p></div></a>` : ""}<div class="user-home-product-stack">${secondaryCase ? `<a class="user-home-mini-case" href="user-case-detail.html"><div class="user-home-mini-case-media" data-tone="2"></div><div><div class="user-home-overline">推荐案例</div><strong>${safe(secondaryCase.title, "推荐案例")}</strong><p>${safe(secondaryCase.model, "车型")} / ${safe(secondaryCase.style, "风格")}</p></div></a>` : ""}${featuredProducts.map((item, index) => `<article class="user-home-product-card"><div class="user-home-product-visual" data-tone="${index + 1}"></div><div><strong>${safe(item.name, "商品")}</strong><div class="muted" style="margin-top:6px;">${safe(item.price, "-")} / ${safe(item.brand, "品牌")}</div></div><div class="admin-action-row"><a class="btn btn-secondary" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(item.sku === "PR-8801" ? "wheel" : item.sku === "PR-8802" ? "exhaust" : item.sku === "PR-8805" ? "interior" : "exterior")}">商品详情</a><a class="btn btn-primary" href="${buildUserGoodsOrderLink(item)}">立即下单</a></div></article>`).join("")}</div></section></div>`;
   }
 
   function renderUserMallHome() {
-    const selectedSku = state.userSelected.goods || products[0]?.sku || "";
-    const selectedProduct = products.find((item) => item.sku === selectedSku) || products[0];
-    const mallCards = [selectedProduct, ...products.filter((item) => item.sku !== selectedSku)];
-    return `<div class="stack">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="mobile-item"><input class="input" type="text" placeholder="搜索改装配件、品牌..." aria-label="搜索改装配件、品牌"></section><section class="mobile-grid-2"><button class="mobile-item" type="button" data-user-action="user-garage-exterior"><div class="eyebrow">Exterior</div><strong>外观套件</strong><div class="muted" style="margin-top:8px;">前唇 / 尾翼 / 宽体</div></button><button class="mobile-item" type="button" data-user-action="user-garage-wheel"><div class="eyebrow">Wheel</div><strong>轮毂轮胎</strong><div class="muted" style="margin-top:8px;">锻造轮组 / 街道数据</div></button><button class="mobile-item" type="button" data-user-action="user-garage-exhaust"><div class="eyebrow">Exhaust</div><strong>排气系统</strong><div class="muted" style="margin-top:8px;">阀门 / 声浪 / 流量</div></button><button class="mobile-item" type="button" data-user-action="user-garage-interior"><div class="eyebrow">Interior</div><strong>内饰精品</strong><div class="muted" style="margin-top:8px;">氛围灯 / 包覆 / 精品</div></button></section><section><div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;"><h3 style="margin:0; font-size:22px;">商城列表</h3><span class="muted">已移除附近门店模块</span></div><div class="mobile-list">${mallCards.map((item, index) => `<section class="admin-detail-card"><div class="eyebrow">${index === 0 ? "当前推荐" : safe(item.category, "精选商品")}</div><h3>${safe(item.name, "商品")}</h3><div class="admin-kv-list"><div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>适配车型</span><strong>${safe(item.fitment, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>状态</span><strong>${nProduct(item.status)}</strong></div></div><div class="admin-timeline"><div>${safe(item.description, "查看商品详情与安装建议。")}</div></div><div class="admin-action-row"><a class="btn btn-secondary" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(item.sku === "PR-8801" ? "wheel" : item.sku === "PR-8802" ? "exhaust" : item.sku === "PR-8805" ? "interior" : "exterior")}">商品详情</a><button class="btn btn-primary" type="button" data-user-action="user-order-open" data-user-id="${item.sku}" data-user-type="goods">立即下单</button></div>${state.userOrderForm.type === "goods" && state.userOrderForm.id === item.sku ? renderUserOrderForm(item, "goods") : ""}</section>`).join("")}</div></section></div>`;
+    const selectedVehicle = getSelectedUserVehicle();
+    const categoryMeta = getUserMallCategoryMeta();
+    const brandOptions = getUserMallBrandOptions();
+    const activeBrand = state.userMall.brand && brandOptions.includes(state.userMall.brand) ? state.userMall.brand : brandOptions[0] || "";
+    const modelOptions = getUserMallModelOptions(activeBrand);
+    const activeModel = state.userMall.model && modelOptions.includes(state.userMall.model) ? state.userMall.model : modelOptions[0] || "";
+    const rows = getUserMallFilteredProducts(activeBrand, activeModel);
+    const selectedSku = state.userSelected.goods || rows[0]?.sku || products[0]?.sku || "";
+    const resultSummary = `${rows.length} 件商品`;
+    return `<div class="stack user-mall-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-mall-shell"><form class="user-mall-search" data-user-mall-search-form><input class="input user-mall-search-input" name="userMallKeyword" type="text" value="${safe(state.userMall.keyword, "")}" placeholder="搜索改装配件、品牌..." aria-label="搜索改装配件、品牌"><button class="user-mall-search-submit" type="submit" aria-label="搜索">搜索</button></form><div class="user-mall-filter-row"><select class="input" data-user-mall-filter="brand">${brandOptions.map((item) => `<option value="${item}" ${item === activeBrand ? "selected" : ""}>${item}</option>`).join("")}</select><select class="input" data-user-mall-filter="model">${modelOptions.map((item) => `<option value="${item}" ${item === activeModel ? "selected" : ""}>${item}</option>`).join("")}</select></div><div class="user-mall-layout"><aside class="user-mall-sidebar">${categoryMeta.map((item) => `<button class="user-mall-category ${state.userMallPage === item.id ? "active" : ""}" type="button" data-user-action="user-mall-category" data-user-id="${item.id}">${item.label}</button>`).join("")}<button class="user-mall-category user-mall-category-reset" type="button" data-user-action="user-mall-reset">重置</button></aside><div class="user-mall-results"><div class="user-mall-results-head"><strong>${safe(activeModel !== "全部车型" ? activeModel : selectedVehicle?.model, "当前车型")}</strong><span>${resultSummary}</span></div>${rows.length ? rows.map((item, index) => `<article class="user-mall-card"><a class="user-mall-card-media" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(item.category))}" data-tone="${(index % 4) + 1}"></a><div class="user-mall-card-body"><a class="user-mall-card-title" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(item.category))}">${safe(item.name, "商品")}</a><p class="user-mall-card-fitment">${safe(item.fitment, "适配当前车型")}</p><div class="user-mall-card-bottom"><strong class="user-mall-card-price">${safe(item.price, "-")}</strong><div class="user-mall-card-actions"><a class="btn btn-secondary" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(item.category))}">详情</a><a class="btn btn-primary" href="${buildUserGoodsOrderLink(item)}">下单</a></div></div></div></article>`).join("") : `<article class="user-mall-empty"><strong>当前筛选下暂无商品</strong><p>可以切换分类、车型或重置筛选后再看。</p><button class="btn btn-secondary" type="button" data-user-action="user-mall-reset">重置筛选</button></article>`}</div></div></section></div>`;
   }
 
   function renderUserMe() {
     const active = state.subTab.me || "profile";
-    return `${subTabs([{ id: "profile", label: "基本信息" }, { id: "orders", label: "历史订单" }, { id: "messages", label: "消息" }, { id: "address", label: "地址管理" }, { id: "credit", label: "金融授信" }])}${active === "profile" ? renderUserProfile() : active === "orders" ? renderUserHistoryOrders() : active === "messages" ? renderUserMessages() : active === "address" ? renderUserAddress() : renderUserCredit()}`;
+    return `${subTabs([{ id: "profile", label: "基本信息" }, { id: "orders", label: "历史订单" }, { id: "cart", label: "我的购物车" }, { id: "messages", label: "消息" }, { id: "address", label: "地址管理" }, { id: "credit", label: "金融授信" }])}${active === "profile" ? renderUserProfile() : active === "orders" ? renderUserHistoryOrders() : active === "cart" ? renderUserCart() : active === "messages" ? renderUserMessages() : active === "address" ? renderUserAddress() : renderUserCredit()}`;
   }
 
   function getUserOrders() {
-    return [...fallback.userHistoryOrders, ...orders.filter((item) => safe(item.user, "") === "当前用户")].slice(0, 8);
+    return [...getStoredUserOrders(), ...fallback.userHistoryOrders, ...orders.filter((item) => safe(item.user, "") === "当前用户")].slice(0, 8);
   }
 
   function getUserOrderById(id) {
     return getUserOrders().find((item) => item.id === id);
+  }
+
+  function getUserCartItems() {
+    if (typeof window === "undefined" || !window.localStorage) return [];
+    try {
+      const raw = window.localStorage.getItem(CART_STORAGE_KEY);
+      const rows = JSON.parse(raw || "[]");
+      return Array.isArray(rows) ? rows : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function setUserCartItems(rows) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(rows));
   }
 
   function getVehicleHistoryEntries(vehicle) {
@@ -1573,6 +1616,62 @@
     return [state.userGarage.locationProvince, state.userGarage.locationCity, state.userGarage.locationCounty].filter(Boolean).join(" / ");
   }
 
+  function renderUserHomeLocationPicker() {
+    const provinceList = Object.keys(locationOptions);
+    const cityList = Array.from(new Set(Object.values(locationOptions).flatMap((cityMap) => Object.keys(cityMap))));
+    const countyList = Array.from(new Set(Object.values(locationOptions).flatMap((cityMap) => Object.values(cityMap).flat())));
+    return `<div class="user-home-location-picker"><div class="user-home-location-grid"><div class="field-group"><label class="field-label" for="home-location-province">省</label><select class="input" id="home-location-province" name="locationProvince">${provinceList.map((item) => `<option value="${item}" ${item === state.userGarage.locationProvince ? "selected" : ""}>${item}</option>`).join("")}</select></div><div class="field-group"><label class="field-label" for="home-location-city">市</label><select class="input" id="home-location-city" name="locationCity">${cityList.map((item) => `<option value="${item}" ${item === state.userGarage.locationCity ? "selected" : ""}>${item}</option>`).join("")}</select></div><div class="field-group user-home-location-county"><label class="field-label" for="home-location-county">区县</label><select class="input" id="home-location-county" name="locationCounty">${countyList.map((item) => `<option value="${item}" ${item === state.userGarage.locationCounty ? "selected" : ""}>${item}</option>`).join("")}</select></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="user-location-save">保存定位</button><button class="btn btn-secondary" type="button" data-user-action="user-location-cancel">取消</button></div></div>`;
+  }
+
+  function getUserMallCategoryMeta() {
+    return [
+      { id: "exterior", label: "车衣", category: "车衣" },
+      { id: "wheel", label: "轮毂", category: "轮毂" },
+      { id: "exhaust", label: "排气", category: "排气" },
+      { id: "brake", label: "制动", category: "制动" },
+      { id: "interior", label: "动力", category: "动力" },
+    ];
+  }
+
+  function resolveUserMallPageByCategory(category) {
+    return getUserMallCategoryMeta().find((item) => item.category === category)?.id || "exterior";
+  }
+
+  function getUserMallBrandOptions() {
+    return ["全部品牌", ...Array.from(new Set(vehicles.map((item) => getVehicleBrandLabel(item.model)).filter(Boolean)))];
+  }
+
+  function getUserMallModelOptions(brand) {
+    const rows = Array.from(new Set(vehicles.map((item) => safe(item.model, "")).filter(Boolean)));
+    const filtered = brand && brand !== "全部品牌" ? rows.filter((item) => getVehicleBrandLabel(item) === brand) : rows;
+    return ["全部车型", ...filtered];
+  }
+
+  function getUserMallFilteredProducts(activeBrand, activeModel) {
+    const keyword = String(state.userMall.keyword || "").trim().toLowerCase();
+    const activeCategory = getUserMallCategoryMeta().find((item) => item.id === state.userMallPage)?.category || "";
+    const modelTokens = String(activeModel || "")
+      .split(/\s+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const fitmentBrand = activeBrand && activeBrand !== "全部品牌" ? activeBrand : "";
+    return products.filter((item) => {
+      const haystack = [item.name, item.brand, item.category, item.fitment, item.description].join(" ").toLowerCase();
+      if (keyword && !haystack.includes(keyword)) return false;
+      if (activeCategory && safe(item.category, "") !== activeCategory) return false;
+      if (fitmentBrand) {
+        const fitmentText = String(item.fitment || "");
+        if (!fitmentText.includes(fitmentBrand) && !fitmentText.includes("全车型") && !fitmentText.includes("高端性能轿车")) return false;
+      }
+      if (activeModel && activeModel !== "全部车型") {
+        const fitmentText = String(item.fitment || "");
+        const matched = modelTokens.slice(1).some((token) => token && fitmentText.includes(token));
+        if (!matched && fitmentBrand && !fitmentText.includes(fitmentBrand) && !fitmentText.includes("全车型") && !fitmentText.includes("高端性能轿车")) return false;
+      }
+      return true;
+    });
+  }
+
   function getUserPreferredProviders() {
     const selectedVehicle = getSelectedUserVehicle();
     const historyProviders = getVehicleIntentProviders(selectedVehicle);
@@ -1592,8 +1691,42 @@
       .sort((a, b) => String(b.appointment || "").localeCompare(String(a.appointment || "")));
   }
 
+  function getUserDefaultAddress() {
+    const target = fallback.userAddresses.find((item) => String(item.tag || "").includes("默认")) || fallback.userAddresses[0];
+    return safe(target?.address, "上海市徐汇区虹桥路 188 号 3 单元 1201");
+  }
+
+  function getStoredUserOrders() {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem(ORDER_STORAGE_KEY);
+      const rows = JSON.parse(raw || "[]");
+      return Array.isArray(rows) ? rows : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function setStoredUserOrders(rows) {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(rows));
+  }
+
+  function buildUserGoodsOrderLink(item, quantity = 1) {
+    return `user-order-create.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(item.category) || "exterior")}&quantity=${encodeURIComponent(String(quantity || 1))}`;
+  }
+
   function renderUserProfile() {
     return `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">User Profile</div><h3>用户基本信息</h3><div class="admin-kv-list"><div><span>昵称</span><strong>当前用户</strong></div><div><span>手机号</span><strong>13800138000</strong></div><div><span>常用城市</span><strong>${state.userGarage.locationCity.replace("市", "")}</strong></div><div><span>默认爱车</span><strong>${safe(getSelectedUserVehicle()?.model, "未绑定车辆")}</strong></div><div><span>当前定位</span><strong>${getGarageLocationSummary()}</strong></div><div><span>账号状态</span><strong>正常</strong></div></div></section></div>`;
+  }
+
+  function renderUserCart() {
+    const rows = getUserCartItems();
+    const totalAmount = rows.reduce((sum, item) => sum + (priceToNumber(item.price) * Number(item.quantity || 0)), 0);
+    if (!rows.length) {
+      return `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Cart</div><h3>我的购物车</h3><div class="admin-timeline"><div>当前购物车为空</div><div>去商城挑选商品后，可以把心仪商品先加入购物车。</div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-tab="mall">去商城</button></div></section></div>`;
+    }
+    return `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Cart</div><h3>我的购物车</h3><div class="admin-kv-list"><div><span>商品数量</span><strong>${rows.length}</strong></div><div><span>商品总件数</span><strong>${rows.reduce((sum, item) => sum + Number(item.quantity || 0), 0)}</strong></div><div><span>合计金额</span><strong>${formatCurrency(totalAmount)}</strong></div><div><span>状态</span><strong>可继续下单</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-tab="mall">继续逛商城</button><button class="btn btn-danger" type="button" data-user-action="user-cart-clear">清空购物车</button></div></section><div class="mobile-list">${rows.map((item) => `<section class="admin-detail-card"><h3>${safe(item.name, "商品")}</h3><div class="admin-kv-list"><div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>适配车型</span><strong>${safe(item.fitment, "-")}</strong></div><div><span>单价</span><strong>${safe(item.price, "-")}</strong></div><div><span>数量</span><strong>${Number(item.quantity || 0)}</strong></div><div><span>小计</span><strong>${formatCurrency(priceToNumber(item.price) * Number(item.quantity || 0))}</strong></div><div><span>下单状态</span><strong>待提交</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-user-action="user-cart-remove" data-user-id="${safe(item.sku, "")}">移除</button><a class="btn btn-primary" href="user-order-create.html?sku=${encodeURIComponent(safe(item.sku, ""))}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment, "适配当前车型"))}&mallPage=${encodeURIComponent(safe(item.mallPage, "exterior"))}&quantity=${encodeURIComponent(String(Number(item.quantity || 1)))}&from=cart">去下单</a></div></section>`).join("")}</div></div>`;
   }
 
   function renderUserHistoryOrders() {
@@ -1610,11 +1743,12 @@
 
   function renderUserHistoryOrderDetail(item) {
     const canAccept = nOrder(item.status) === "待验收";
+    const isGoodsOrder = safe(item.type, "") === "商品订单" || ["自提", "快递配送"].includes(safe(item.displayType, ""));
     const providerMeta = providerOrderExtras[item.id] || {};
     const completionSummary = safe(item.progress, "服务商暂未提交完工说明");
     const uploadSummary = safe(providerMeta.arrival, "暂未上传完工图片");
     const acceptanceTips = safe(providerMeta.remark, "请重点核对施工效果、功能联调和随车物品");
-    return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>服务</span><strong>${safe(item.service, "-")}</strong></div><div><span>预约时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>当前进度</span><strong>${completionSummary}</strong></div><div><span>订单状态</span><strong>${nOrder(item.status)}</strong></div></div>${canAccept ? `<section class="provider-complete-form"><div class="field-group"><label class="field-label">服务商完工情况</label><div class="admin-timeline"><div>${completionSummary}</div><div>${uploadSummary}</div><div>验收提示：${acceptanceTips}</div></div></div></section>` : ""}<div class="admin-action-row">${canAccept ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系服务商</button><button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>` : `<button class="btn btn-secondary" type="button" disabled>当前无需验收</button>`}</div></section>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>${isGoodsOrder ? "商品" : "服务"}</span><strong>${safe(item.service, "-")}</strong></div>${isGoodsOrder ? `<div><span>收货方式</span><strong>快递配送</strong></div><div><span>收货地址</span><strong>${safe(item.address, getUserDefaultAddress())}</strong></div>` : `<div><span>预约时间</span><strong>${safe(item.appointment, "-")}</strong></div>`}<div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>当前进度</span><strong>${completionSummary}</strong></div><div><span>订单状态</span><strong>${nOrder(item.status)}</strong></div></div>${canAccept ? `<section class="provider-complete-form"><div class="field-group"><label class="field-label">服务商完工情况</label><div class="admin-timeline"><div>${completionSummary}</div><div>${uploadSummary}</div><div>验收提示：${acceptanceTips}</div></div></div></section>` : ""}<div class="admin-action-row">${canAccept ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系服务商</button><button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>` : `<button class="btn btn-secondary" type="button" disabled>当前无需验收</button>`}</div></section>`;
   }
 
   function renderUserAddress() {
@@ -1660,7 +1794,7 @@
   function renderUserMallDetail(item, active) {
     const itemId = active === "goods" ? item.sku : item.id || item.name;
     const orderOpen = state.userOrderForm.type === active && state.userOrderForm.id === itemId;
-    return `<section class="admin-detail-card"><div class="eyebrow">${active === "goods" ? "Mall Goods" : "Service Booking"}</div><h3>${safe(item.name, active === "goods" ? "商品详情" : "服务详情")}</h3><div class="admin-kv-list">${active === "goods" ? `<div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>适配车型</span><strong>${safe(item.fitment || item.model, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>状态</span><strong>${nProduct(item.status)}</strong></div>` : `<div><span>服务名称</span><strong>${safe(item.name, "-")}</strong></div><div><span>服务说明</span><strong>${safe(item.desc, "-")}</strong></div><div><span>价格参考</span><strong>${safe(item.price, "-")}</strong></div><div><span>预约方式</span><strong>${safe(item.duration, "支持到店预约")}</strong></div>`}</div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="${orderOpen ? "user-order-cancel" : "user-order-open"}" data-user-id="${itemId}" data-user-type="${active}">${orderOpen ? "收起下单表单" : "立即下单"}</button></div>${orderOpen ? renderUserOrderForm(item, active) : ""}</section>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">${active === "goods" ? "Mall Goods" : "Service Booking"}</div><h3>${safe(item.name, active === "goods" ? "商品详情" : "服务详情")}</h3><div class="admin-kv-list">${active === "goods" ? `<div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>适配车型</span><strong>${safe(item.fitment || item.model, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>状态</span><strong>${nProduct(item.status)}</strong></div>` : `<div><span>服务名称</span><strong>${safe(item.name, "-")}</strong></div><div><span>服务说明</span><strong>${safe(item.desc, "-")}</strong></div><div><span>价格参考</span><strong>${safe(item.price, "-")}</strong></div><div><span>预约方式</span><strong>${safe(item.duration, "支持到店预约")}</strong></div>`}</div><div class="admin-action-row">${active === "goods" ? `<a class="btn btn-primary" href="${buildUserGoodsOrderLink(item)}">立即下单</a>` : `<button class="btn btn-primary" type="button" data-user-action="${orderOpen ? "user-order-cancel" : "user-order-open"}" data-user-id="${itemId}" data-user-type="${active}">${orderOpen ? "收起下单表单" : "立即下单"}</button>`}</div>${active !== "goods" && orderOpen ? renderUserOrderForm(item, active) : ""}</section>`;
   }
 
   function getUserVehicleKey(item) {
@@ -1699,32 +1833,7 @@
   }
 
   function renderUserMallCategoryPage() {
-    const selectedVehicle = getSelectedUserVehicle();
-    const pageMap = {
-      exterior: {
-        title: "车身套件商城",
-        intro: `${safe(selectedVehicle?.model, "当前车型")} 适配外观件推荐`,
-        skus: ["PR-8804", "PR-8803", "PR-8801"],
-      },
-      wheel: {
-        title: "轮毂商城",
-        intro: "锻造轮毂与轮组升级推荐",
-        skus: ["PR-8801", "PR-8803", "PR-8804"],
-      },
-      exhaust: {
-        title: "排气商城",
-        intro: "阀门排气与高性能声浪升级推荐",
-        skus: ["PR-8802", "PR-8805", "PR-8803"],
-      },
-      interior: {
-        title: "内饰商城",
-        intro: "座舱氛围、材质升级与精品推荐",
-        skus: ["PR-8805", "PR-8804", "PR-8801"],
-      },
-    };
-    const current = pageMap[state.userMallPage] || pageMap.exterior;
-    const pageProducts = current.skus.map((sku) => products.find((item) => item.sku === sku)).filter(Boolean);
-    return `<div class="stack"><section class="mobile-item"><div style="display:flex; justify-content:space-between; align-items:center; gap:12px;"><div><div class="eyebrow">Mall Page</div><strong style="display:block; margin-top:8px; font-size:22px;">${current.title}</strong><div class="muted" style="margin-top:8px;">${current.intro}</div></div><button class="btn btn-secondary" type="button" data-user-action="user-mall-back">返回商城</button></div></section><div class="mobile-list">${pageProducts.map((item) => `<section class="admin-detail-card"><div class="eyebrow">${safe(item.category, "精选商品")}</div><h3>${safe(item.name, "商品")}</h3><div class="admin-kv-list"><div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>适配车型</span><strong>${safe(item.fitment || selectedVehicle?.model, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>状态</span><strong>${nProduct(item.status)}</strong></div></div><div class="admin-timeline"><div>${safe(item.description, "查看商品详情与安装建议。")}</div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="user-order-open" data-user-id="${item.sku}" data-user-type="goods">立即下单</button></div>${state.userOrderForm.type === "goods" && state.userOrderForm.id === item.sku ? renderUserOrderForm(item, "goods") : ""}</section>`).join("")}</div></div>`;
+    return renderUserMallHome();
   }
 
   function renderUserVehicleDetail(item) {
@@ -1737,7 +1846,7 @@
 
   function renderUserOrderForm(item, active) {
     const itemId = active === "goods" ? item.sku : item.id || item.name;
-    return `<form class="provider-complete-form" data-user-order-form data-user-type="${active}" data-user-id="${itemId}"><div class="form-grid"><div class="field-group"><label class="field-label" for="user-vehicle-${itemId}">车辆信息</label><input class="input" id="user-vehicle-${itemId}" name="userVehicle" type="text" value="${getSelectedUserVehicle()?.model || "宝马 G20 330i"}" required></div><div class="field-group"><label class="field-label" for="user-phone-${itemId}">联系电话</label><input class="input" id="user-phone-${itemId}" name="userPhone" type="text" value="13800138000" required></div>${active === "goods" ? `<div class="field-group"><label class="field-label" for="user-pickup-store-${itemId}">自提门店</label><input class="input" id="user-pickup-store-${itemId}" name="userPickupStore" type="text" value="${getUserPreferredProviders()[0]?.name || "御驰 Performance Studio"}" required></div><div class="field-group"><label class="field-label" for="user-pickup-city-${itemId}">自提城市</label><input class="input" id="user-pickup-city-${itemId}" name="userPickupCity" type="text" value="${state.userGarage.locationCity}" required></div>` : ""}<div class="field-group"><label class="field-label" for="user-time-${itemId}">${active === "goods" ? "自提时间" : "预约时间"}</label><input class="input" id="user-time-${itemId}" name="userTime" type="text" value="2026-04-03 14:30" required></div><div class="field-group"><label class="field-label" for="user-qty-${itemId}">${active === "goods" ? "数量" : "服务数量"}</label><input class="input" id="user-qty-${itemId}" name="userQuantity" type="number" min="1" max="9" value="1" required></div><div class="field-group"><label class="field-label" for="user-note-${itemId}">备注</label><textarea class="textarea" id="user-note-${itemId}" name="userNote" required>${active === "goods" ? "请提前 1 小时确认自提和安装排期。" : "请优先安排周末到店。"} </textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交订单</button><button class="btn btn-secondary" type="button" data-user-action="user-order-cancel" data-user-id="${itemId}" data-user-type="${active}">取消</button></div></form>`;
+    return `<form class="provider-complete-form" data-user-order-form data-user-type="${active}" data-user-id="${itemId}"><div class="form-grid"><div class="field-group"><label class="field-label" for="user-vehicle-${itemId}">车辆信息</label><input class="input" id="user-vehicle-${itemId}" name="userVehicle" type="text" value="${getSelectedUserVehicle()?.model || "宝马 G20 330i"}" required></div><div class="field-group"><label class="field-label" for="user-phone-${itemId}">联系电话</label><input class="input" id="user-phone-${itemId}" name="userPhone" type="text" value="13800138000" required></div>${active === "goods" ? `<div class="field-group field-group-full"><label class="field-label" for="user-address-${itemId}">收货地址</label><textarea class="textarea" id="user-address-${itemId}" name="userAddress" required>${getUserDefaultAddress()}</textarea></div>` : `<div class="field-group"><label class="field-label" for="user-time-${itemId}">预约时间</label><input class="input" id="user-time-${itemId}" name="userTime" type="text" value="2026-04-03 14:30" required></div>`}<div class="field-group"><label class="field-label" for="user-qty-${itemId}">${active === "goods" ? "数量" : "服务数量"}</label><input class="input" id="user-qty-${itemId}" name="userQuantity" type="number" min="1" max="9" value="1" required></div><div class="field-group"><label class="field-label" for="user-note-${itemId}">备注</label><textarea class="textarea" id="user-note-${itemId}" name="userNote" required>${active === "goods" ? "发货后请按物流信息签收快递。" : "请优先安排周末到店。"} </textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交订单</button><button class="btn btn-secondary" type="button" data-user-action="user-order-cancel" data-user-id="${itemId}" data-user-type="${active}">取消</button></div></form>`;
   }
 
   function handleUserAction(button) {
@@ -1831,6 +1940,38 @@
       render();
       return;
     }
+    if (action === "user-mall-category") {
+      state.userMallPage = id;
+      render();
+      return;
+    }
+    if (action === "user-mall-reset") {
+      state.userMallPage = "";
+      state.userMall.keyword = "";
+      state.userMall.brand = "全部品牌";
+      state.userMall.model = "全部车型";
+      render();
+      return;
+    }
+    if (action === "user-cart-remove") {
+      const nextRows = getUserCartItems().filter((item) => safe(item.sku, "") !== id);
+      setUserCartItems(nextRows);
+      state.userFeedback = "商品已从购物车移除。";
+      render();
+      return;
+    }
+    if (action === "user-cart-clear") {
+      setUserCartItems([]);
+      state.userFeedback = "购物车已清空。";
+      render();
+      return;
+    }
+    if (action === "user-cart-order") {
+      const target = getUserCartItems().find((item) => safe(item.sku, "") === id);
+      if (!target) return;
+      window.location.href = `user-order-create.html?sku=${encodeURIComponent(safe(target.sku, ""))}&name=${encodeURIComponent(safe(target.name, "商品"))}&price=${encodeURIComponent(safe(target.price, "¥0"))}&brand=${encodeURIComponent(safe(target.brand, "-"))}&fitment=${encodeURIComponent(safe(target.fitment, "适配当前车型"))}&mallPage=${encodeURIComponent(safe(target.mallPage, "exterior"))}&quantity=${encodeURIComponent(String(Number(target.quantity || 1)))}&from=cart`;
+      return;
+    }
     if (action === "user-credit-apply") {
       state.userMe.creditApplyOpen = true;
       render();
@@ -1864,6 +2005,12 @@
       return;
     }
     if (action === "user-order-open") {
+      if (type === "goods") {
+        const target = products.find((item) => item.sku === id);
+        if (!target) return;
+        window.location.href = buildUserGoodsOrderLink(target);
+        return;
+      }
       state.userOrderForm = { type, id };
       state.userFeedback = "";
       render();
@@ -1975,6 +2122,29 @@
     render();
   }
 
+  function handleUserMallSearchSubmit(event) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    state.userMall.keyword = String(formData.get("userMallKeyword") || "").trim();
+    render();
+  }
+
+  function handleUserMallFilterChange(select) {
+    const type = select.dataset.userMallFilter || "";
+    if (type === "brand") {
+      state.userMall.brand = select.value;
+      const nextModels = getUserMallModelOptions(state.userMall.brand);
+      state.userMall.model = nextModels.includes(state.userMall.model) ? state.userMall.model : nextModels[0] || "";
+    }
+    if (type === "model") {
+      state.userMall.model = select.value;
+      if (select.value && select.value !== "全部车型") {
+        state.userMall.brand = getVehicleBrandLabel(select.value);
+      }
+    }
+    render();
+  }
+
   function handleUserForumSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -2079,13 +2249,13 @@
     const formData = new FormData(form);
     const vehicle = String(formData.get("userVehicle") || "").trim();
     const phone = String(formData.get("userPhone") || "").trim();
-    const pickupStore = String(formData.get("userPickupStore") || "").trim();
-    const pickupCity = String(formData.get("userPickupCity") || "").trim();
+    const address = String(formData.get("userAddress") || "").trim();
     const time = String(formData.get("userTime") || "").trim();
     const quantity = Math.max(1, Number(formData.get("userQuantity") || 1));
     const note = String(formData.get("userNote") || "").trim();
-    if (!vehicle || !phone || !time || !note) return;
-    if (type === "goods" && (!pickupStore || !pickupCity)) return;
+    if (!vehicle || !phone || !note) return;
+    if (type === "goods" && !address) return;
+    if (type !== "goods" && !time) return;
     const source = (type === "goods" ? products.find((item) => item.sku === id) : services.find((item) => String(item.id || item.name) === id));
     if (!source) return;
     const orderId = `UO-${Date.now().toString().slice(-6)}`;
@@ -2093,19 +2263,20 @@
     orders.unshift({
       id: orderId,
       type: type === "goods" ? "商品订单" : "服务订单",
-      displayType: type === "goods" ? "自提" : "改装服务",
+      displayType: type === "goods" ? "快递配送" : "改装服务",
       user: "当前用户",
       vehicle,
       service: `${safe(source.name, "下单项目")} x${quantity}`,
-      provider: type === "goods" ? pickupStore : safe(preferredProvider?.name, "推荐门店"),
-      city: type === "goods" ? pickupCity : safe(preferredProvider?.city, "上海"),
+      provider: type === "goods" ? "平台仓" : safe(preferredProvider?.name, "推荐门店"),
+      city: type === "goods" ? state.userGarage.locationCity : safe(preferredProvider?.city, "上海"),
       quote: safe(source.price, "待确认"),
       payment: type === "goods" ? "已支付" : "待支付",
       paymentMethod: type === "goods" ? "支付宝" : "微信支付",
-      status: "待分配",
-      progress: `${type === "goods" ? `商品已付款，用户选择到 ${pickupStore} 自提` : "服务预约已提交"}，备注：${note}`,
-      appointment: time,
-      intention: safe(preferredProvider?.name, "推荐门店"),
+      status: type === "goods" ? "待发货" : "待分配",
+      progress: `${type === "goods" ? `商品已付款，等待平台发货，快递将配送至 ${address}` : "服务预约已提交"}，备注：${note}`,
+      appointment: type === "goods" ? "等待发货" : time,
+      intention: type === "goods" ? "无" : safe(preferredProvider?.name, "推荐门店"),
+      address: type === "goods" ? address : "",
       phone,
     });
     state.userOrderForm = { type: "", id: "" };

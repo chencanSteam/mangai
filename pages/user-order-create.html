@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>确认下单 - 满改平台</title>
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+  </head>
+  <body data-page="user-order-create">
+    <main class="page-shell phone-stage">
+      <div class="phone-wrap">
+        <div class="phone-frame">
+          <div class="phone-screen" data-mobile-shell="user">
+            <div class="android-status"><span>9:41</span><span>5G 92%</span></div>
+            <header class="android-topbar product-detail-topbar">
+              <h2>确认下单</h2>
+            </header>
+            <section class="screen-content">
+              <div class="stack order-create-page">
+                <section class="order-create-product">
+                  <div class="order-create-visual">
+                    <span class="product-detail-sku" id="orderSku">SKU</span>
+                  </div>
+                  <div class="product-detail-head">
+                    <h3 id="orderName">改装商品</h3>
+                    <p id="orderFitment">适配车型信息</p>
+                    <div class="product-detail-price-line">
+                      <strong id="orderPrice">¥0</strong>
+                      <span id="orderBrand">-</span>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="order-create-summary">
+                  <div class="product-detail-section-head">
+                    <h3>订单信息</h3>
+                  </div>
+                  <div class="product-detail-kv-grid">
+                    <article>
+                      <span>商品数量</span>
+                      <strong id="orderQuantityText">1 件</strong>
+                    </article>
+                    <article>
+                      <span>合计金额</span>
+                      <strong id="orderTotalPrice">¥0</strong>
+                    </article>
+                    <article>
+                      <span>收货方式</span>
+                      <strong>快递配送</strong>
+                    </article>
+                    <article>
+                      <span>订单状态</span>
+                      <strong>待提交</strong>
+                    </article>
+                  </div>
+                </section>
+
+                <form class="order-create-form" id="orderCreateForm">
+                  <div class="field-group">
+                    <label class="field-label" for="orderVehicle">车辆信息</label>
+                    <input class="input" id="orderVehicle" name="orderVehicle" type="text" value="宝马 G20 330i" required />
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label" for="orderPhone">联系电话</label>
+                    <input class="input" id="orderPhone" name="orderPhone" type="text" value="13800138000" required />
+                  </div>
+                  <div class="field-group field-group-full">
+                    <label class="field-label" for="orderAddress">收货地址</label>
+                    <textarea class="textarea" id="orderAddress" name="orderAddress" required>上海市闵行区申长路 1688 号 2 栋 801</textarea>
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label" for="orderQuantity">购买数量</label>
+                    <input class="input" id="orderQuantity" name="orderQuantity" type="number" min="1" max="9" value="1" required />
+                  </div>
+                  <div class="field-group field-group-full">
+                    <label class="field-label" for="orderNote">备注</label>
+                    <textarea class="textarea" id="orderNote" name="orderNote" required>发货后请按物流信息签收快递。</textarea>
+                  </div>
+                  <div class="order-create-actions">
+                    <a class="btn btn-secondary" id="orderBackLink" href="user-app.html">返回商城</a>
+                    <button class="btn btn-primary" type="submit">提交订单</button>
+                  </div>
+                </form>
+
+                <section class="order-create-success" id="orderSuccess" hidden>
+                  <h3>下单成功</h3>
+                  <p id="orderSuccessText">订单已提交。</p>
+                  <div class="order-create-actions">
+                    <a class="btn btn-secondary" id="orderContinueLink" href="user-app.html">继续逛商城</a>
+                    <a class="btn btn-primary" id="orderCenterLink" href="user-app.html">查看订单</a>
+                  </div>
+                </section>
+              </div>
+            </section>
+            <nav class="bottom-nav">
+              <button type="button" data-user-nav="home"><span>首页</span></button>
+              <button class="active" type="button" data-user-nav="mall"><span>商城</span></button>
+              <button type="button" data-user-nav="garage"><span>爱车</span></button>
+              <button type="button" data-user-nav="forum"><span>论坛</span></button>
+              <button type="button" data-user-nav="me"><span>我的</span></button>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script>
+      const ORDER_STORAGE_KEY = "mockUserOrders";
+      const CART_STORAGE_KEY = "mockUserCart";
+      const params = new URLSearchParams(location.search);
+      const sku = params.get("sku") || "SKU";
+      const name = params.get("name") || "改装商品";
+      const price = params.get("price") || "¥0";
+      const brand = params.get("brand") || "-";
+      const fitment = params.get("fitment") || "适配车型信息";
+      const mallPage = params.get("mallPage") || "exterior";
+      const sourceFrom = params.get("from") || "";
+      const initialQuantity = Math.max(1, Number(params.get("quantity") || 1));
+
+      const orderSkuEl = document.getElementById("orderSku");
+      const orderNameEl = document.getElementById("orderName");
+      const orderFitmentEl = document.getElementById("orderFitment");
+      const orderBrandEl = document.getElementById("orderBrand");
+      const orderPriceEl = document.getElementById("orderPrice");
+      const orderQuantityTextEl = document.getElementById("orderQuantityText");
+      const orderTotalPriceEl = document.getElementById("orderTotalPrice");
+      const orderQuantityInput = document.getElementById("orderQuantity");
+      const orderCreateForm = document.getElementById("orderCreateForm");
+      const orderSuccess = document.getElementById("orderSuccess");
+      const orderSuccessText = document.getElementById("orderSuccessText");
+      const orderBackLink = document.getElementById("orderBackLink");
+      const orderContinueLink = document.getElementById("orderContinueLink");
+      const orderCenterLink = document.getElementById("orderCenterLink");
+
+      orderSkuEl.textContent = sku;
+      orderNameEl.textContent = name;
+      orderFitmentEl.textContent = fitment;
+      orderBrandEl.textContent = brand;
+      orderPriceEl.textContent = price;
+      orderQuantityInput.value = String(initialQuantity);
+
+      orderBackLink.href = `user-app.html?tab=mall&mallPage=${encodeURIComponent(mallPage)}`;
+      orderContinueLink.href = `user-app.html?tab=mall&mallPage=${encodeURIComponent(mallPage)}`;
+
+      document.querySelectorAll("[data-user-nav]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const target = button.dataset.userNav || "home";
+          const suffix = target === "mall" ? `?tab=mall&mallPage=${encodeURIComponent(mallPage)}` : `?tab=${encodeURIComponent(target)}`;
+          window.location.href = `user-app.html${suffix}`;
+        });
+      });
+
+      function priceToNumber(value) {
+        return Number(String(value || "").replace(/[^\d.]/g, "")) || 0;
+      }
+
+      function formatCurrency(value) {
+        return `¥ ${Number(value || 0).toLocaleString("zh-CN")}`;
+      }
+
+      function readOrders() {
+        try {
+          const raw = window.localStorage.getItem(ORDER_STORAGE_KEY);
+          const rows = JSON.parse(raw || "[]");
+          return Array.isArray(rows) ? rows : [];
+        } catch (error) {
+          return [];
+        }
+      }
+
+      function writeOrders(rows) {
+        window.localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(rows));
+      }
+
+      function readCart() {
+        try {
+          const raw = window.localStorage.getItem(CART_STORAGE_KEY);
+          const rows = JSON.parse(raw || "[]");
+          return Array.isArray(rows) ? rows : [];
+        } catch (error) {
+          return [];
+        }
+      }
+
+      function writeCart(rows) {
+        window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(rows));
+      }
+
+      function syncSummary() {
+        const quantity = Math.max(1, Number(orderQuantityInput.value || 1));
+        orderQuantityTextEl.textContent = `${quantity} 件`;
+        orderTotalPriceEl.textContent = formatCurrency(priceToNumber(price) * quantity);
+      }
+
+      orderQuantityInput.addEventListener("input", syncSummary);
+      syncSummary();
+
+      orderCreateForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const formData = new FormData(orderCreateForm);
+        const vehicle = String(formData.get("orderVehicle") || "").trim();
+        const phone = String(formData.get("orderPhone") || "").trim();
+        const address = String(formData.get("orderAddress") || "").trim();
+        const note = String(formData.get("orderNote") || "").trim();
+        const quantity = Math.max(1, Number(formData.get("orderQuantity") || 1));
+        if (!vehicle || !phone || !address || !note) return;
+
+        const orderId = `UO-${Date.now().toString().slice(-6)}`;
+        const totalPrice = formatCurrency(priceToNumber(price) * quantity);
+        const nextOrders = [
+          {
+            id: orderId,
+            type: "商品订单",
+            displayType: "快递配送",
+            user: "当前用户",
+            vehicle,
+            service: `${name} x${quantity}`,
+            provider: "平台仓",
+            city: "上海",
+            quote: totalPrice,
+            payment: "已支付",
+            paymentMethod: "支付宝",
+            status: "待发货",
+            progress: `商品已付款，等待平台发货，快递将配送至 ${address}，备注：${note}`,
+            appointment: "等待发货",
+            intention: "无",
+            address,
+            phone,
+          },
+          ...readOrders(),
+        ].slice(0, 20);
+
+        writeOrders(nextOrders);
+
+        if (sourceFrom === "cart") {
+          writeCart(readCart().filter((item) => String(item.sku || "") !== sku));
+        }
+
+        orderCreateForm.hidden = true;
+        orderSuccess.hidden = false;
+        orderSuccessText.textContent = `${name} 已下单成功，订单编号 ${orderId}。`;
+        orderCenterLink.href = `user-app.html?tab=me&meTab=orders&orderId=${encodeURIComponent(orderId)}&feedback=${encodeURIComponent(`${name} 已下单成功。`)}`;
+      });
+    </script>
+  </body>
+</html>

@@ -134,9 +134,9 @@
   };
 
   const forumBoards = [
-    { id: "BOARD-01", name: "性能改装", summary: "围绕动力、制动、底盘等深度改装内容维护。", moderatorLimit: 3, status: "启用" },
-    { id: "BOARD-02", name: "姿态玩家", summary: "围绕轮组、车身姿态和街道风格交流。", moderatorLimit: 2, status: "启用" },
-    { id: "BOARD-03", name: "新能源升级", summary: "聚焦新能源车型外观、轮组和精品升级。", moderatorLimit: 2, status: "停用" },
+    { id: "BOARD-01", name: "性能改装", summary: "围绕动力、制动、底盘等深度改装内容维护。", currentModerators: "御驰 Performance Studio、平台巡检", status: "启用" },
+    { id: "BOARD-02", name: "姿态玩家", summary: "围绕轮组、车身姿态和街道风格交流。", currentModerators: "平台巡检", status: "启用" },
+    { id: "BOARD-03", name: "新能源升级", summary: "聚焦新能源车型外观、轮组和精品升级。", currentModerators: "暂无", status: "停用" },
   ];
 
   const forumTopics = [
@@ -1159,7 +1159,7 @@
         actions: "caseList",
       }),
     }),
-    forumBoards: simpleListDef("版面维护", "维护论坛版面名称、说明、状态和版主人数上限。", forumBoards, ["name", "moderatorLimit", "status"], ["版面名称", "版主人数上限", "状态"]),
+    forumBoards: simpleListDef("版面维护", "维护论坛版面名称、当前版主和状态。", forumBoards, ["name", "currentModerators", "status"], ["版面名称", "当前版主", "状态"]),
     forumTopics: simpleListDef("话题维护", "维护论坛话题名称、所属版面、排序和封面说明。", forumTopics, ["name", "board", "sort", "status"], ["话题名称", "所属版面", "排序", "状态"]),
     forumModerators: makeTableDef({
       title: "版主申请",
@@ -3595,7 +3595,7 @@
 
   function openForumBoardEditorModal(mode, row) {
     const isEdit = mode === "edit";
-    const source = row || { id: `BOARD-${Date.now().toString().slice(-4)}`, name: "", summary: "", moderatorLimit: 2, status: "启用" };
+    const source = row || { id: `BOARD-${Date.now().toString().slice(-4)}`, name: "", summary: "", currentModerators: "", status: "启用" };
     openModal(`
       <div class="panel-header">
         <div>
@@ -3609,9 +3609,9 @@
           <div class="field-label">版面名称</div>
           <input class="input" data-forum-board-field="name" value="${source.name}" />
         </div>
-        <div class="field-group">
-          <div class="field-label">版主人数上限</div>
-          <input class="input" data-forum-board-field="moderatorLimit" value="${source.moderatorLimit}" />
+        <div class="field-group field-group-full">
+          <div class="field-label">当前版主</div>
+          <input class="input" data-forum-board-field="currentModerators" placeholder="多个版主使用顿号或逗号分隔" value="${source.currentModerators || ""}" />
         </div>
         <div class="field-group field-group-full">
           <div class="field-label">版面说明</div>
@@ -4801,11 +4801,11 @@
       id: sourceId,
       name: getValue("name"),
       summary: getValue("summary"),
-      moderatorLimit: Number(getValue("moderatorLimit")) || 0,
+      currentModerators: getValue("currentModerators"),
       status: getValue("status"),
     };
-    if (!payload.name || !payload.summary || !payload.moderatorLimit) {
-      openFeedbackModal("信息不完整", "请填写版面名称、版面说明和版主人数上限。");
+    if (!payload.name || !payload.summary || !payload.currentModerators) {
+      openFeedbackModal("信息不完整", "请填写版面名称、当前版主和版面说明。");
       return;
     }
     if (mode === "edit") {

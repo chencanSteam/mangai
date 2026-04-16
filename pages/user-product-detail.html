@@ -6,62 +6,85 @@
     <title>商品详情 - 满改平台</title>
     <link rel="stylesheet" href="../assets/css/styles.css" />
   </head>
-  <body>
+  <body data-page="user-product-detail">
     <main class="page-shell phone-stage">
       <div class="phone-wrap">
         <div class="phone-frame">
-          <div class="phone-screen">
+          <div class="phone-screen" data-mobile-shell="user">
             <div class="android-status"><span>9:41</span><span>5G 92%</span></div>
-            <header class="android-topbar">
-              <span class="eyebrow">Product Detail</span>
+            <header class="android-topbar product-detail-topbar">
               <h2>商品详情</h2>
-              <div class="muted">查看改装商品的基础信息、适配车型与下单入口</div>
             </header>
             <section class="screen-content">
-              <div class="stack">
-                <section class="hero-banner">
-                  <div class="eyebrow" id="productSku">SKU</div>
-                  <h3 id="productName" style="margin:10px 0 8px; font-size:28px; font-family:var(--font-display);">改装商品</h3>
-                  <p class="muted" id="productFitment">适配车型信息</p>
-                </section>
-                <section class="admin-detail-card">
-                  <div class="eyebrow">Product Summary</div>
-                  <h3>商品信息</h3>
-                  <div class="admin-kv-list">
-                    <div><span>品牌</span><strong id="productBrand">-</strong></div>
-                    <div><span>价格</span><strong id="productPrice">¥0</strong></div>
-                    <div><span>适配车型</span><strong id="productModel">-</strong></div>
-                    <div><span>状态</span><strong>在售</strong></div>
+              <div class="stack product-detail-page">
+                <section class="product-detail-hero">
+                  <div class="product-detail-visual">
+                    <span class="product-detail-sku" id="productSku">SKU</span>
+                  </div>
+                  <div class="product-detail-head">
+                    <h3 id="productName">改装商品</h3>
+                    <p id="productFitment">适配车型信息</p>
+                    <div class="product-detail-price-line">
+                      <strong id="productPrice">¥0</strong>
+                      <span id="productBrand">-</span>
+                    </div>
                   </div>
                 </section>
-                <section class="mobile-list">
-                  <article class="mobile-item">
-                    <strong>商品图片</strong>
-                    <div style="margin-top:12px; height:180px; border-radius:18px; display:grid; place-items:center; color:#9ca5b2; border:1px dashed rgba(255,255,255,0.16); background:rgba(255,255,255,0.03);">商品图片占位</div>
-                  </article>
-                  <article class="mobile-item">
-                    <strong>商品说明</strong>
-                    <div class="muted" style="margin-top:8px;">该商品适用于高性能改装与街道风格升级场景，支持到店安装和专业方案咨询。</div>
-                  </article>
+
+                <section class="product-detail-summary">
+                  <div class="product-detail-section-head">
+                    <h3>商品信息</h3>
+                  </div>
+                  <div class="product-detail-kv-grid">
+                    <article>
+                      <span>品牌</span>
+                      <strong id="productBrandSecondary">-</strong>
+                    </article>
+                    <article>
+                      <span>价格</span>
+                      <strong id="productPriceSecondary">¥0</strong>
+                    </article>
+                    <article>
+                      <span>适配车型</span>
+                      <strong id="productModel">-</strong>
+                    </article>
+                    <article>
+                      <span>状态</span>
+                      <strong>在售</strong>
+                    </article>
+                  </div>
                 </section>
-                <div class="admin-action-row">
-                  <a class="btn btn-secondary" href="user-app.html">返回商城</a>
-                  <a class="btn btn-primary" id="productOrderLink" href="user-app.html">立即下单</a>
+
+                <section class="product-detail-gallery">
+                  <div class="product-detail-section-head">
+                    <h3>商品图片</h3>
+                  </div>
+                  <div class="product-detail-gallery-frame">
+                    <div class="product-detail-gallery-visual"></div>
+                  </div>
+                </section>
+
+                <div class="product-detail-action-bar">
+                  <a class="btn btn-secondary" id="productBackLink" href="user-app.html">返回商城</a>
+                  <button class="btn btn-secondary" id="productCartButton" type="button">加入购物车</button>
+                  <a class="btn btn-primary product-detail-action-main" id="productOrderLink" href="user-app.html">立即下单</a>
                 </div>
+                <div class="product-detail-feedback" id="productCartFeedback" hidden></div>
               </div>
             </section>
             <nav class="bottom-nav">
-              <button type="button" onclick="location.href='user-app.html'"><span>首页</span></button>
-              <button type="button" onclick="location.href='user-app.html'"><span>商城</span></button>
-              <button type="button" onclick="location.href='user-app.html'"><span>爱车</span></button>
-              <button type="button" onclick="location.href='user-app.html'"><span>论坛</span></button>
-              <button type="button" onclick="location.href='user-app.html'"><span>我的</span></button>
+              <button type="button" data-user-nav="home"><span>首页</span></button>
+              <button class="active" type="button" data-user-nav="mall"><span>商城</span></button>
+              <button type="button" data-user-nav="garage"><span>爱车</span></button>
+              <button type="button" data-user-nav="forum"><span>论坛</span></button>
+              <button type="button" data-user-nav="me"><span>我的</span></button>
             </nav>
           </div>
         </div>
       </div>
     </main>
     <script>
+      const CART_STORAGE_KEY = "mockUserCart";
       const params = new URLSearchParams(location.search);
       const sku = params.get("sku") || "SKU";
       const name = params.get("name") || "改装商品";
@@ -69,13 +92,70 @@
       const brand = params.get("brand") || "-";
       const fitment = params.get("fitment") || "适配车型信息";
       const mallPage = params.get("mallPage") || "exterior";
+      const productBackLink = document.getElementById("productBackLink");
+
       document.getElementById("productSku").textContent = sku;
       document.getElementById("productName").textContent = name;
       document.getElementById("productFitment").textContent = fitment;
       document.getElementById("productBrand").textContent = brand;
+      document.getElementById("productBrandSecondary").textContent = brand;
       document.getElementById("productPrice").textContent = price;
+      document.getElementById("productPriceSecondary").textContent = price;
       document.getElementById("productModel").textContent = fitment;
-      document.getElementById("productOrderLink").href = `user-app.html?mallPage=${encodeURIComponent(mallPage)}&orderSku=${encodeURIComponent(sku)}`;
+      productBackLink.href = `user-app.html?tab=mall&mallPage=${encodeURIComponent(mallPage)}`;
+      document.getElementById("productOrderLink").href = `user-order-create.html?sku=${encodeURIComponent(sku)}&name=${encodeURIComponent(name)}&price=${encodeURIComponent(price)}&brand=${encodeURIComponent(brand)}&fitment=${encodeURIComponent(fitment)}&mallPage=${encodeURIComponent(mallPage)}&quantity=1`;
+
+      document.querySelectorAll("[data-user-nav]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const target = button.dataset.userNav || "home";
+          const suffix = target === "mall" ? `?tab=mall&mallPage=${encodeURIComponent(mallPage)}` : `?tab=${encodeURIComponent(target)}`;
+          window.location.href = `user-app.html${suffix}`;
+        });
+      });
+
+      const cartButton = document.getElementById("productCartButton");
+      const cartFeedback = document.getElementById("productCartFeedback");
+
+      function readCart() {
+        try {
+          const raw = window.localStorage.getItem(CART_STORAGE_KEY);
+          const list = JSON.parse(raw || "[]");
+          return Array.isArray(list) ? list : [];
+        } catch (error) {
+          return [];
+        }
+      }
+
+      function writeCart(list) {
+        window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(list));
+      }
+
+      function showCartFeedback(text) {
+        cartFeedback.hidden = false;
+        cartFeedback.textContent = text;
+      }
+
+      cartButton.addEventListener("click", () => {
+        const cart = readCart();
+        const target = cart.find((item) => item.sku === sku);
+        if (target) {
+          target.quantity += 1;
+        } else {
+          cart.push({
+            sku,
+            name,
+            price,
+            brand,
+            fitment,
+            mallPage,
+            quantity: 1,
+          });
+        }
+        writeCart(cart);
+        const totalQuantity = cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+        const currentQuantity = cart.find((item) => item.sku === sku)?.quantity || 1;
+        showCartFeedback(`${name} 已加入购物车，当前商品 ${currentQuantity} 件，购物车共 ${totalQuantity} 件。`);
+      });
     </script>
   </body>
 </html>
