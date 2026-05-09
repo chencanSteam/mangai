@@ -159,6 +159,7 @@
             ["服务商", row.provider],
             ["车型", row.model],
             ["风格", row.style],
+            ["改装类型", row.modType],
             ["费用", row.cost],
             ["审核状态", row.audit],
             ["展示状态", row.display],
@@ -231,7 +232,7 @@
               <input class="input" value="陈骁 / 138****9088" />
             </div>
             <div class="field-group">
-              <div class="field-label">门店城市</div>
+              <div class="field-label">所在区域</div>
               <input class="input" value="${store.city}" />
             </div>
             <div class="field-group">
@@ -418,7 +419,7 @@
             </div>
             <div class="showcase-location-card">
               <div class="provider-display-list">
-                <div class="provider-display-item"><div><strong>${store.city}</strong><p>门店所在城市</p></div><span class="tag neutral">定位信息</span></div>
+                <div class="provider-display-item"><div><strong>${store.city}</strong><p>门店所在区域</p></div><span class="tag neutral">定位信息</span></div>
                 <div class="provider-display-item"><div><strong>${store.address}</strong><p>详细地址</p></div><span class="tag info">可导航</span></div>
                 <div class="provider-display-item"><div><strong>${store.hours}</strong><p>营业时间</p></div><span class="tag success">欢迎到店</span></div>
               </div>
@@ -509,6 +510,7 @@
                       <div class="case-card-tags">
                         ${formatTag(item.audit || "待审核")}
                         <span class="pill">${item.style}</span>
+                        <span class="pill">${item.modType || "-"}</span>
                         <span class="pill">${item.cost}</span>
                       </div>
                       <p>${getCaseContentSummary(item.content)}</p>
@@ -565,6 +567,7 @@
       title: "",
       model: "宝马 G20 330i",
       style: "黑武士街道风",
+      modType: "车衣改造",
       cost: "¥ 26,800",
       image: "new-case-cover.jpg",
       imagePreview: "",
@@ -594,6 +597,7 @@
             <div class="case-editor-preview-meta">
               <span data-provider-case-preview-model>${source.model}</span>
               <span data-provider-case-preview-style>${source.style}</span>
+              <span data-provider-case-preview-modType>${source.modType}</span>
               <span data-provider-case-preview-cost>${source.cost}</span>
             </div>
           </div>
@@ -615,6 +619,13 @@
             <div class="field-group">
               <div class="field-label">改装风格</div>
               <input class="input" data-provider-case-field="style" placeholder="请输入改装风格" value="${source.style}" />
+            </div>
+            <div class="field-group">
+              <div class="field-label">改装类型</div>
+              <select class="select" data-provider-case-field="modType">
+                <option value="车衣改造" ${source.modType === "车衣改造" ? "selected" : ""}>车衣改造</option>
+                <option value="轮毂改造" ${source.modType === "轮毂改造" ? "selected" : ""}>轮毂改造</option>
+              </select>
             </div>
             <div class="field-group">
               <div class="field-label">案例费用</div>
@@ -687,6 +698,7 @@
       title: getValue("title"),
       model: getValue("model"),
       style: getValue("style"),
+      modType: getValue("modType"),
       cost: getValue("cost"),
       image: getValue("image"),
       imagePreview: getValue("imagePreview"),
@@ -696,8 +708,8 @@
       provider: store.name,
       timeline: [`${new Date().toISOString().slice(0, 16).replace("T", " ")} 服务商${mode === "edit" ? "更新" : "新增"}案例：${getValue("title")}`],
     };
-    if (!payload.title || !payload.model || !payload.style || !payload.cost || !payload.image || !payload.content) {
-      openFeedbackModal("信息不完整", "请填写案例标题、适配车型、改装风格、案例费用、封面图和案例说明。");
+    if (!payload.title || !payload.model || !payload.style || !payload.modType || !payload.cost || !payload.image || !payload.content) {
+      openFeedbackModal("信息不完整", "请填写案例标题、适配车型、改装风格、改装类型、案例费用、封面图和案例说明。");
       return;
     }
     if (mode === "edit") {
@@ -723,6 +735,7 @@
     const title = getValue("title") || "";
     const model = getValue("model") || "";
     const style = getValue("style") || "";
+    const modType = getValue("modType") || "";
     const cost = getValue("cost") || "";
     const image = getValue("image") || "";
     const imagePreview = getValue("imagePreview");
@@ -744,6 +757,7 @@
     modalCardEl.querySelector("[data-provider-case-preview-summary]")?.replaceChildren(contentSummary);
     modalCardEl.querySelector("[data-provider-case-preview-model]")?.replaceChildren(model);
     modalCardEl.querySelector("[data-provider-case-preview-style]")?.replaceChildren(style);
+    modalCardEl.querySelector("[data-provider-case-preview-modType]")?.replaceChildren(modType);
     modalCardEl.querySelector("[data-provider-case-preview-cost]")?.replaceChildren(cost);
 
     const tagsEl = modalCardEl.querySelector("[data-provider-case-editor-tags]");

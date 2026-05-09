@@ -8,13 +8,13 @@ window.MockData = {
       { label: "当日新增订单", value: "128", trend: "+14.8%", tone: "accent" },
       { label: "待审核服务商", value: "18", trend: "+3", tone: "warning" },
       { label: "进行中施工单", value: "56", trend: "92.4% 准时", tone: "info" },
-      { label: "本月结算申请", value: "¥ 1,286,000", trend: "+22.1%", tone: "success" },
+      { label: "本月应收平台服务费", value: "¥ 154,320", trend: "+22.1%", tone: "success" },
     ],
     todo: [
       { title: "待审核入驻", value: 18, note: "6 家资质待补充" },
       { title: "待分配订单", value: 12, note: "华东区域需求集中" },
       { title: "待审核案例", value: 27, note: "3 组图片尺寸异常" },
-      { title: "待审核结算", value: 9, note: "2 笔资料缺签章" },
+      { title: "待确认收款", value: 9, note: "2 笔付款凭证待核对" },
     ],
     trend: [
       { month: "11月", orders: 216, services: 162, retail: 54 },
@@ -34,7 +34,7 @@ window.MockData = {
     alerts: [
       { level: "高", item: "OD-240402-011", reason: "服务商拒单后超 2 小时未重新分配", owner: "订单中心", time: "10:28" },
       { level: "中", item: "CA-240402-007", reason: "案例主图含门店联系电话，需要遮挡", owner: "运营审核", time: "09:54" },
-      { level: "中", item: "ST-240402-003", reason: "结算申请缺少施工完成凭证", owner: "财务审核", time: "09:22" },
+      { level: "中", item: "ST-240402-003", reason: "平台服务费付款记录待确认", owner: "财务收款", time: "09:22" },
       { level: "低", item: "LG-240402-015", reason: "物流签收备注未填写完整", owner: "物流管理", time: "08:47" },
     ],
   },
@@ -297,11 +297,11 @@ window.MockData = {
     },
   ],
   vehicles: [
-    { plate: "沪A·9P21K", owner: "顾铭", model: "宝马 G20 330i", color: "曜夜黑", history: "轮毂升级 / M 套件 / XPEL 车衣", compliance: "正常" },
-    { plate: "浙A·8L72Y", owner: "沈越", model: "奥迪 A4L 45TFSI", color: "天云灰", history: "刹车升级 / 短簧", compliance: "需复核" },
-    { plate: "粤B·3T88R", owner: "陆川", model: "Model 3 Performance", color: "冰川白", history: "碳纤维尾翼 / 锻造轮毂", compliance: "正常" },
-    { plate: "京N·6K33S", owner: "梁栩", model: "奔驰 C260L", color: "皓沙银", history: "氛围灯 / 柏林之声音响", compliance: "正常" },
-    { plate: "川A·2M60Q", owner: "时原", model: "极氪 001 FR", color: "猎装绿", history: "赛道胎 / 六活塞卡钳", compliance: "关注中" },
+    { plate: "沪A·9P21K", owner: "顾铭", model: "宝马 G20 330i", color: "曜夜黑", history: "2025-11 更换 BBS RI-D 19 寸锻造轮毂 / 2026-01 升级曜夜版 M Performance 前唇与侧裙 / 2026-03 全车施工 XPEL LUX PLUS 车衣", compliance: "正常" },
+    { plate: "浙A·8L72Y", owner: "沈越", model: "奥迪 A4L 45TFSI", color: "天云灰", history: "2025-08 升级 AP Racing 前六后四刹车套件 / 2025-10 更换 Eibach 短簧并重做四轮定位 / 2026-02 补做底盘胶套与异响排查", compliance: "需复核" },
+    { plate: "粤B·3T88R", owner: "陆川", model: "Model 3 Performance", color: "冰川白", history: "2025-09 加装碳纤维尾翼与前唇套件 / 2025-12 升级 20 寸锻造轮毂与米其林 PS4S / 2026-03 完成卡钳改色与姿态数据微调", compliance: "正常" },
+    { plate: "京N·6K33S", owner: "梁栩", model: "奔驰 C260L", color: "皓沙银", history: "2025-07 升级 64 色智能氛围灯联动方案 / 2025-11 加装柏林之声高音旋转盖与前门喇叭 / 2026-02 完成 Alcantara 方向盘与门板包覆", compliance: "正常" },
+    { plate: "川A·2M60Q", owner: "时原", model: "极氪 001 FR", color: "猎装绿", history: "2025-10 更换半热熔赛道胎并设定双用胎压 / 2026-01 升级前六后四活塞卡钳与划线盘 / 2026-03 完成赛道日底盘数据标定与制动热衰减测试", compliance: "关注中" },
   ],
   products: [
     { sku: "PR-8801", name: "BBS 锻造轮毂 19寸", category: "轮毂", brand: "BBS", price: "¥ 18,800", stock: 16, fitment: "宝马 3系 / 奥迪 A4L", image: "bbs-wheel-19-matte-grey.jpg", description: "主图展示哑光枪灰轮毂正侧视角，辅图说明锻造工艺、J 值与安装完成效果。", status: "上架" },
@@ -439,19 +439,19 @@ window.MockData = {
     { id: "SH-240331-11", orderId: "OD-240329-018", company: "德邦汽配", number: "DBA02018831", shipTime: "2026-03-31 09:16", note: "需本人签收", status: "已签收" },
   ],
   signing: [
-    { orderId: "OD-240329-018", customer: "顾铭", signTime: "2026-04-01 10:11", status: "已签收", note: "外包装完好", anomalyPhotos: [] },
-    { orderId: "OD-240328-022", customer: "时原", signTime: "2026-03-30 19:20", status: "异常签收", note: "箱角轻微压痕，已留证", anomalyPhotos: ["sign-240328-022-1.jpg", "sign-240328-022-2.jpg"] },
-    { orderId: "OD-240327-010", customer: "沈越", signTime: "2026-03-29 14:02", status: "已签收", note: "正常", anomalyPhotos: [] },
+    { orderId: "OD-240329-018", company: "德邦汽配", number: "DBA02018831", customer: "顾铭", signTime: "2026-04-01 10:11", status: "已签收", note: "外包装完好", anomalyPhotos: [] },
+    { orderId: "OD-240328-022", company: "顺丰特快", number: "SF30289176620", customer: "时原", signTime: "2026-03-30 19:20", status: "异常签收", note: "箱角轻微压痕，已留证", anomalyPhotos: ["sign-240328-022-1.jpg", "sign-240328-022-2.jpg"] },
+    { orderId: "OD-240327-010", company: "京东物流", number: "JDVA302716050", customer: "沈越", signTime: "2026-03-29 14:02", status: "已签收", note: "正常", anomalyPhotos: [] },
   ],
   settlements: [
-    { id: "ST-240402-003", provider: "凌速 High Spec Garage", amount: "¥ 86,300", orders: 4, applyTime: "2026-04-02 09:08", status: "待审核" },
-    { id: "ST-240401-005", provider: "擎速 Motorsport Lab", amount: "¥ 128,900", orders: 6, applyTime: "2026-04-01 16:18", status: "审核中" },
-    { id: "ST-240331-004", provider: "御驰 Performance Studio", amount: "¥ 69,500", orders: 3, applyTime: "2026-03-31 13:30", status: "已通过" },
+    { id: "ST-240402-003", provider: "凌速 High Spec Garage", amount: "¥ 86,300", grossAmount: "¥ 86,300", feeRate: "12%", platformReceivable: "¥ 10,356", orders: 4, applyTime: "2026-04-02 09:08", paidAt: "", status: "待付款", paymentStatus: "待付款", paymentNote: "客户已支付给服务商，待服务商支付平台服务费。" },
+    { id: "ST-240401-005", provider: "擎速 Motorsport Lab", amount: "¥ 128,900", grossAmount: "¥ 128,900", feeRate: "12%", platformReceivable: "¥ 15,468", orders: 6, applyTime: "2026-04-01 16:18", paidAt: "2026-04-02 10:35", status: "待确认", paymentStatus: "待确认", paymentNote: "服务商已提交付款记录，待平台确认收款。" },
+    { id: "ST-240331-004", provider: "御驰 Performance Studio", amount: "¥ 69,500", grossAmount: "¥ 69,500", feeRate: "12%", platformReceivable: "¥ 8,340", orders: 3, applyTime: "2026-03-31 13:30", paidAt: "2026-04-01 09:40", status: "已结清", paymentStatus: "已结清", paymentNote: "平台已确认收款，协议服务费已结清。" },
   ],
   cases: [
-    { id: "CA-240402-007", title: "宝马 G20 曜夜姿态升级", provider: "御驰 Performance Studio", model: "宝马 G20 330i", style: "黑武士街道风", cost: "¥ 56,800", audit: "待审核", display: "未展示" },
-    { id: "CA-240401-011", title: "极氪 001 FR 赛道化轻改", provider: "Racing One Atelier", model: "极氪 001 FR", style: "赛道性能风", cost: "¥ 73,400", audit: "已通过", display: "首页推荐" },
-    { id: "CA-240330-022", title: "奔驰 C260L 豪华氛围内饰", provider: "曜黑 Auto Atelier", model: "奔驰 C260L", style: "豪华夜幕风", cost: "¥ 18,600", audit: "驳回修改", display: "未展示" },
+    { id: "CA-240402-007", title: "宝马 G20 曜夜姿态升级", provider: "御驰 Performance Studio", model: "宝马 G20 330i", style: "黑武士街道风", modType: "轮毂改造", cost: "¥ 56,800", audit: "待审核", display: "未展示" },
+    { id: "CA-240401-011", title: "极氪 001 FR 赛道化轻改", provider: "Racing One Atelier", model: "极氪 001 FR", style: "赛道性能风", modType: "轮毂改造", cost: "¥ 73,400", audit: "已通过", display: "首页推荐" },
+    { id: "CA-240330-022", title: "奔驰 C260L 豪华氛围内饰", provider: "曜黑 Auto Atelier", model: "奔驰 C260L", style: "豪华夜幕风", modType: "车衣改造", cost: "¥ 18,600", audit: "驳回修改", display: "未展示" },
   ],
   posts: [
     { id: "POST-1182", title: "宝马 G20 升级 19 寸轮毂后需要重新做四轮定位吗？", author: "顾铭", replies: 26, likes: 98, status: "正常", time: "今天 09:24" },
@@ -531,13 +531,13 @@ window.MockData = {
     configs: [
       { key: "自动验收时长", value: "24 小时", scope: "服务订单", status: "生效中" },
       { key: "消息模板版本", value: "V2.8", scope: "订单 / 审核 / 结算", status: "生效中" },
-      { key: "结算资料必填项", value: "施工照片 + 完工单", scope: "结算审核", status: "生效中" },
+      { key: "平台服务费付款资料", value: "付款凭证 + 订单汇总", scope: "结算收款", status: "生效中" },
     ],
   },
   providerWeb: {
     store: {
       name: "御驰 Performance Studio",
-      city: "上海闵行",
+      city: "上海市 / 闵行区",
       slogan: "高端性能升级与精品姿态改装",
       contractNo: "HT-2026-0218",
       contractStatus: "履约中",
@@ -564,9 +564,9 @@ window.MockData = {
         "极氪 001 猎装姿态与低风阻轮组",
       ],
       cases: [
-        { id: "PCASE-01", title: "宝马 G20 黑武士街道姿态", model: "宝马 G20 330i", style: "姿态 + 制动 + 轮组", cost: "¥ 56,800", cover: "曜夜黑主视角", summary: "强调前后轮齐平姿态、制动红卡钳与曜夜黑整车质感。" },
-        { id: "PCASE-02", title: "奔驰 C260L 夜幕内饰升级", model: "奔驰 C260L", style: "氛围灯 + 包覆", cost: "¥ 18,600", cover: "座舱夜景细节", summary: "以夜幕蓝氛围灯和 Alcantara 包覆增强豪华感与沉浸感。" },
-        { id: "PCASE-03", title: "极氪 001 FR 猎装性能轻改", model: "极氪 001 FR", style: "轮组 + 低风阻 + 底盘", cost: "¥ 73,400", cover: "猎装侧后视角", summary: "突出新能源性能车的低风阻轮组和车身姿态协调。", }
+        { id: "PCASE-01", title: "宝马 G20 黑武士街道姿态", model: "宝马 G20 330i", style: "姿态 + 制动 + 轮组", modType: "轮毂改造", cost: "¥ 56,800", cover: "曜夜黑主视角", summary: "强调前后轮齐平姿态、制动红卡钳与曜夜黑整车质感。" },
+        { id: "PCASE-02", title: "奔驰 C260L 夜幕内饰升级", model: "奔驰 C260L", style: "氛围灯 + 包覆", modType: "车衣改造", cost: "¥ 18,600", cover: "座舱夜景细节", summary: "以夜幕蓝氛围灯和 Alcantara 包覆增强豪华感与沉浸感。" },
+        { id: "PCASE-03", title: "极氪 001 FR 猎装性能轻改", model: "极氪 001 FR", style: "轮组 + 低风阻 + 底盘", modType: "轮毂改造", cost: "¥ 73,400", cover: "猎装侧后视角", summary: "突出新能源性能车的低风阻轮组和车身姿态协调。", }
       ],
     },
   },
@@ -582,7 +582,7 @@ window.MockData = {
         { title: "待接单", value: 5 },
         { title: "施工中", value: 12 },
         { title: "待完工提交", value: 3 },
-        { title: "待申请结算", value: 4 },
+        { title: "待支付平台服务费", value: 4 },
       ],
     },
     user: {

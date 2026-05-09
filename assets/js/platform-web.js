@@ -73,23 +73,9 @@
         { id: "orderAssign", label: "订单分配", badge: orders.filter((item) => item.status === "待分配").length },
       ],
     },
-    {
-      id: "logistics",
-      label: "物流管理",
-      children: [
-        { id: "shipping", label: "发货管理" },
-        { id: "signing", label: "签收管理" },
-      ],
-    },
+    { id: "logisticsManage", label: "物流管理" },
     { id: "settlements", label: "结算管理" },
-    {
-      id: "cases",
-      label: "案例管理",
-      children: [
-        { id: "caseAudit", label: "案例审核" },
-        { id: "caseList", label: "案例列表" },
-      ],
-    },
+    { id: "caseManage", label: "案例管理" },
     {
       id: "forum",
       label: "论坛管理",
@@ -116,13 +102,20 @@
         { id: "configs", label: "系统配置" },
       ],
     },
+    {
+      id: "traffic",
+      label: "访客监控",
+      children: [
+        { id: "visitorMonitor", label: "未登录访客" },
+      ],
+    },
   ];
 
   const shortcuts = [
     { page: "providerAudit", title: "入驻审核", desc: "快速处理新提交的服务商资质与门店资料。", icon: "审" },
     { page: "orderAssign", title: "订单分配", desc: "进入待分配服务订单，优先完成派单与改派。", icon: "派" },
-    { page: "caseAudit", title: "案例审核", desc: "集中审核门店上传的案例图片与车型说明。", icon: "案" },
-    { page: "settlements", title: "结算管理", desc: "查看结算申请、审核状态与订单汇总信息。", icon: "结" },
+    { page: "caseManage", title: "案例管理", desc: "集中审核与维护全平台案例数据。", icon: "案" },
+    { page: "settlements", title: "结算管理", desc: "查看服务商平台服务费付款与平台确认收款状态。", icon: "结" },
   ];
 
   const state = {
@@ -153,14 +146,35 @@
 
   const tagType = (text) => {
     if (!text) return "neutral";
-    if (["正常营业", "已通过", "启用", "上架", "正常", "已完成", "已签收", "生效中", "首页展示", "正常展示"].includes(text)) return "success";
-    if (["待审核", "待分配", "待发货", "待签收", "运输中", "关注中", "需复核", "待揽收"].includes(text)) return "warning";
+    if (["正常营业", "已通过", "启用", "上架", "正常", "已完成", "已签收", "已结清", "生效中", "首页展示", "正常展示"].includes(text)) return "success";
+    if (["待审核", "待分配", "待发货", "待签收", "待付款", "待确认", "运输中", "关注中", "需复核", "待揽收"].includes(text)) return "warning";
     if (["已驳回", "驳回修改", "异常签收", "缺货", "暂停接单", "停用", "已停用"].includes(text)) return "danger";
     if (["施工中", "待支付"].includes(text)) return "info";
     return "neutral";
   };
 
   const formatTag = (text) => `<span class="tag ${tagType(text)}">${text}</span>`;
+  const priceToNumber = (value) => Number(String(value || "").replace(/[^\d.]/g, "")) || 0;
+  const formatCurrency = (value) => `¥ ${Number(value || 0).toLocaleString("zh-CN")}`;
+  const parseFeeRate = (value) => {
+    const raw = Number(String(value || "").replace(/[^\d.]/g, "")) || 12;
+    return raw > 1 ? raw / 100 : raw;
+  };
+  const formatFeeRate = (value) => `${Math.round(parseFeeRate(value) * 1000) / 10}%`;
+  const normalizeSettlementStatus = (status) => {
+    const text = String(status || "");
+    if (text.includes("结清") || text.includes("通过")) return "已结清";
+    if (text.includes("驳")) return "已驳回";
+    if (text.includes("确认") || text.includes("审核中")) return "待确认";
+    return "待付款";
+  };
+
+  function formatProviderRegion(item) {
+    const province = item.locationProvince || "";
+    const city = item.locationCity || (item.city ? `${item.city}${item.city.endsWith("市") ? "" : "市"}` : "");
+    const county = item.locationCounty || (item.district ? `${item.district}${item.district.endsWith("区") ? "" : "区"}` : "");
+    return [province, city && city !== province ? city : "", county].filter(Boolean).join(" / ");
+  }
 
   providers.forEach((item) => {
     item.contractNo = item.contractNo || `HT-2026-${item.id.slice(-4)}`;
@@ -171,11 +185,67 @@
     item.locationCity = item.locationCity || `${item.city}${item.city.endsWith("市") ? "" : "市"}`;
     item.locationCounty = item.locationCounty || `${item.district}${item.district.endsWith("区") ? "" : "区"}`;
     item.locationAddress = item.locationAddress || item.address;
+    item.providerRegion = formatProviderRegion(item);
   });
+
+  const orderDeliveryMethodDefaults = {
+    "OD-240402-011": "指定地点",
+    "OD-240402-008": "自提",
+    "OD-240401-023": "自提",
+    "OD-240331-017": "指定地点",
+    "OD-240329-006": "自提",
+  };
+
+  const orderTimelineDefaults = {
+    "OD-240402-011": [
+      "2026-04-02 09:18 用户提交订单需求",
+      "2026-04-02 09:24 平台完成资料校验",
+      "2026-04-02 10:28 服务商拒单，订单进入重新分配队列",
+    ],
+    "OD-240402-008": [
+      "2026-04-02 13:42 用户完成支付",
+      "2026-04-02 14:00 服务商确认到店排期",
+      "2026-04-02 16:30 门店开始施工",
+    ],
+    "OD-240401-023": [
+      "2026-04-01 18:16 用户完成商品下单",
+      "2026-04-02 09:10 平台完成库存复核",
+      "2026-04-03 09:00 等待录入物流信息",
+    ],
+    "OD-240331-017": [
+      "2026-03-31 17:08 订单完成支付",
+      "2026-04-01 11:30 服务商接车并开始施工",
+      "2026-04-02 15:40 服务商提交完工验收",
+    ],
+    "OD-240329-006": [
+      "2026-03-29 19:22 用户确认施工方案",
+      "2026-03-30 13:00 服务商开始施工",
+      "2026-03-31 18:10 用户完成验收并评价",
+    ],
+  };
+
+  function getNowStamp() {
+    const date = new Date();
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function appendOrderTimeline(order, text) {
+    if (!order) return;
+    order.timeline = order.timeline || [];
+    order.timeline.unshift(`${getNowStamp()} ${text}`);
+  }
 
   orders.forEach((item) => {
     item.displayType = item.displayType || (item.type === "商品订单" ? "自提" : "改装服务");
     item.paymentMethod = item.paymentMethod || (item.payment === "待支付" ? "微信支付" : "支付宝");
+    item.deliveryMethod = item.deliveryMethod || orderDeliveryMethodDefaults[item.id] || "自提";
+    item.timeline =
+      item.timeline ||
+      orderTimelineDefaults[item.id] || [
+        `${item.appointment || "2026-04-02 09:00"} 订单创建`,
+        `${item.appointment || "2026-04-02 09:00"} 当前进度：${item.progress || "处理中"}`,
+      ];
   });
 
   signing.forEach((item) => {
@@ -237,9 +307,9 @@
   );
 
   const normalizedSettlementDefaults = [
-    { id: "ST-240402-003", provider: "凌速 High Spec Garage", amount: "¥ 86,300", orders: 4, applyTime: "2026-04-02 09:08", status: "待审核" },
-    { id: "ST-240401-005", provider: "擎速 Motorsport Lab", amount: "¥ 128,900", orders: 6, applyTime: "2026-04-01 16:18", status: "待审核" },
-    { id: "ST-240331-004", provider: "德驭 Performance Studio", amount: "¥ 69,500", orders: 3, applyTime: "2026-03-31 13:30", status: "已通过" },
+    { id: "ST-240402-003", provider: "凌速 High Spec Garage", amount: "¥ 86,300", grossAmount: "¥ 86,300", feeRate: "12%", orders: 4, applyTime: "2026-04-02 09:08", paidAt: "", status: "待付款", paymentNote: "客户已支付给服务商，待服务商支付平台服务费。" },
+    { id: "ST-240401-005", provider: "擎速 Motorsport Lab", amount: "¥ 128,900", grossAmount: "¥ 128,900", feeRate: "12%", orders: 6, applyTime: "2026-04-01 16:18", paidAt: "2026-04-02 10:35", status: "待确认", paymentNote: "服务商已提交付款记录，待平台确认收款。" },
+    { id: "ST-240331-004", provider: "御驰 Performance Studio", amount: "¥ 69,500", grossAmount: "¥ 69,500", feeRate: "12%", orders: 3, applyTime: "2026-03-31 13:30", paidAt: "2026-04-01 09:40", status: "已结清", paymentNote: "平台已确认收款，协议服务费已结清。" },
   ];
 
   settlements.splice(
@@ -247,29 +317,42 @@
     settlements.length,
     ...settlements.map((item, index) => {
       const fallback = normalizedSettlementDefaults[index] || normalizedSettlementDefaults[0];
+      const grossAmount = item.grossAmount || item.amount || fallback.grossAmount || fallback.amount;
+      const feeRate = item.feeRate || fallback.feeRate || "12%";
+      const platformReceivable = item.platformReceivable || formatCurrency(Math.round(priceToNumber(grossAmount) * parseFeeRate(feeRate)));
+      const status = normalizeSettlementStatus(item.paymentStatus || item.status || fallback.status);
       return {
         id: item.id || fallback.id,
         provider: item.provider || fallback.provider,
-        amount: item.amount || fallback.amount,
+        amount: grossAmount,
+        grossAmount,
+        feeRate: formatFeeRate(feeRate),
+        platformReceivable,
         orders: item.orders || fallback.orders,
         applyTime: item.applyTime || fallback.applyTime,
-        status: item.status || fallback.status,
+        paidAt: item.paidAt || fallback.paidAt || "",
+        get paymentTime() {
+          return this.paidAt || this.applyTime || "-";
+        },
+        status,
+        paymentStatus: status,
+        paymentNote: item.paymentNote || fallback.paymentNote || "",
         rejectReason: item.rejectReason || "",
         timeline:
           item.timeline ||
           [
-            `申请提交：${item.applyTime || fallback.applyTime}`,
-            `结算订单数：${item.orders || fallback.orders} 单`,
-            `当前状态：${item.status || fallback.status}`,
+            `客户已支付服务商：${grossAmount}`,
+            `协议比例：${formatFeeRate(feeRate)} / 应付平台：${platformReceivable}`,
+            `当前付款状态：${status}`,
           ],
       };
     })
   );
 
   const normalizedCaseDefaults = [
-    { id: "CA-240402-007", title: "宝马 G20 曜夜姿态升级", provider: "德驭 Performance Studio", model: "宝马 G20 330i", style: "黑武士街道风", cost: "¥ 56,800", audit: "待审核", display: "未展示", content: "整车围绕曜夜黑化、轮毂姿态和车身细节统一做街道性能风升级，突出日常可用与视觉压迫感。", image: "case-bmw-g20-black-style.jpg" },
-    { id: "CA-240401-011", title: "极氪 001 FR 赛道化轻改", provider: "Racing One Atelier", model: "极氪 001 FR", style: "赛道性能风", cost: "¥ 73,400", audit: "已通过", display: "首页展示", content: "以轻量化轮组、制动强化和姿态微调为核心，构建更偏赛道化的高性能展示案例。", image: "case-zeekr-001fr-track-kit.jpg" },
-    { id: "CA-240330-022", title: "奔驰 C260L 豪华氛围内饰", provider: "曜黑 Auto Atelier", model: "奔驰 C260L", style: "豪华夜幕风", cost: "¥ 18,600", audit: "已驳回", display: "正常展示", content: "围绕车内氛围灯、内饰包覆和细节材质升级，营造夜幕豪华与舒适座舱体验。", image: "case-benz-c260l-luxury-interior.jpg" },
+    { id: "CA-240402-007", title: "宝马 G20 曜夜姿态升级", provider: "德驭 Performance Studio", model: "宝马 G20 330i", style: "黑武士街道风", modType: "轮毂改造", cost: "¥ 56,800", audit: "待审核", display: "未展示", content: "整车围绕曜夜黑化、轮毂姿态和车身细节统一做街道性能风升级，突出日常可用与视觉压迫感。", image: "case-bmw-g20-black-style.jpg" },
+    { id: "CA-240401-011", title: "极氪 001 FR 赛道化轻改", provider: "Racing One Atelier", model: "极氪 001 FR", style: "赛道性能风", modType: "轮毂改造", cost: "¥ 73,400", audit: "已通过", display: "首页展示", content: "以轻量化轮组、制动强化和姿态微调为核心，构建更偏赛道化的高性能展示案例。", image: "case-zeekr-001fr-track-kit.jpg" },
+    { id: "CA-240330-022", title: "奔驰 C260L 豪华氛围内饰", provider: "曜黑 Auto Atelier", model: "奔驰 C260L", style: "豪华夜幕风", modType: "车衣改造", cost: "¥ 18,600", audit: "已驳回", display: "正常展示", content: "围绕车内氛围灯、内饰包覆和细节材质升级，营造夜幕豪华与舒适座舱体验。", image: "case-benz-c260l-luxury-interior.jpg" },
   ];
 
   cases.splice(
@@ -283,6 +366,7 @@
         provider: item.provider || fallback.provider,
         model: item.model || fallback.model,
         style: item.style || fallback.style,
+        modType: item.modType || fallback.modType,
         cost: item.cost || fallback.cost,
         audit: item.audit || fallback.audit,
         display: item.display === "首页推荐" ? "首页展示" : item.display || fallback.display,
@@ -434,7 +518,7 @@
       members: 12,
       status: "启用",
       description: "负责平台后台的审核、派单、结算、案例与系统配置管理。",
-      permissions: ["首页总览", "服务商审核", "订单分配", "案例审核", "结算审核", "系统配置"],
+      permissions: ["首页总览", "服务商审核", "订单分配", "案例管理", "结算收款", "系统配置"],
       updatedAt: "2026-04-03 11:20",
     },
     {
@@ -504,12 +588,12 @@
       updatedAt: "2026-04-02 17:45",
     },
     {
-      key: "结算资料必填项",
-      value: "施工照片 + 完工单",
-      scope: "结算审核",
+      key: "平台服务费付款资料",
+      value: "付款凭证 + 订单汇总",
+      scope: "结算收款",
       status: "已停用",
-      description: "服务商提交结算申请时，需要同时上传的凭证资料说明。",
-      editor: "财务审核",
+      description: "服务商向平台支付平台服务费时，需要同步提交的付款凭证资料说明。",
+      editor: "财务收款",
       updatedAt: "2026-04-01 14:15",
     },
   ];
@@ -538,6 +622,95 @@
     })
   );
 
+  const visitorSessions = [
+    {
+      id: "VIS-240403-0891",
+      fingerprint: "未登录访客 A79F",
+      source: "小红书种草页",
+      city: "上海",
+      device: "iPhone 15 Pro / Safari",
+      firstVisit: "今天 10:42",
+      lastActive: "2分钟前",
+      duration: "12m 48s",
+      pageViews: 18,
+      currentPage: "高端隐形车衣服务详情",
+      pages: ["首页", "服务项目列表", "高端隐形车衣服务详情", "案例：宝马 G20 曜夜姿态升级", "服务商：德驭 Performance Studio"],
+      services: ["高端隐形车衣", "精品氛围灯与内饰包覆"],
+      products: ["Aurora Blade 19", "陶瓷刹车片套装"],
+      casesViewed: ["宝马 G20 曜夜姿态升级", "奔驰 C260L 豪华氛围内饰"],
+      postsViewed: ["宝马 G20 升级 19 寸轮毂后需要重新做四轮定位吗？"],
+      events: ["10:42 进入首页", "10:45 浏览高端隐形车衣", "10:51 查看宝马 G20 案例", "10:54 进入服务商详情"],
+    },
+    {
+      id: "VIS-240403-0876",
+      fingerprint: "未登录访客 C21B",
+      source: "百度搜索",
+      city: "杭州",
+      device: "Windows / Edge",
+      firstVisit: "今天 10:16",
+      lastActive: "6分钟前",
+      duration: "8m 03s",
+      pageViews: 11,
+      currentPage: "轮毂锻造升级服务",
+      pages: ["首页", "商品商城", "轮毂分类", "轮毂锻造升级服务", "论坛：轮毂数据避让"],
+      services: ["轮毂锻造升级"],
+      products: ["RS Track 20", "Monarch Aero 19"],
+      casesViewed: ["极氪 001 FR 赛道化轻改"],
+      postsViewed: ["宝马 G20 升级 19 寸轮毂后需要重新做四轮定位吗？", "Model 3 Performance 上街道兼顾舒适和支撑的避震怎么选？"],
+      events: ["10:16 搜索落地服务页", "10:18 切换轮毂商品", "10:20 查看论坛帖子", "10:23 二次打开服务详情"],
+    },
+    {
+      id: "VIS-240403-0832",
+      fingerprint: "未登录访客 E04D",
+      source: "抖音落地页",
+      city: "深圳",
+      device: "Android / Chrome",
+      firstVisit: "今天 09:58",
+      lastActive: "12分钟前",
+      duration: "5m 19s",
+      pageViews: 7,
+      currentPage: "案例列表",
+      pages: ["首页", "案例列表", "案例：极氪 001 FR 赛道化轻改", "服务项目列表"],
+      services: ["制动套件升级"],
+      products: ["高性能制动套件"],
+      casesViewed: ["极氪 001 FR 赛道化轻改"],
+      postsViewed: ["Model 3 Performance 上街道兼顾舒适和支撑的避震怎么选？"],
+      events: ["09:58 进入首页", "10:00 打开案例列表", "10:02 查看极氪案例", "10:03 返回服务列表"],
+    },
+    {
+      id: "VIS-240403-0794",
+      fingerprint: "未登录访客 B55A",
+      source: "自然直接访问",
+      city: "北京",
+      device: "Mac / Chrome",
+      firstVisit: "今天 09:41",
+      lastActive: "28分钟前",
+      duration: "3m 44s",
+      pageViews: 5,
+      currentPage: "商品详情",
+      pages: ["首页", "商品商城", "商品详情", "论坛首页"],
+      services: [],
+      products: ["陶瓷刹车片套装"],
+      casesViewed: [],
+      postsViewed: ["某门店案例图带联系方式，是否属于违规导流？"],
+      events: ["09:41 进入首页", "09:42 打开商品详情", "09:44 浏览论坛", "09:45 停止活跃"],
+    },
+  ];
+
+  const visitorPopularPages = [
+    { name: "服务项目列表", views: 286, ratio: 88 },
+    { name: "商品商城", views: 243, ratio: 74 },
+    { name: "案例列表", views: 198, ratio: 61 },
+    { name: "论坛内容", views: 136, ratio: 42 },
+  ];
+
+  const visitorHotItems = [
+    { type: "服务", name: "高端隐形车衣", views: 92 },
+    { type: "商品", name: "RS Track 20", views: 76 },
+    { type: "案例", name: "宝马 G20 曜夜姿态升级", views: 68 },
+    { type: "帖子", name: "轮毂数据避让", views: 51 },
+  ];
+
   function metric(label, value) {
     return { label, value };
   }
@@ -550,12 +723,95 @@
     return { type: "simple", title, description, rows, keys, labels };
   }
 
+  function getShippingByOrderId(orderId) {
+    return shipping.find((item) => item.orderId === orderId);
+  }
+
+  function buildLogisticsRows() {
+    const shippingRows = shipping.map((item) => ({
+      type: "shipping",
+      source: item,
+      get logisticsType() {
+        return "发货";
+      },
+      get id() {
+        return item.id;
+      },
+      get orderId() {
+        return item.orderId;
+      },
+      get company() {
+        return item.company;
+      },
+      get number() {
+        return item.number;
+      },
+      get customer() {
+        return "-";
+      },
+      get time() {
+        return item.shipTime || "-";
+      },
+      get status() {
+        return item.status;
+      },
+      get anomalyPhotoCount() {
+        return "-";
+      },
+      get note() {
+        return item.note || "-";
+      },
+    }));
+    const signingRows = signing.map((item) => {
+      const shippingRecord = getShippingByOrderId(item.orderId);
+      return {
+        type: "signing",
+        source: item,
+        get logisticsType() {
+          return "签收";
+        },
+        get id() {
+          return item.orderId;
+        },
+        get orderId() {
+          return item.orderId;
+        },
+        get company() {
+          return shippingRecord?.company || item.company || "-";
+        },
+        get number() {
+          return shippingRecord?.number || item.number || "-";
+        },
+        get customer() {
+          return item.customer;
+        },
+        get time() {
+          return item.signTime || "-";
+        },
+        get status() {
+          return item.status;
+        },
+        get anomalyPhotoCount() {
+          return item.anomalyPhotoCount;
+        },
+        get note() {
+          return item.note || "-";
+        },
+      };
+    });
+    return [...shippingRows, ...signingRows];
+  }
+
   function getCaseProviderOptions(currentProvider = "") {
     return [...new Set([...providers.map((item) => item.name), ...cases.map((item) => item.provider), currentProvider].filter(Boolean))];
   }
 
   function getCaseStyleOptions(currentStyle = "") {
     return [...new Set(["黑武士街道风", "赛道性能风", "豪华夜幕风", "轻改姿态风", "质感通勤风", ...cases.map((item) => item.style), currentStyle].filter(Boolean))];
+  }
+
+  function getCaseModTypeOptions(currentModType = "") {
+    return [...new Set(["车衣改造", "轮毂改造", ...cases.map((item) => item.modType), currentModType].filter(Boolean))];
   }
 
   function getCaseDisplayHint(display) {
@@ -622,57 +878,6 @@
         <span class="case-cover-preview-tag">${compact ? "CASE" : "案例封面"}</span>
         <strong>${safeTitle}</strong>
         <small>${safeImage}</small>
-      </div>
-    `;
-  }
-
-  function renderCaseDetailPanel(row) {
-    return `
-      <div class="panel-header">
-        <div>
-          <h2 class="section-title">${row.title}</h2>
-        </div>
-      </div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
-        ${[row.audit, row.display, row.provider].filter(Boolean).map((item) => formatTag(item)).join("")}
-      </div>
-      <div class="case-detail-shell">
-        ${renderCaseCoverPreview(row.image, row.title, false, row.imagePreview || "")}
-        <div class="case-detail-metrics">
-          ${[
-            ["案例编号", row.id],
-            ["服务商", row.provider],
-            ["车型", row.model],
-            ["风格", row.style],
-            ["费用", row.cost],
-            ["审核状态", row.audit],
-            ["展示状态", row.display],
-          ]
-            .map(
-              ([label, value]) => `
-                <div class="case-detail-card">
-                  <span>${label}</span>
-                  <strong>${value || "-"}</strong>
-                </div>
-              `
-            )
-            .join("")}
-        </div>
-        <div class="case-detail-section">
-          <h3>案例说明</h3>
-          ${renderCaseRichContent(row.content)}
-        </div>
-        <div class="case-detail-section">
-          <h3>处理轨迹</h3>
-          <div class="timeline">
-            ${(row.timeline || ["暂无处理轨迹"]).map((item) => `<div class="timeline-item">${item}</div>`).join("")}
-          </div>
-        </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn btn-secondary" type="button" data-case-list-action="edit">编辑案例</button>
-          <button class="btn btn-primary" type="button" data-case-list-action="display">展示设置</button>
-          <button class="btn btn-danger" type="button" data-case-list-action="delete">删除案例</button>
-        </div>
       </div>
     `;
   }
@@ -764,7 +969,7 @@
       stats: [metric("今日新提交", "6"), metric("待补充资料", "4"), metric("驳回重提中", "3"), metric("平均审核时长", "2.1h")],
       columns: [
         { key: "name", label: "服务商" },
-        { key: "city", label: "城市" },
+        { key: "providerRegion", label: "所在区域" },
         { key: "specialties", label: "主营能力" },
         { key: "auditStatus", label: "审核状态", tag: true },
       ],
@@ -775,7 +980,7 @@
         badges: [...new Set([row.auditStatus, row.auditStatus === "待审核" ? "" : row.status].filter(Boolean))],
         facts: [
           ["联系人", row.contact],
-          ["位置", `${row.locationProvince} / ${row.locationCity} / ${row.locationCounty}`],
+          ["位置", row.providerRegion],
           ["详细地址", row.locationAddress],
           ["工位数量", `${row.bays} 个`],
           ["营业执照", row.license],
@@ -795,7 +1000,7 @@
       columns: [
         { key: "id", label: "编号" },
         { key: "name", label: "门店名称" },
-        { key: "city", label: "城市" },
+        { key: "providerRegion", label: "所在区域" },
         { key: "monthOrders", label: "月订单" },
         { key: "status", label: "经营状态", tag: true },
       ],
@@ -806,7 +1011,7 @@
         badges: [row.status, `${row.score} 分`].filter(Boolean),
         facts: [
           ["门店编号", row.id],
-          ["地区", `${row.locationProvince} / ${row.locationCity} / ${row.locationCounty}`],
+          ["地区", row.providerRegion],
           ["门店地址", row.locationAddress],
           ["联系人", row.contact],
           ["合同编号", row.contractNo],
@@ -924,6 +1129,20 @@
         actions: "userVehicles",
       }),
     }),
+    visitorMonitor: {
+      type: "visitor",
+      title: "未登录访客监控",
+      description: "追踪未登录访客在服务、商品、案例和论坛内容中的浏览路径。",
+      filters: ["全部"],
+      filterBy: "",
+      stats: [
+        metric("今日访客", "1,284"),
+        metric("未登录占比", "71%"),
+        metric("访客会话", String(visitorSessions.length)),
+        metric("平均浏览深度", "7.8页"),
+      ],
+      rows: visitorSessions,
+    },
     productList: makeTableDef({
       title: "商品列表",
       description: "平台统一维护商品信息、价格、库存和适配车型。",
@@ -1009,6 +1228,8 @@
         { key: "displayType", label: "订单类型" },
         { key: "user", label: "用户" },
         { key: "vehicle", label: "车辆" },
+        { key: "provider", label: "服务商" },
+        { key: "deliveryMethod", label: "交货方式" },
         { key: "paymentMethod", label: "支付方式" },
         { key: "status", label: "订单状态", tag: true },
       ],
@@ -1022,12 +1243,13 @@
           ["车辆", row.vehicle],
           ["项目", row.service],
           ["订单类型", row.displayType],
+          ["交货方式", row.deliveryMethod],
           ["支付方式", row.paymentMethod],
           ["服务商", row.provider],
           ["预约时间", row.appointment],
           ["报价", row.quote],
         ],
-        timeline: [`下单城市：${row.city}`, `意向门店：${row.intention}`, `当前进度：${row.progress}`],
+        timeline: row.timeline,
         actions: "orderList",
       }),
     }),
@@ -1041,6 +1263,7 @@
         { key: "user", label: "用户" },
         { key: "service", label: "需求内容" },
         { key: "city", label: "城市" },
+        { key: "provider", label: "服务商" },
         { key: "status", label: "状态", tag: true },
       ],
       rows: orders,
@@ -1053,31 +1276,42 @@
           ["车辆", row.vehicle],
           ["项目", row.service],
           ["意向门店", row.intention],
+          ["已分配服务商", row.provider],
           ["建议优先级", row.status === "待分配" ? "高" : "中"],
           ["建议门店", "德驭 / 擎速 / 凌速"],
         ],
-        timeline: [
-          "算法推荐：根据城市、工位、能力标签匹配",
-          "人工建议：优先考虑高端性能项目经验",
-          "拒单后策略：自动进入重派队列",
-        ],
+        timeline: row.timeline,
         actions: "orderAssign",
       }),
     }),
+    logisticsManage: simpleListDef(
+      "物流管理",
+      "统一处理商品订单发货、物流单维护、签收确认和异常签收留证。",
+      buildLogisticsRows(),
+      ["logisticsType", "id", "orderId", "company", "number", "customer", "time", "status", "anomalyPhotoCount"],
+      ["类型", "单据号", "订单号", "物流公司", "物流单号", "签收人", "时间", "状态", "异常照片"]
+    ),
     shipping: simpleListDef("发货管理", "商品订单发货信息录入与物流单维护。", shipping, ["id", "orderId", "company", "number", "status"], ["发货单", "订单号", "物流公司", "物流单号", "状态"]),
     signing: simpleListDef("签收管理", "维护订单签收状态、异常备注与异常照片。", signing, ["orderId", "customer", "signTime", "status", "anomalyPhotoCount", "note"], ["订单号", "签收人", "签收时间", "状态", "异常照片", "备注"]),
     settlements: makeTableDef({
       title: "结算管理",
-      description: "统一查看结算申请、审核状态与订单汇总信息。",
-      filters: ["全部", "待审核", "已通过", "已驳回"],
-      stats: [metric("待审核", "9"), metric("已通过", "18"), metric("本月结算金额", "¥ 386,700"), metric("已驳回", "2")],
+      description: "订单完成后，客户支付给服务商，服务商按协议比例向平台支付平台服务费。",
+      filters: ["全部", "待付款", "待确认", "已结清", "已驳回"],
+      stats: [
+        metric("待付款", String(settlements.filter((item) => item.status === "待付款").length)),
+        metric("待确认", String(settlements.filter((item) => item.status === "待确认").length)),
+        metric("已结清", String(settlements.filter((item) => item.status === "已结清").length)),
+        metric("本月应收平台服务费", formatCurrency(settlements.reduce((sum, item) => sum + priceToNumber(item.platformReceivable), 0))),
+      ],
       columns: [
-        { key: "id", label: "申请单" },
+        { key: "id", label: "结算单" },
         { key: "provider", label: "服务商" },
         { key: "orders", label: "订单数" },
-        { key: "amount", label: "结算金额" },
-        { key: "applyTime", label: "申请时间" },
-        { key: "status", label: "状态", tag: true },
+        { key: "grossAmount", label: "客户实付服务商金额" },
+        { key: "feeRate", label: "协议比例" },
+        { key: "platformReceivable", label: "应付平台金额" },
+        { key: "paymentTime", label: "申请/付款时间" },
+        { key: "status", label: "付款状态", tag: true },
       ],
       rows: settlements,
       filterBy: "status",
@@ -1087,28 +1321,35 @@
         facts: [
           ["服务商", row.provider],
           ["订单数", `${row.orders} 单`],
-          ["结算金额", row.amount],
-          ["申请时间", row.applyTime],
+          ["客户已支付给服务商", row.grossAmount],
+          ["协议比例", row.feeRate],
+          ["应付平台服务费", row.platformReceivable],
+          ["服务商付款状态", row.status],
+          ["申请/付款时间", row.paidAt || row.applyTime || "-"],
+          ["付款凭证/备注", row.paymentNote || "-"],
           ...(row.status === "已驳回" ? [["驳回原因", row.rejectReason || "无"]] : []),
         ],
         timeline: row.timeline,
         actions: "settlements",
       }),
     }),
-    caseAudit: makeTableDef({
-      title: "案例审核",
-      description: "审核服务商上传的案例内容与图片。",
-      filters: ["全部", "待审核", "已通过", "已驳回"],
-      stats: [metric("待审核案例", "8"), metric("已通过", "26"), metric("首页展示", "12"), metric("已驳回", "3")],
+    caseManage: makeTableDef({
+      title: "案例管理",
+      description: "维护与审核全平台案例数据，支持新增、编辑、删除、审核与展示状态设置。",
+      filters: ["全部", "待审核", "已通过", "已驳回", "首页展示", "正常展示", "未展示"],
+      stats: [metric("案例总数", String(cases.length)), metric("待审核", String(cases.filter((i) => i.audit === "待审核").length)), metric("首页展示", String(cases.filter((i) => i.display === "首页展示").length)), metric("已驳回", String(cases.filter((i) => i.audit === "已驳回").length))],
       columns: [
         { key: "id", label: "案例编号" },
         { key: "title", label: "案例标题" },
         { key: "provider", label: "服务商" },
+        { key: "model", label: "车型" },
+        { key: "style", label: "风格" },
+        { key: "modType", label: "改装类型" },
         { key: "audit", label: "审核状态", tag: true },
         { key: "display", label: "展示状态", tag: true },
       ],
       rows: cases,
-      filterBy: "audit",
+      filterBy: "caseManage",
       detail: (row) => ({
         title: row.title,
         badges: [row.audit, row.display, row.provider],
@@ -1118,45 +1359,14 @@
           ["服务商", row.provider],
           ["车型", row.model],
           ["风格", row.style],
+          ["改装类型", row.modType],
           ["费用", row.cost],
           ["案例内容", row.content],
           ["图片", row.image],
           ...(row.audit === "已驳回" ? [["驳回原因", row.rejectReason || "无"]] : []),
         ],
         timeline: row.timeline,
-        actions: "caseAudit",
-      }),
-    }),
-    caseList: makeTableDef({
-      title: "案例维护",
-      description: "平台侧维护全平台案例数据，支持新增、编辑、删除和展示状态设置。",
-      filters: ["全部", "首页展示", "正常展示", "未展示"],
-      stats: [metric("案例总数", "68"), metric("首页展示", "12"), metric("待优化内容", "5"), metric("本周新增", "9")],
-      columns: [
-        { key: "id", label: "案例编号" },
-        { key: "title", label: "案例标题" },
-        { key: "provider", label: "服务商" },
-        { key: "model", label: "车型" },
-        { key: "style", label: "风格" },
-        { key: "display", label: "展示状态", tag: true },
-      ],
-      rows: cases,
-      filterBy: "display",
-      detail: (row) => ({
-        title: row.title,
-        badges: [row.display, row.provider],
-        facts: [
-          ["案例编号", row.id],
-          ["案例标题", row.title],
-          ["服务商", row.provider],
-          ["车型", row.model],
-          ["风格", row.style],
-          ["费用", row.cost],
-          ["案例内容", row.content],
-          ["图片", row.image],
-        ],
-        timeline: row.timeline,
-        actions: "caseList",
+        actions: "caseManage",
       }),
     }),
     forumBoards: simpleListDef("版面维护", "维护论坛版面名称、当前版主和状态。", forumBoards, ["name", "currentModerators", "status"], ["版面名称", "当前版主", "状态"]),
@@ -1430,11 +1640,12 @@
         renderForumManagePage(def);
         return;
       }
-      if (state.activePage === "caseList") {
-        renderCaseListPage(def);
-        return;
-      }
       renderTablePage(def);
+      return;
+    }
+
+    if (def.type === "visitor") {
+      renderVisitorMonitorPage(def);
       return;
     }
 
@@ -1560,7 +1771,7 @@
                     <div class="platform-home-provider-main">
                       <strong>${item.name}</strong>
                       <div class="platform-home-provider-meta">
-                        <span>${item.city}</span>
+                        <span>${item.providerRegion}</span>
                         <span>${item.score}</span>
                         <span>${item.monthOrders}</span>
                       </div>
@@ -1596,6 +1807,187 @@
     });
   }
 
+  function renderVisitorChips(items, emptyText = "暂无记录") {
+    if (!items || !items.length) return `<span class="muted">${emptyText}</span>`;
+    return items.map((item) => `<span class="visitor-chip">${item}</span>`).join("");
+  }
+
+  function renderVisitorDetail(row) {
+    if (!row) {
+      return `<div class="page-heading"><h1 style="font-size:24px;">暂无访客详情</h1></div>`;
+    }
+
+    return `
+      <div class="panel-header">
+        <div>
+          <h2 class="section-title">${row.fingerprint}</h2>
+        </div>
+      </div>
+      <div class="kv-list visitor-detail-kv">
+        <div class="kv-row"><span class="muted">访客编号</span><strong>${row.id}</strong></div>
+        <div class="kv-row"><span class="muted">来源</span><strong>${row.source}</strong></div>
+        <div class="kv-row"><span class="muted">城市</span><strong>${row.city}</strong></div>
+        <div class="kv-row"><span class="muted">设备</span><strong>${row.device}</strong></div>
+        <div class="kv-row"><span class="muted">首次访问</span><strong>${row.firstVisit}</strong></div>
+        <div class="kv-row"><span class="muted">最近活跃</span><strong>${row.lastActive}</strong></div>
+      </div>
+      <div class="visitor-detail-section">
+        <h3>浏览页面</h3>
+        <div class="visitor-path">
+          ${row.pages.map((item, index) => `<span>${index + 1}. ${item}</span>`).join("")}
+        </div>
+      </div>
+      <div class="visitor-detail-section">
+        <h3>已查看内容</h3>
+        <div class="visitor-content-groups">
+          <div><span>服务</span><div>${renderVisitorChips(row.services, "未查看服务")}</div></div>
+          <div><span>商品</span><div>${renderVisitorChips(row.products, "未查看商品")}</div></div>
+          <div><span>案例</span><div>${renderVisitorChips(row.casesViewed, "未查看案例")}</div></div>
+          <div><span>帖子</span><div>${renderVisitorChips(row.postsViewed, "未查看帖子")}</div></div>
+        </div>
+      </div>
+      <div class="visitor-detail-section">
+        <h3>最近行为</h3>
+        <div class="timeline">
+          ${row.events.map((item) => `<div class="timeline-item">${item}</div>`).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderVisitorMonitorPage(def) {
+    const rows = filterRows(def.rows, def.filterBy);
+    const selected = rows[state.selectedIndex] || rows[0];
+
+    contentEl.innerHTML = `
+      <section class="page-heading">
+        <h1>${def.title}</h1>
+      </section>
+      <section class="stats-grid">
+        ${def.stats
+          .map(
+            (item) => `
+              <article class="panel stat-card">
+                <span class="label">${item.label}</span>
+                <strong>${item.value}</strong>
+              </article>
+            `
+          )
+          .join("")}
+      </section>
+      <section class="visitor-monitor-layout visitor-monitor-list-layout">
+        <article class="panel table-card visitor-session-panel">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              ${def.filters
+                .map(
+                  (item) => `
+                    <button class="filter-chip ${state.activeFilter === item ? "active" : ""}" type="button" data-visitor-filter="${item}">
+                      ${item}
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>
+          </div>
+          <div class="visitor-session-list">
+            ${
+              rows.length
+                ? rows
+                    .map(
+                      (row, index) => `
+                        <button class="visitor-session-card ${index === state.selectedIndex ? "active" : ""}" type="button" data-visitor-row-index="${index}">
+                          <div class="visitor-session-head">
+                            <div>
+                              <strong>${row.fingerprint}</strong>
+                              <span>${row.source} / ${row.city}</span>
+                            </div>
+                          </div>
+                          <div class="visitor-session-meta">
+                            <span>${row.pageViews} PV</span>
+                            <span>${row.duration}</span>
+                            <span>${row.lastActive}</span>
+                          </div>
+                          <div class="visitor-current-page">${row.currentPage}</div>
+                        </button>
+                      `
+                    )
+                    .join("")
+                : `<div class="muted">没有符合当前筛选条件的访客。</div>`
+            }
+          </div>
+        </article>
+      </section>
+      <section class="visitor-insight-grid">
+        <article class="panel dashboard-card">
+          <div class="panel-header">
+            <div><h2 class="section-title">热门访问页面</h2></div>
+          </div>
+          <div class="visitor-rank-list">
+            ${visitorPopularPages
+              .map(
+                (item) => `
+                  <div class="visitor-rank-item">
+                    <div>
+                      <strong>${item.name}</strong>
+                      <span>${item.views} 次浏览</span>
+                    </div>
+                    <div class="progress"><span style="width:${item.ratio}%"></span></div>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        </article>
+        <article class="panel dashboard-card">
+          <div class="panel-header">
+            <div><h2 class="section-title">内容浏览排行</h2></div>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr><th>类型</th><th>内容</th><th>浏览</th></tr>
+            </thead>
+            <tbody>
+              ${visitorHotItems
+                .map(
+                  (item) => `
+                    <tr>
+                      <td>${item.type}</td>
+                      <td>${item.name}</td>
+                      <td>${item.views}</td>
+                    </tr>
+                  `
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </article>
+      </section>
+    `;
+
+    bindVisitorMonitorEvents(def);
+  }
+
+  function bindVisitorMonitorEvents(def) {
+    contentEl.querySelectorAll("[data-visitor-filter]").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        state.activeFilter = chip.dataset.visitorFilter;
+        state.selectedIndex = 0;
+        renderVisitorMonitorPage(def);
+      });
+    });
+
+    contentEl.querySelectorAll("[data-visitor-row-index]").forEach((row) => {
+      row.addEventListener("click", () => {
+        state.selectedIndex = Number(row.dataset.visitorRowIndex);
+        renderVisitorMonitorPage(def);
+        const currentRows = filterRows(def.rows, def.filterBy);
+        const current = currentRows[state.selectedIndex];
+        if (current) openPlatformDetailModal(def, current, "visitor");
+      });
+    });
+  }
+
   function renderTablePage(def) {
     const rows = filterRows(def.rows, def.filterBy);
     const selected = rows[state.selectedIndex] || rows[0];
@@ -1613,11 +2005,9 @@
           ? `
             <button class="btn btn-secondary" type="button" data-vehicle-model-toolbar="create">新增车型</button>
           `
-        : state.activePage === "caseList"
+        : state.activePage === "caseManage"
           ? `
             <button class="btn btn-secondary" type="button" data-case-toolbar="create">新增案例</button>
-            <button class="btn btn-primary" type="button" data-case-toolbar="edit" ${selected ? "" : "disabled"}>编辑案例</button>
-            <button class="btn btn-danger" type="button" data-case-toolbar="delete" ${selected ? "" : "disabled"}>删除案例</button>
           `
         : state.activePage === "roles"
           ? `
@@ -1656,7 +2046,7 @@
             </section>
           `
       }
-      <section class="table-layout" style="margin-top:22px;">
+      <section style="margin-top:22px;">
         <article class="panel table-card">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -1695,9 +2085,6 @@
             </tbody>
           </table>
         </article>
-        <aside class="panel drawer-card">
-          ${selected ? renderDrawer(def.detail(selected)) : `<div class="page-heading"><h1 style="font-size:24px;">暂无详情</h1></div>`}
-        </aside>
       </section>
     `;
 
@@ -1707,13 +2094,12 @@
   function renderForumManagePage(def) {
     const rows = filterRows(def.rows, def.filterBy);
     const selected = rows[state.selectedIndex] || rows[0];
-    const detail = selected ? def.detail(selected) : null;
 
     contentEl.innerHTML = `
       <section class="page-heading">
         <h1>${def.title}</h1>
       </section>
-      <section class="table-layout forum-layout" style="margin-top:22px;">
+      <section style="margin-top:22px;">
         <article class="panel table-card forum-card">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -1762,80 +2148,6 @@
             }
           </div>
         </article>
-        <aside class="panel drawer-card">
-          ${detail ? renderForumDetail(detail) : `<div class="page-heading"><h1 style="font-size:24px;">暂无详情</h1></div>`}
-        </aside>
-      </section>
-    `;
-
-    bindTableEvents(def, selected);
-  }
-
-  function renderCaseListPage(def) {
-    const rows = filterRows(def.rows, def.filterBy);
-    const selected = rows[state.selectedIndex] || rows[0];
-
-    contentEl.innerHTML = `
-      <section class="page-heading">
-        <h1>${def.title}</h1>
-      </section>
-      <section class="table-layout case-layout" style="margin-top:22px;">
-        <article class="panel table-card case-board">
-          <div class="toolbar">
-            <div class="toolbar-left">
-              ${(def.filters || ["全部"])
-                .map(
-                  (item) => `
-                    <button class="filter-chip ${state.activeFilter === item ? "active" : ""}" type="button" data-filter="${item}">
-                      ${item}
-                    </button>
-                  `
-                )
-                .join("")}
-            </div>
-            <div class="toolbar-right">
-              <button class="btn btn-secondary" type="button" data-case-toolbar="create">新增案例</button>
-              <button class="btn btn-primary" type="button" data-case-toolbar="edit" ${selected ? "" : "disabled"}>编辑案例</button>
-              <button class="btn btn-danger" type="button" data-case-toolbar="delete" ${selected ? "" : "disabled"}>删除案例</button>
-            </div>
-          </div>
-          <div class="case-feed">
-            ${
-              rows.length
-                ? rows
-                    .map(
-                      (row, index) => `
-                        <article class="case-card ${index === state.selectedIndex ? "active" : ""}" data-row-index="${index}">
-                          ${renderCaseCoverPreview(row.image, row.title, true, row.imagePreview || "")}
-                          <div class="case-card-body">
-                            <div class="case-card-top">
-                              <div>
-                                <h3>${row.title}</h3>
-                                <div class="case-card-meta">
-                                  <span>${row.provider}</span>
-                                  <span>${row.model}</span>
-                                </div>
-                              </div>
-                              ${formatTag(row.display)}
-                            </div>
-                            <div class="case-card-tags">
-                              ${formatTag(row.audit)}
-                              <span class="pill">${row.style}</span>
-                              <span class="pill">${row.cost}</span>
-                            </div>
-                            <p>${getCaseContentSummary(row.content)}</p>
-                          </div>
-                        </article>
-                      `
-                    )
-                    .join("")
-                : `<div class="page-heading"><h1 style="font-size:24px;">暂无案例内容</h1></div>`
-            }
-          </div>
-        </article>
-        <aside class="panel drawer-card">
-          ${selected ? renderCaseDetailPanel(selected) : `<div class="page-heading"><h1 style="font-size:24px;">暂无详情</h1></div>`}
-        </aside>
       </section>
     `;
 
@@ -1944,6 +2256,10 @@
               <button class="btn btn-primary" type="button" data-template-toolbar="edit" ${selected ? "" : "disabled"}>编辑</button>
             <button class="btn btn-danger" type="button" data-template-toolbar="delete" ${selected ? "" : "disabled"}>删除</button>
           `
+        : state.activePage === "logisticsManage"
+          ? selected?.type === "shipping"
+            ? `<button class="btn btn-secondary" type="button" data-logistics-toolbar="ship" ${selected ? "" : "disabled"}>发货</button>`
+            : ""
         : state.activePage === "shipping"
           ? `
             <button class="btn btn-secondary" type="button" data-shipping-toolbar="ship" ${selected ? "" : "disabled"}>发货</button>
@@ -2091,14 +2407,11 @@
                   `
                 : detail.actions === "settlements"
                   ? `
-                    <button class="btn btn-primary" type="button" data-settlement-action="audit">审核</button>
+                    <button class="btn btn-primary" type="button" data-settlement-action="audit" ${detail.badges.includes("已结清") ? "disabled" : ""}>${detail.badges.includes("已结清") ? "已结清" : "确认收款"}</button>
                   `
-                : detail.actions === "caseAudit"
+                : detail.actions === "caseManage"
                   ? `
                     <button class="btn btn-primary" type="button" data-case-action="audit">审核</button>
-                  `
-                : detail.actions === "caseList"
-                  ? `
                     <button class="btn btn-secondary" type="button" data-case-list-action="edit">编辑案例</button>
                     <button class="btn btn-primary" type="button" data-case-list-action="display">展示设置</button>
                     <button class="btn btn-danger" type="button" data-case-list-action="delete">删除案例</button>
@@ -2149,6 +2462,206 @@
     `;
   }
 
+  function openPlatformDetailModal(def, row, mode = "drawer") {
+    const content =
+      mode === "forum"
+        ? renderForumDetail(def.detail(row))
+        : mode === "visitor"
+          ? renderVisitorDetail(row)
+          : renderDrawer(def.detail(row));
+
+    openModal(`
+      <div class="platform-detail-modal">
+        ${content}
+        <div class="platform-detail-modal-footer">
+          <button class="btn btn-secondary" type="button" data-close-modal>关闭</button>
+        </div>
+      </div>
+    `);
+    bindDetailModalActions(def, row);
+  }
+
+  function bindDetailModalActions(def, selected) {
+    if (!selected) return;
+
+    modalCardEl.querySelectorAll("[data-provider-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.providerAction === "process") {
+          openProviderAuditProcessModal(selected);
+          return;
+        }
+        openProviderAuditMaterialsModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-provider-list-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.providerListAction === "materials") {
+          openProviderListMaterialsModal(selected);
+          return;
+        }
+        toggleProviderStatus(selected.id);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-provider-account-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.providerAccountAction;
+        if (action === "edit") {
+          openProviderAccountEditorModal("edit", selected);
+          return;
+        }
+        if (action === "delete") {
+          openProviderAccountDeleteModal(selected);
+          return;
+        }
+        if (action === "reset") {
+          resetProviderAccountPassword(selected.id);
+          return;
+        }
+        toggleProviderAccountStatus(selected.id);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-user-list-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.userListAction === "materials") {
+          openUserMaterialsModal(selected);
+          return;
+        }
+        toggleUserStatus(selected.id);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-vehicle-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        openVehicleMaterialsModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-order-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.orderAction === "detail") {
+          openGenericDetailModal(def.detail(selected));
+          return;
+        }
+        openOrderProcessModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-assign-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.assignAction === "detail") {
+          openOrderAssignDetailModal(selected);
+          return;
+        }
+        openOrderAssignModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-settlement-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        openSettlementAuditModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-case-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        openCaseAuditModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-case-list-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.caseListAction;
+        if (action === "edit") {
+          openCaseEditorModal("edit", selected);
+          return;
+        }
+        if (action === "delete") {
+          openCaseDeleteModal(selected);
+          return;
+        }
+        openCaseDisplayModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-moderator-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        submitModeratorApply(selected.id, button.dataset.moderatorAction);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-post-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        openPostManageModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-comment-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = comments.find((item) => item.id === button.dataset.commentId);
+        if (target) openCommentManageModal(target);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-material-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.materialAction;
+        if (action === "toggle") {
+          toggleMaterialStatus(state.activePage, selected.id);
+          return;
+        }
+        if (action === "preview") {
+          openMaterialPreviewModal(state.activePage, selected);
+          return;
+        }
+        openMaterialEditorModal(state.activePage, selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-vehicle-model-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.vehicleModelAction;
+        if (action === "detail") {
+          openGenericDetailModal(def.detail(selected));
+          return;
+        }
+        if (action === "edit") {
+          openVehicleModelEditorModal("edit", selected);
+          return;
+        }
+        openVehicleModelDeleteModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-role-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.roleAction === "edit") {
+          openRoleEditorModal("edit", selected);
+          return;
+        }
+        toggleRoleStatus(selected.id);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-config-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.configAction === "edit") {
+          openConfigEditorModal(selected);
+          return;
+        }
+        toggleConfigStatus(selected.key);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-detail-action='open']").forEach((button) => {
+      button.addEventListener("click", () => {
+        openGenericDetailModal(def.detail(selected));
+      });
+    });
+  }
+
   function bindTableEvents(def, selected) {
     contentEl.querySelectorAll("[data-filter]").forEach((chip) => {
       chip.addEventListener("click", () => {
@@ -2158,10 +2671,6 @@
           renderForumManagePage(def);
           return;
         }
-        if (state.activePage === "caseList") {
-          renderCaseListPage(def);
-          return;
-        }
         renderTablePage(def);
       });
     });
@@ -2169,15 +2678,15 @@
     contentEl.querySelectorAll("[data-row-index]").forEach((row) => {
       row.addEventListener("click", () => {
         state.selectedIndex = Number(row.dataset.rowIndex);
+        const currentRows = filterRows(def.rows, def.filterBy);
+        const current = currentRows[state.selectedIndex];
         if (state.activePage === "forumManage") {
           renderForumManagePage(def);
-          return;
-        }
-        if (state.activePage === "caseList") {
-          renderCaseListPage(def);
+          if (current) openPlatformDetailModal(def, current, "forum");
           return;
         }
         renderTablePage(def);
+        if (current) openPlatformDetailModal(def, current, "drawer");
       });
     });
 
@@ -2228,7 +2737,7 @@
       }
     }
 
-    if (state.activePage === "caseList") {
+    if (state.activePage === "caseManage") {
       contentEl.querySelectorAll("[data-case-toolbar]").forEach((button) => {
         button.addEventListener("click", () => {
           const action = button.dataset.caseToolbar;
@@ -2416,15 +2925,12 @@
       });
     }
 
-    if (state.activePage === "caseAudit" && selected) {
+    if (state.activePage === "caseManage" && selected) {
       contentEl.querySelectorAll("[data-case-action]").forEach((button) => {
         button.addEventListener("click", () => {
           openCaseAuditModal(selected);
         });
       });
-    }
-
-    if (state.activePage === "caseList" && selected) {
       contentEl.querySelectorAll("[data-case-list-action]").forEach((button) => {
         button.addEventListener("click", () => {
           const action = button.dataset.caseListAction;
@@ -2489,10 +2995,25 @@
   function bindSimplePageEvents(def, selected) {
     contentEl.querySelectorAll("[data-simple-row-index]").forEach((row) => {
       row.addEventListener("click", () => {
-        state.selectedIndex = Number(row.dataset.simpleRowIndex);
+        const rowIndex = Number(row.dataset.simpleRowIndex);
+        state.selectedIndex = rowIndex;
+        if (state.activePage === "logisticsManage") {
+          renderSimplePage(def);
+          openLogisticsDetailModal(def.rows[rowIndex]);
+          return;
+        }
         renderSimplePage(def);
       });
     });
+
+    if (state.activePage === "logisticsManage") {
+      contentEl.querySelectorAll("[data-logistics-toolbar='ship']").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (selected?.type === "shipping") openShippingEditModal(selected.source);
+        });
+      });
+      return;
+    }
 
     if (state.activePage === "productCategories") {
       contentEl.querySelectorAll("[data-category-toolbar]").forEach((button) => {
@@ -2774,9 +3295,18 @@
         const orderId = modalCardEl.querySelector("[data-order-id]")?.dataset.orderId;
         const target = orders.find((item) => item.id === orderId);
         if (target) {
-          if (mode === "assign") target.progress = "等待重新派单";
-          if (mode === "progress") target.progress = target.status === "待发货" ? "待签收" : "施工中";
-          if (mode === "close") target.progress = "已完成";
+          if (mode === "assign") {
+            target.progress = "等待重新派单";
+            appendOrderTimeline(target, "平台将订单加入重新派单流程");
+          }
+          if (mode === "progress") {
+            target.progress = target.status === "待发货" ? "待签收" : "施工中";
+            appendOrderTimeline(target, `平台更新订单进度为：${target.progress}`);
+          }
+          if (mode === "close") {
+            target.progress = "已完成";
+            appendOrderTimeline(target, "平台将订单标记为已完成");
+          }
         }
         openFeedbackModal(titleMap[mode], messageMap[mode]);
       });
@@ -2790,8 +3320,10 @@
         const order = orders.find((item) => item.id === orderId);
         if (order && target) {
           order.intention = target.name;
+          order.provider = target.name;
           order.progress = "已派单";
           order.status = "施工中";
+          appendOrderTimeline(order, `平台派单给 ${target.name}，订单状态更新为施工中`);
           openFeedbackModal("派单成功", `${order.id} 已分配给 ${target.name}，当前状态已更新为施工中。`);
         }
       });
@@ -3047,6 +3579,8 @@
         target.number = number;
         target.note = note;
         target.status = "待签收";
+        const order = orders.find((item) => item.id === target.orderId);
+        if (order) appendOrderTimeline(order, `${company} 已发货，物流单号：${number}`);
         openFeedbackModal("发货已提交", `${target.id} 的物流信息已保存，状态已更新为待签收。`);
       });
     }
@@ -3083,7 +3617,7 @@
         <div>
           <span class="eyebrow">Provider Audit</span>
           <h2 class="section-title">处理入驻审核</h2>
-          <p class="section-subtitle">${row.name} 路 ${row.city} 路 ${row.specialties}</p>
+          <p class="section-subtitle">${row.name} / ${row.providerRegion} / ${row.specialties}</p>
         </div>
       </div>
       <div class="action-grid" data-order-id="${row.id}">
@@ -3259,7 +3793,7 @@
           <div class="provider-material-grid provider-material-grid-wide">
             <div class="provider-material-card">
               <span>所在地区</span>
-              <strong>${[row.locationProvince, row.locationCity, row.locationCounty].filter(Boolean).join(" / ") || `${row.city} / ${row.district}`}</strong>
+              <strong>${row.providerRegion}</strong>
             </div>
             <div class="provider-material-card">
               <span>详细地址</span>
@@ -3492,7 +4026,7 @@
             (item, index) => `
               <div class="doc-item">
                 <strong>#${index + 1} ${item.name}</strong>
-                <div class="muted">${item.city} 路 ${item.specialties}${row.intention === item.name ? " 路 客户意向门店" : ""}</div>
+                <div class="muted">${item.providerRegion} / ${item.specialties}${row.intention === item.name ? " / 客户意向门店" : ""}</div>
                 <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
                   ${formatTag(item.status)}
                   <button class="btn btn-primary" type="button" data-assign-provider="${item.id}">派给此门店</button>
@@ -3524,6 +4058,14 @@
         <div class="doc-item"><strong>城市</strong><div class="muted">${row.city}</div></div>
         <div class="doc-item"><strong>意向门店</strong><div class="muted">${row.intention}</div></div>
         <div class="doc-item"><strong>当前进度</strong><div class="muted">${row.progress}</div></div>
+      </div>
+      <div style="margin-top:18px;">
+        <div class="panel-header" style="margin-bottom:12px;">
+          <div><h3 class="section-title" style="font-size:18px;">处理轨迹</h3></div>
+        </div>
+        <div class="timeline">
+          ${(row.timeline || ["暂无处理轨迹"]).map((item) => `<div class="timeline-item">${item}</div>`).join("")}
+        </div>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-primary" type="button" data-close-modal>关闭</button>
@@ -3885,6 +4427,14 @@
     `);
   }
 
+  function openLogisticsDetailModal(row) {
+    if (row.type === "signing") {
+      openSigningDetailModal(row.source);
+      return;
+    }
+    openShippingDetailModal(row.source);
+  }
+
   function openShippingDetailModal(row) {
     openGenericDetailModal({
       title: row.id,
@@ -3960,10 +4510,13 @@
   }
 
   function openSigningDetailModal(row) {
+    const shippingRecord = getShippingByOrderId(row.orderId);
     openGenericDetailModal({
       title: row.orderId,
       badges: [row.status],
       facts: [
+        ["物流公司", shippingRecord?.company || row.company || "-"],
+        ["物流单号", shippingRecord?.number || row.number || "-"],
         ["签收人", row.customer],
         ["签收时间", row.signTime],
         ["异常照片", renderSigningPhotoPlaceholders(row.anomalyPhotos)],
@@ -3971,6 +4524,8 @@
       ],
       timeline: [
         `订单号：${row.orderId}`,
+        `物流公司：${shippingRecord?.company || row.company || "-"}`,
+        `物流单号：${shippingRecord?.number || row.number || "-"}`,
         `签收状态：${row.status}`,
         `异常照片：${row.anomalyPhotos?.length ? `${row.anomalyPhotos.length} 张` : "无"}`,
         `签收备注：${row.note}`,
@@ -4290,22 +4845,27 @@
     if (!target) return;
 
     if (decision === "reject" && !reason) {
-      openFeedbackModal("请填写驳回原因", "驳回结算申请前需要填写明确原因，方便服务商后续修正。");
+      openFeedbackModal("请填写驳回原因", "驳回付款记录前需要填写明确原因，方便服务商后续修正。");
       return;
     }
 
     if (decision === "approve") {
-      target.status = "已通过";
+      target.status = "已结清";
+      target.paymentStatus = "已结清";
       target.rejectReason = "";
-      target.timeline.unshift("2026-04-03 14:20 平台审核通过，已进入结算执行流程");
-      openFeedbackModal("结算审核已通过", `${target.id} 已审核通过。`);
+      target.paymentNote = target.paymentNote || "平台已确认收到服务商支付的平台服务费。";
+      target.paidAt = target.paidAt || getNowStamp();
+      target.timeline.unshift(`${getNowStamp()} 平台确认收款，服务商已按协议结清平台服务费`);
+      openFeedbackModal("收款已确认", `${target.id} 已更新为已结清。`);
       return;
     }
 
     target.status = "已驳回";
+    target.paymentStatus = "已驳回";
     target.rejectReason = reason;
-    target.timeline.unshift(`2026-04-03 14:20 平台驳回结算申请。驳回原因：${reason}`);
-    openFeedbackModal("结算申请已驳回", `${target.id} 已记录驳回原因。`);
+    target.paymentNote = `付款记录被驳回：${reason}`;
+    target.timeline.unshift(`${getNowStamp()} 平台驳回付款记录。驳回原因：${reason}`);
+    openFeedbackModal("付款记录已驳回", `${target.id} 已记录驳回原因。`);
   }
 
   function submitCaseAudit(caseId, decision, reason = "") {
@@ -4354,6 +4914,7 @@
       provider: getValue("provider"),
       model: getValue("model"),
       style: getValue("style"),
+      modType: getValue("modType"),
       cost: getValue("cost"),
       image: getValue("image"),
       imagePreview: getValue("imagePreview"),
@@ -4362,8 +4923,8 @@
       audit: "待审核",
       timeline: [`2026-04-03 16:20 平台${mode === "edit" ? "更新" : "新增"}案例：${getValue("title")}`],
     };
-    if (!payload.title || !payload.provider || !payload.model || !payload.style || !payload.cost || !payload.image || !payload.content || !payload.display) {
-      openFeedbackModal("信息不完整", "请填写案例标题、服务商、车型、风格、费用、封面图、案例说明和展示状态。");
+    if (!payload.title || !payload.provider || !payload.model || !payload.style || !payload.modType || !payload.cost || !payload.image || !payload.content || !payload.display) {
+      openFeedbackModal("信息不完整", "请填写案例标题、服务商、车型、风格、改装类型、费用、封面图、案例说明和展示状态。");
       return;
     }
     if (mode === "edit") {
@@ -4905,19 +5466,19 @@
     openModal(`
       <div class="panel-header">
         <div>
-          <span class="eyebrow">Settlement Audit</span>
-          <h2 class="section-title">审核结算申请</h2>
-          <p class="section-subtitle">${row.id} / ${row.provider} / ${row.amount}</p>
+          <span class="eyebrow">Settlement Payment</span>
+          <h2 class="section-title">确认平台服务费收款</h2>
+          <p class="section-subtitle">${row.id} / ${row.provider} / 应收 ${row.platformReceivable}</p>
         </div>
       </div>
       <div class="action-grid">
         <button class="action-tile" type="button" data-settlement-decision="approve" data-settlement-id="${row.id}">
-          <strong>审核通过</strong>
-          <p>确认结算订单与金额无误，进入通过状态并记录审核轨迹。</p>
+          <strong>确认收款</strong>
+          <p>确认服务商已按协议比例支付平台服务费，并将状态更新为已结清。</p>
         </button>
         <button class="action-tile" type="button" data-settlement-decision="reject" data-settlement-id="${row.id}">
-          <strong>审核驳回</strong>
-          <p>驳回本次结算申请，并填写明确的驳回原因供服务商修正。</p>
+          <strong>驳回付款记录</strong>
+          <p>付款凭证或金额不一致时驳回，并填写原因供服务商修正。</p>
         </button>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
@@ -4933,13 +5494,13 @@
       <div class="panel-header">
         <div>
           <span class="eyebrow">Settlement Reject</span>
-          <h2 class="section-title">驳回结算申请</h2>
+          <h2 class="section-title">驳回付款记录</h2>
           <p class="section-subtitle">${target.id} / ${target.provider} / 请填写驳回原因</p>
         </div>
       </div>
       <div class="field-group field-group-full">
         <div class="field-label">驳回原因</div>
-        <textarea class="textarea" data-settlement-reject-reason>结算订单与完工资料不一致，请补充完整凭证后重新提交审核。</textarea>
+        <textarea class="textarea" data-settlement-reject-reason>付款金额或凭证与应付平台服务费不一致，请修正后重新提交。</textarea>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-primary" type="button" data-submit-settlement-reject data-settlement-id="${target.id}">确认驳回</button>
@@ -5003,6 +5564,7 @@
     const provider = getValue("provider") || "未选择服务商";
     const model = getValue("model") || "未填写车型";
     const style = getValue("style") || "未填写风格";
+    const modType = getValue("modType") || "未填写改装类型";
     const cost = getValue("cost") || "未填写费用";
     const image = getValue("image") || "未填写封面图";
     const imagePreview = getValue("imagePreview");
@@ -5028,6 +5590,8 @@
     if (modelEl) modelEl.textContent = model;
     const styleEl = modalCardEl.querySelector("[data-case-preview-style]");
     if (styleEl) styleEl.textContent = style;
+    const modTypeEl = modalCardEl.querySelector("[data-case-preview-modType]");
+    if (modTypeEl) modTypeEl.textContent = modType;
     const costEl = modalCardEl.querySelector("[data-case-preview-cost]");
     if (costEl) costEl.textContent = cost;
 
@@ -5087,6 +5651,7 @@
       provider: providers.find((item) => item.auditStatus === "已通过")?.name || providers[0]?.name || "御驰 Performance Studio",
       model: "宝马 G20 330i",
       style: "黑武士街道风",
+      modType: "车衣改造",
       cost: "¥ 26,800",
       image: "case-new-cover.jpg",
       imagePreview: "",
@@ -5099,6 +5664,9 @@
       .join("");
     const styleOptions = getCaseStyleOptions(source.style)
       .map((item) => `<option value="${item}" ${item === source.style ? "selected" : ""}>${item}</option>`)
+      .join("");
+    const modTypeOptions = getCaseModTypeOptions(source.modType)
+      .map((item) => `<option value="${item}" ${item === source.modType ? "selected" : ""}>${item}</option>`)
       .join("");
     openModal(`
       <div class="case-editor-modal" data-case-editor data-audit="${source.audit || "待审核"}">
@@ -5122,6 +5690,7 @@
             <div class="case-editor-preview-meta">
               <span data-case-preview-model>${source.model}</span>
               <span data-case-preview-style>${source.style}</span>
+              <span data-case-preview-modType>${source.modType}</span>
               <span data-case-preview-cost>${source.cost}</span>
             </div>
           </div>
@@ -5147,6 +5716,10 @@
             <div class="field-group">
               <div class="field-label">风格</div>
               <select class="select" data-case-field="style">${styleOptions}</select>
+            </div>
+            <div class="field-group">
+              <div class="field-label">改装类型</div>
+              <select class="select" data-case-field="modType">${modTypeOptions}</select>
             </div>
             <div class="field-group">
               <div class="field-label">费用</div>
@@ -5656,7 +6229,17 @@
     let result = [...rows];
 
     if (filterBy && state.activeFilter !== "全部") {
-      result = result.filter((row) => row[filterBy] === state.activeFilter);
+      if (filterBy === "caseManage") {
+        const auditFilters = ["待审核", "已通过", "已驳回"];
+        const displayFilters = ["首页展示", "正常展示", "未展示"];
+        if (auditFilters.includes(state.activeFilter)) {
+          result = result.filter((row) => row.audit === state.activeFilter);
+        } else if (displayFilters.includes(state.activeFilter)) {
+          result = result.filter((row) => row.display === state.activeFilter);
+        }
+      } else {
+        result = result.filter((row) => row[filterBy] === state.activeFilter);
+      }
     }
 
     if (state.search.trim()) {

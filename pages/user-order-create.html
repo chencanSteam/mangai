@@ -44,14 +44,6 @@
                       <span>合计金额</span>
                       <strong id="orderTotalPrice">¥0</strong>
                     </article>
-                    <article>
-                      <span>收货方式</span>
-                      <strong>快递配送</strong>
-                    </article>
-                    <article>
-                      <span>订单状态</span>
-                      <strong>待提交</strong>
-                    </article>
                   </div>
                 </section>
 
@@ -59,6 +51,10 @@
                   <div class="field-group">
                     <label class="field-label" for="orderVehicle">车辆信息</label>
                     <input class="input" id="orderVehicle" name="orderVehicle" type="text" value="宝马 G20 330i" required />
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label" for="orderRecipientInput">收货人</label>
+                    <input class="input" id="orderRecipientInput" name="orderRecipient" type="text" value="周恺" required />
                   </div>
                   <div class="field-group">
                     <label class="field-label" for="orderPhone">联系电话</label>
@@ -123,7 +119,9 @@
       const orderPriceEl = document.getElementById("orderPrice");
       const orderQuantityTextEl = document.getElementById("orderQuantityText");
       const orderTotalPriceEl = document.getElementById("orderTotalPrice");
+      const orderRecipientInput = document.getElementById("orderRecipientInput");
       const orderQuantityInput = document.getElementById("orderQuantity");
+      const orderAddressInput = document.getElementById("orderAddress");
       const orderCreateForm = document.getElementById("orderCreateForm");
       const orderSuccess = document.getElementById("orderSuccess");
       const orderSuccessText = document.getElementById("orderSuccessText");
@@ -192,17 +190,19 @@
       }
 
       orderQuantityInput.addEventListener("input", syncSummary);
+      orderAddressInput.addEventListener("input", syncSummary);
       syncSummary();
 
       orderCreateForm.addEventListener("submit", (event) => {
         event.preventDefault();
         const formData = new FormData(orderCreateForm);
         const vehicle = String(formData.get("orderVehicle") || "").trim();
+        const recipient = String(formData.get("orderRecipient") || "").trim();
         const phone = String(formData.get("orderPhone") || "").trim();
         const address = String(formData.get("orderAddress") || "").trim();
         const note = String(formData.get("orderNote") || "").trim();
         const quantity = Math.max(1, Number(formData.get("orderQuantity") || 1));
-        if (!vehicle || !phone || !address || !note) return;
+        if (!vehicle || !recipient || !phone || !address || !note) return;
 
         const orderId = `UO-${Date.now().toString().slice(-6)}`;
         const totalPrice = formatCurrency(priceToNumber(price) * quantity);
@@ -224,6 +224,7 @@
             appointment: "等待发货",
             intention: "无",
             address,
+            recipient,
             phone,
           },
           ...readOrders(),

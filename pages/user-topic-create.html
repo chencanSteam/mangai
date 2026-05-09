@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>发布帖子 - 满改平台</title>
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+  </head>
+  <body>
+    <main class="page-shell phone-stage">
+      <div class="phone-wrap">
+        <div class="phone-frame">
+          <div class="phone-screen" data-mobile-shell="user">
+            <div class="android-status"><span>9:41</span><span>5G 92%</span></div>
+            <header class="android-topbar topic-create-topbar">
+              <span class="eyebrow">发布帖子</span>
+              <h2>新建内容</h2>
+            </header>
+            <section class="screen-content">
+              <div class="stack topic-create-page">
+                <form class="topic-create-form" id="topicCreateForm">
+                  <div class="field-group">
+                    <label class="field-label" for="topicTitle">帖子标题</label>
+                    <input class="input" id="topicTitle" name="topicTitle" type="text" value="分享本周新改的轮毂搭配" required />
+                  </div>
+
+                  <div class="field-group">
+                    <label class="field-label" for="topicCategory">内容分类</label>
+                    <select class="input" id="topicCategory" name="topicCategory" required>
+                      <option value="案例分享" selected>案例分享</option>
+                      <option value="街拍记录">街拍记录</option>
+                      <option value="施工日常">施工日常</option>
+                      <option value="用车讨论">用车讨论</option>
+                    </select>
+                  </div>
+
+                  <div class="field-group">
+                    <label class="field-label" for="topicMedia">上传图片或视频</label>
+                    <label class="upload-panel" for="topicMedia">
+                      <input id="topicMedia" class="upload-input" name="topicMedia" type="file" accept="image/*,video/*" multiple />
+                      <span class="upload-illustration"></span>
+                      <strong>上传帖子素材</strong>
+                      <small>支持上传图片或短视频，最多选择 9 个文件</small>
+                    </label>
+                    <div class="topic-create-file-tip" id="topicFileTip">当前未选择素材</div>
+                  </div>
+
+                  <div class="field-group">
+                    <label class="field-label" for="topicContent">帖子内容</label>
+                    <textarea class="textarea topic-create-textarea" id="topicContent" name="topicContent" required>刚换了新轮毂和短簧，整体姿态比之前精神很多，晚点把更多细节图和参数也补上，大家可以先帮我看看这套搭配顺不顺眼。</textarea>
+                  </div>
+
+                  <div class="topic-create-actions">
+                    <a class="btn btn-secondary" href="user-app.html?tab=forum">返回论坛</a>
+                    <button class="btn btn-primary" type="submit">发布帖子</button>
+                  </div>
+                </form>
+
+              </div>
+            </section>
+            <div class="modal" id="topicCreateSuccessModal" hidden>
+              <div class="panel modal-card topic-create-success">
+                <div class="topic-detail-overline">发布成功</div>
+                <h3>帖子已提交到社区</h3>
+                <p id="topicCreateSuccessText">你的帖子已经发布成功。</p>
+                <div class="topic-create-actions">
+                  <button class="btn btn-secondary" type="button" id="topicCreateContinue">继续发布</button>
+                  <a class="btn btn-primary" id="topicCreateBackLink" href="user-app.html?tab=forum">返回论坛</a>
+                </div>
+              </div>
+            </div>
+            <nav class="bottom-nav">
+              <button type="button" onclick="location.href='user-app.html?tab=home'"><span>首页</span></button>
+              <button type="button" onclick="location.href='user-app.html?tab=mall'"><span>商城</span></button>
+              <button type="button" onclick="location.href='user-app.html?tab=garage'"><span>爱车</span></button>
+              <button type="button" class="active" onclick="location.href='user-app.html?tab=forum'"><span>论坛</span></button>
+              <button type="button" onclick="location.href='user-app.html?tab=me'"><span>我的</span></button>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script>
+      (function () {
+        const form = document.getElementById("topicCreateForm");
+        const success = document.getElementById("topicCreateSuccessModal");
+        const successText = document.getElementById("topicCreateSuccessText");
+        const backLink = document.getElementById("topicCreateBackLink");
+        const continueBtn = document.getElementById("topicCreateContinue");
+        const mediaInput = document.getElementById("topicMedia");
+        const fileTip = document.getElementById("topicFileTip");
+
+        if (!form || !success || !successText || !backLink || !continueBtn || !mediaInput || !fileTip) return;
+
+        mediaInput.addEventListener("change", function () {
+          const count = mediaInput.files ? mediaInput.files.length : 0;
+          fileTip.textContent = count ? `已选择 ${count} 个素材文件` : "当前未选择素材";
+        });
+
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          const formData = new FormData(form);
+          const title = String(formData.get("topicTitle") || "").trim();
+          const content = String(formData.get("topicContent") || "").trim();
+          const count = mediaInput.files ? mediaInput.files.length : 0;
+          if (!title || !content) return;
+
+          successText.textContent = count
+            ? `《${title}》已发布，并上传 ${count} 个素材文件。`
+            : `《${title}》已发布到社区。`;
+          backLink.href = `user-app.html?tab=forum&feedback=${encodeURIComponent(title + " 已发布")}`;
+          success.hidden = false;
+          success.classList.add("visible");
+        });
+
+        continueBtn.addEventListener("click", function () {
+          success.hidden = true;
+          success.classList.remove("visible");
+        });
+      })();
+    </script>
+  </body>
+</html>
