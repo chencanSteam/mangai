@@ -12,6 +12,7 @@
     services,
     consultationTemplates,
     orders,
+    orderChats,
     shipping,
     signing,
     settlements,
@@ -28,6 +29,8 @@
   const searchEl = document.getElementById("platformSearch");
   const modalEl = document.getElementById("platformModal");
   const modalCardEl = document.getElementById("platformModalCard");
+  const INVOICE_STORAGE_KEY = "mockUserInvoices";
+  const MALL_RECOMMENDATION_STORAGE_KEY = "mockMallRecommendations";
 
   const menu = [
     { id: "home", label: "首页" },
@@ -71,10 +74,21 @@
       children: [
         { id: "orderList", label: "订单列表" },
         { id: "orderAssign", label: "订单分配", badge: orders.filter((item) => item.status === "待分配").length },
+        { id: "chatRecords", label: "聊天记录", badge: orderChats.length },
       ],
     },
     { id: "logisticsManage", label: "物流管理" },
-    { id: "settlements", label: "结算管理" },
+    { id: "settlements", label: "服务统计" },
+    { id: "invoiceManage", label: "发票管理" },
+    { id: "promotionManage", label: "活动促销" },
+    {
+      id: "brands",
+      label: "品牌管理",
+      children: [
+        { id: "brandManage", label: "品牌列表" },
+        { id: "brandAccounts", label: "品牌方账号" },
+      ],
+    },
     { id: "caseManage", label: "案例管理" },
     {
       id: "forum",
@@ -115,7 +129,9 @@
     { page: "providerAudit", title: "入驻审核", desc: "快速处理新提交的服务商资质与门店资料。", icon: "审" },
     { page: "orderAssign", title: "订单分配", desc: "进入待分配服务订单，优先完成派单与改派。", icon: "派" },
     { page: "caseManage", title: "案例管理", desc: "集中审核与维护全平台案例数据。", icon: "案" },
-    { page: "settlements", title: "结算管理", desc: "查看服务商平台服务费付款与平台确认收款状态。", icon: "结" },
+    { page: "settlements", title: "服务统计", desc: "查看服务商服务记录与推荐客户统计。", icon: "统" },
+    { page: "invoiceManage", title: "发票管理", desc: "处理用户开票申请与回传。", icon: "票" },
+    { page: "promotionManage", title: "活动促销", desc: "配置优惠券与折扣活动。", icon: "促" },
   ];
 
   const state = {
@@ -125,6 +141,13 @@
     search: "",
     expandedGroups: Object.fromEntries(menu.filter((item) => item.children).map((item) => [item.id, true])),
   };
+
+  const promotionRedemptions = [
+    { id: "RC-240401-001", promoId: "PROMO-001", coupon: "SPR-WHEEL-0001", user: "顾铭", orderId: "UO-128674", amount: "¥ 2,820", channel: "用户 App", time: "2026-04-02 10:28", status: "已核销" },
+    { id: "RC-240401-002", promoId: "PROMO-001", coupon: "SPR-WHEEL-0002", user: "周恺", orderId: "OD-240401-023", amount: "¥ 2,820", channel: "服务商 Web", time: "2026-04-02 15:46", status: "已核销" },
+    { id: "RC-240401-003", promoId: "PROMO-001", coupon: "SPR-WHEEL-0003", user: "沈越", orderId: "OD-240402-011", amount: "¥ 3,375", channel: "用户 App", time: "2026-04-03 09:12", status: "已核销" },
+    { id: "RC-240415-001", promoId: "PROMO-002", coupon: "PPF-2000-0001", user: "梁栘", orderId: "UO-240320", amount: "¥ 2,000", channel: "平台录入", time: "待开始", status: "待核销" },
+  ];
 
   const forumBoards = [
     { id: "BOARD-01", name: "性能改装", summary: "围绕动力、制动、底盘等深度改装内容维护。", currentModerators: "御驰 Performance Studio、平台巡检", status: "启用" },
@@ -144,16 +167,30 @@
     { id: "MOD-APPLY-03", account: "擎速 Motorsport Lab", accountType: "服务商账号", board: "新能源升级", reason: "希望参与新能源案例话题运营与答疑。", status: "已驳回" },
   ];
 
+  const authorizedCommerceAccounts = ["满改官方", "御驰 Performance Studio", "擎速 Motorsport Lab", "平台巡检"];
+  const defaultPostGovernance = [
+    { top: "置顶", featured: "加精", linkAuth: "已授权", linkedProducts: ["PR-8801"], creatorPinned: "是", creatorHomeRank: 1 },
+    { top: "未置顶", featured: "加精", linkAuth: "未授权", linkedProducts: [], creatorPinned: "否", creatorHomeRank: 0 },
+    { top: "未置顶", featured: "未加精", linkAuth: "未授权", linkedProducts: [], creatorPinned: "否", creatorHomeRank: 0 },
+  ];
+
   const tagType = (text) => {
     if (!text) return "neutral";
-    if (["正常营业", "已通过", "启用", "上架", "正常", "已完成", "已签收", "已结清", "生效中", "首页展示", "正常展示"].includes(text)) return "success";
-    if (["待审核", "待分配", "待发货", "待签收", "待付款", "待确认", "运输中", "关注中", "需复核", "待揽收"].includes(text)) return "warning";
-    if (["已驳回", "驳回修改", "异常签收", "缺货", "暂停接单", "停用", "已停用"].includes(text)) return "danger";
-    if (["施工中", "待支付"].includes(text)) return "info";
+    if (["正常营业", "已通过", "启用", "上架", "正常", "已完成", "已签收", "已结清", "生效中", "首页展示", "正常展示", "已开具", "已支付", "已到账", "置顶", "加精", "已授权", "是"].includes(text)) return "success";
+    if (["待审核", "待分配", "待接单", "待发货", "待签收", "待付款", "待确认", "运输中", "关注中", "需复核", "待揽收", "待处理", "待开票", "待到账", "待重派", "未授权"].includes(text)) return "warning";
+    if (["已驳回", "驳回修改", "异常签收", "缺货", "暂停接单", "停用", "已停用", "到账异常"].includes(text)) return "danger";
+    if (["施工中", "待支付", "部分支付", "已延期"].includes(text)) return "info";
     return "neutral";
   };
 
-  const formatTag = (text) => `<span class="tag ${tagType(text)}">${text}</span>`;
+  const displayValue = (value, fallback = "-") => {
+    if (Array.isArray(value)) return value.length ? value.join(" / ") : fallback;
+    return value === undefined || value === null || value === "" ? fallback : value;
+  };
+  const formatTag = (text) => {
+    const value = displayValue(text);
+    return `<span class="tag ${tagType(value)}">${value}</span>`;
+  };
   const priceToNumber = (value) => Number(String(value || "").replace(/[^\d.]/g, "")) || 0;
   const formatCurrency = (value) => `¥ ${Number(value || 0).toLocaleString("zh-CN")}`;
   const parseFeeRate = (value) => {
@@ -236,6 +273,22 @@
     order.timeline.unshift(`${getNowStamp()} ${text}`);
   }
 
+  posts.forEach((item, index) => {
+    const fallback = defaultPostGovernance[index] || defaultPostGovernance[0];
+    item.content = item.content || `${item.title} 的正文内容待补充，后台可在发后管理中查看互动和治理记录。`;
+    item.topStatus = item.topStatus || fallback.top;
+    item.featuredStatus = item.featuredStatus || fallback.featured;
+    item.linkAuthStatus = item.linkAuthStatus || (authorizedCommerceAccounts.includes(item.author) ? "已授权" : fallback.linkAuth);
+    item.linkedProducts = Array.isArray(item.linkedProducts) ? item.linkedProducts : fallback.linkedProducts.slice();
+    item.creatorPinned = item.creatorPinned || fallback.creatorPinned;
+    item.creatorHomeRank = Number(item.creatorHomeRank ?? fallback.creatorHomeRank) || 0;
+    item.governanceNote = item.governanceNote || "支持置顶、加精、商品链接审核和创作者主页置顶作品。";
+    item.timeline = item.timeline || [
+      `${item.time || "2026-04-03 10:00"} 帖子发布`,
+      `治理状态：${item.topStatus} / ${item.featuredStatus} / 商品链接${item.linkAuthStatus}`,
+    ];
+  });
+
   orders.forEach((item) => {
     item.displayType = item.displayType || (item.type === "商品订单" ? "自提" : "改装服务");
     item.paymentMethod = item.paymentMethod || (item.payment === "待支付" ? "微信支付" : "支付宝");
@@ -307,9 +360,9 @@
   );
 
   const normalizedSettlementDefaults = [
-    { id: "ST-240402-003", provider: "凌速 High Spec Garage", amount: "¥ 86,300", grossAmount: "¥ 86,300", feeRate: "12%", orders: 4, applyTime: "2026-04-02 09:08", paidAt: "", status: "待付款", paymentNote: "客户已支付给服务商，待服务商支付平台服务费。" },
-    { id: "ST-240401-005", provider: "擎速 Motorsport Lab", amount: "¥ 128,900", grossAmount: "¥ 128,900", feeRate: "12%", orders: 6, applyTime: "2026-04-01 16:18", paidAt: "2026-04-02 10:35", status: "待确认", paymentNote: "服务商已提交付款记录，待平台确认收款。" },
-    { id: "ST-240331-004", provider: "御驰 Performance Studio", amount: "¥ 69,500", grossAmount: "¥ 69,500", feeRate: "12%", orders: 3, applyTime: "2026-03-31 13:30", paidAt: "2026-04-01 09:40", status: "已结清", paymentNote: "平台已确认收款，协议服务费已结清。" },
+    { id: "ST-240402-003", provider: "凌速 High Spec Garage", amount: "¥ 86,300", grossAmount: "¥ 86,300", orders: 4, directOrders: 2, referralOrders: 2, referredUsers: 18, status: "待复核", applyTime: "2026-04-02 09:08", paymentNote: "按服务次数、推荐用户和订单金额统计本期数据。" },
+    { id: "ST-240401-005", provider: "擎速 Motorsport Lab", amount: "¥ 128,900", grossAmount: "¥ 128,900", orders: 6, directOrders: 4, referralOrders: 2, referredUsers: 26, status: "待复核", applyTime: "2026-04-01 16:18", paymentNote: "推荐用户转化较高，待运营确认归属。" },
+    { id: "ST-240331-004", provider: "御驰 Performance Studio", amount: "¥ 69,500", grossAmount: "¥ 69,500", orders: 3, directOrders: 1, referralOrders: 2, referredUsers: 12, status: "已归档", applyTime: "2026-03-31 13:30", paidAt: "2026-04-01 09:40", paymentNote: "本期服务统计已归档。" },
   ];
 
   settlements.splice(
@@ -318,17 +371,23 @@
     ...settlements.map((item, index) => {
       const fallback = normalizedSettlementDefaults[index] || normalizedSettlementDefaults[0];
       const grossAmount = item.grossAmount || item.amount || fallback.grossAmount || fallback.amount;
-      const feeRate = item.feeRate || fallback.feeRate || "12%";
-      const platformReceivable = item.platformReceivable || formatCurrency(Math.round(priceToNumber(grossAmount) * parseFeeRate(feeRate)));
-      const status = normalizeSettlementStatus(item.paymentStatus || item.status || fallback.status);
+      const serviceTimes = Number(item.serviceTimes || item.orders || fallback.orders || 0);
+      const directOrders = Number(item.directOrders ?? fallback.directOrders ?? 0);
+      const referralOrders = Number(item.referralOrders ?? fallback.referralOrders ?? Math.max(0, serviceTimes - directOrders));
+      const referredUsers = Number(item.referredUsers ?? item.referralUsers ?? fallback.referredUsers ?? referralOrders * 6);
+      const status = item.status || fallback.status || "待复核";
       return {
         id: item.id || fallback.id,
         provider: item.provider || fallback.provider,
         amount: grossAmount,
         grossAmount,
-        feeRate: formatFeeRate(feeRate),
-        platformReceivable,
-        orders: item.orders || fallback.orders,
+        orderAmount: grossAmount,
+        orders: serviceTimes,
+        serviceTimes,
+        directOrders,
+        referralOrders,
+        referredUsers,
+        referralUsers: referredUsers,
         applyTime: item.applyTime || fallback.applyTime,
         paidAt: item.paidAt || fallback.paidAt || "",
         get paymentTime() {
@@ -341,9 +400,9 @@
         timeline:
           item.timeline ||
           [
-            `客户已支付服务商：${grossAmount}`,
-            `协议比例：${formatFeeRate(feeRate)} / 应付平台：${platformReceivable}`,
-            `当前付款状态：${status}`,
+            `服务次数：${serviceTimes} 次 / 推荐用户：${referredUsers} 人`,
+            `订单金额：${grossAmount}`,
+            `统计状态：${status}`,
           ],
       };
     })
@@ -517,8 +576,8 @@
       scope: "平台 Web + 平台管理端 App",
       members: 12,
       status: "启用",
-      description: "负责平台后台的审核、派单、结算、案例与系统配置管理。",
-      permissions: ["首页总览", "服务商审核", "订单分配", "案例管理", "结算收款", "系统配置"],
+      description: "负责平台后台的审核、派单、服务统计、案例与系统配置管理。",
+      permissions: ["首页总览", "服务商审核", "订单分配", "案例管理", "服务统计", "系统配置"],
       updatedAt: "2026-04-03 11:20",
     },
     {
@@ -581,19 +640,19 @@
     {
       key: "消息模板版本",
       value: "V2.8",
-      scope: "订单 / 审核 / 结算",
+      scope: "订单 / 审核 / 服务统计",
       status: "生效中",
-      description: "用于订单流转、审核结果与结算通知的统一消息模板版本。",
+      description: "用于订单流转、审核结果与服务统计通知的统一消息模板版本。",
       editor: "运营中心",
       updatedAt: "2026-04-02 17:45",
     },
     {
-      key: "平台服务费付款资料",
-      value: "付款凭证 + 订单汇总",
-      scope: "结算收款",
+      key: "服务统计规则",
+      value: "服务次数 + 推荐用户 + 订单金额",
+      scope: "服务统计",
       status: "已停用",
-      description: "服务商向平台支付平台服务费时，需要同步提交的付款凭证资料说明。",
-      editor: "财务收款",
+      description: "用于配置服务商统计口径，覆盖服务次数、推荐用户与订单金额。",
+      editor: "运营中心",
       updatedAt: "2026-04-01 14:15",
     },
   ];
@@ -832,6 +891,161 @@
       .replace(/'/g, "&#39;");
   }
 
+  function readStorageRows(key) {
+    if (typeof window === "undefined" || !window.localStorage) return [];
+    try {
+      const rows = JSON.parse(window.localStorage.getItem(key) || "[]");
+      return Array.isArray(rows) ? rows : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function writeStorageRows(key, rows) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    window.localStorage.setItem(key, JSON.stringify(rows));
+  }
+
+  function getMallRecommendationRows() {
+    const localRows = readStorageRows(MALL_RECOMMENDATION_STORAGE_KEY);
+    return localRows.length ? localRows : (window.MockData.mallRecommendations || []);
+  }
+
+  function persistMallRecommendationRows(rows) {
+    writeStorageRows(MALL_RECOMMENDATION_STORAGE_KEY, rows);
+    window.MockData.mallRecommendations = rows;
+  }
+
+  function normalizeInvoiceStatus(status) {
+    const text = String(status || "");
+    if (text.includes("已开")) return "已开具";
+    return "待开票";
+  }
+
+  function getInvoiceTimeValue(row) {
+    const raw = row.deliveredAt || row.time || row.applyTime || "";
+    const parsed = Date.parse(String(raw).replace(/-/g, "/"));
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  function normalizeInvoiceRow(row, index, source = "mock") {
+    const order = orders.find((item) => item.id === row.orderId);
+    return {
+      ...row,
+      id: row.id || `INV-MOCK-${String(index + 1).padStart(3, "0")}`,
+      orderId: row.orderId || order?.id || "-",
+      user: row.user || row.title || "当前用户",
+      type: row.type || row.invoiceType || "普票",
+      amount: row.amount || order?.quote || "-",
+      method: row.method || "电子发票",
+      status: normalizeInvoiceStatus(row.status),
+      time: row.time || row.applyTime || "",
+      title: row.title || row.user || "个人",
+      email: row.email || "-",
+      phoneNumber: row.phoneNumber || row.phone || "-",
+      attachmentName: row.attachmentName || row.fileName || "",
+      attachmentType: row.attachmentType || "",
+      deliveredAt: row.deliveredAt || "",
+      timeline:
+        row.timeline ||
+        [
+          row.time ? `${row.time} 用户提交开票申请` : "用户提交开票申请",
+          row.status ? `当前状态：${normalizeInvoiceStatus(row.status)}` : "当前状态：待开票",
+        ],
+      __invoiceSource: source,
+    };
+  }
+
+  function getInvoiceRows() {
+    const localRows = readStorageRows(INVOICE_STORAGE_KEY).map((row, index) => normalizeInvoiceRow(row, index, "local"));
+    const localIds = new Set(localRows.map((row) => row.id));
+    const mockRows = (Array.isArray(window.MockData.invoices) ? window.MockData.invoices : [])
+      .filter((row) => !localIds.has(row.id))
+      .map((row, index) => normalizeInvoiceRow(row, index, "mock"));
+    return [...localRows, ...mockRows].sort((a, b) => getInvoiceTimeValue(b) - getInvoiceTimeValue(a));
+  }
+
+  const invoiceRows = getInvoiceRows();
+
+  function getInvoiceStatusByOrderId(orderId) {
+    const rows = invoiceRows.filter((item) => item.orderId === orderId);
+    if (rows.some((item) => normalizeInvoiceStatus(item.status) === "已开具")) return "已开具";
+    return rows.length ? "待开票" : "未申请";
+  }
+
+  function syncOrderInvoiceStatuses() {
+    orders.forEach((order) => {
+      order.invoiceStatus = getInvoiceStatusByOrderId(order.id);
+    });
+  }
+
+  function resolveReceiptStatus(order, paidAmount) {
+    if (order.receiptStatus) return order.receiptStatus;
+    if ((order.payment || "") === "待支付") return "待到账";
+    if (paidAmount <= 0) return "待到账";
+    if ((order.paymentMethod || "").includes("对公")) return "待到账";
+    return "已到账";
+  }
+
+  const orderFinanceDefaults = [
+    { originalRate: 1.08, discount: 2600, receiptStatus: "待到账" },
+    { originalRate: 1.05, discount: 800, receiptStatus: "已到账" },
+    { originalRate: 1.15, discount: 2820, receiptStatus: "已到账" },
+    { originalRate: 1.04, discount: 0, receiptStatus: "待到账" },
+    { originalRate: 1.12, discount: 1200, receiptStatus: "已到账" },
+  ];
+
+  orders.forEach((order, index) => {
+    const defaults = orderFinanceDefaults[index % orderFinanceDefaults.length];
+    const paidBase = priceToNumber(order.paidAmount || order.userPaidAmount || order.quote);
+    const discountAmount = priceToNumber(order.discountAmount) || defaults.discount || 0;
+    const originalAmount = priceToNumber(order.originalAmount) || Math.max(paidBase + discountAmount, Math.round(paidBase * defaults.originalRate));
+    const paidAmount = order.payment === "待支付" ? 0 : paidBase;
+    const receiptStatus = resolveReceiptStatus(order, paidAmount) || defaults.receiptStatus;
+    order.originalAmount = formatCurrency(originalAmount);
+    order.discountAmount = formatCurrency(discountAmount);
+    order.userPaidAmount = formatCurrency(paidAmount);
+    order.paymentStatus = order.paymentStatus || order.payment || (paidAmount > 0 ? "已支付" : "待支付");
+    order.receiptStatus = receiptStatus;
+    order.invoiceStatus = getInvoiceStatusByOrderId(order.id);
+    order.transactionNo = order.transactionNo || `TX-${order.id.replace(/[^0-9]/g, "").slice(-8).padStart(8, "0")}-${String(index + 1).padStart(2, "0")}`;
+    order.financeTimeline = order.financeTimeline || [
+      `${order.appointment || "2026-04-02 09:00"} 订单生成，应收 ${order.originalAmount}`,
+      `${order.appointment || "2026-04-02 09:00"} 优惠抵扣 ${order.discountAmount}，用户实付 ${order.userPaidAmount}`,
+      `支付状态：${order.paymentStatus} / 到账状态：${order.receiptStatus}`,
+    ];
+  });
+
+  orders.forEach((order) => {
+    const hasProviderReject = Boolean(order.rejectReason || order.rejectedBy || (order.timeline || []).some((item) => String(item).includes("拒单")));
+    if (!hasProviderReject) return;
+    order.platformInterventionStatus = order.platformInterventionStatus || "待重派";
+    order.platformInterventionAction = order.platformInterventionAction || "重派/延期";
+    order.userVisibleStatus = order.userVisibleStatus || "待接单";
+    order.userVisibleProgress = order.userVisibleProgress || "已提交需求，平台正在安排可接单服务商。";
+    order.rejectedBy = order.rejectedBy || order.provider || "服务商";
+    order.rejectReason = order.rejectReason || "服务商当前排期或资源不足，无法承接本单。";
+    order.delayDeadline = order.delayDeadline || "2026-04-03 18:00";
+  });
+
+  syncOrderInvoiceStatuses();
+
+  function getChatTimeRank(value) {
+    const text = String(value || "").trim();
+    if (!text) return 0;
+    if (text === "刚刚") return 1000000;
+    const minuteMatch = text.match(/(\d+)\s*分钟(?:前)?/);
+    if (minuteMatch) return 1000000 - Number(minuteMatch[1]);
+    const todayMatch = text.match(/今天\s*(\d{1,2}):(\d{2})/);
+    if (todayMatch) return 900000 + Number(todayMatch[1]) * 60 + Number(todayMatch[2]);
+    const yesterdayMatch = text.match(/昨天\s*(\d{1,2}):(\d{2})/);
+    if (yesterdayMatch) return 800000 + Number(yesterdayMatch[1]) * 60 + Number(yesterdayMatch[2]);
+    const parsed = Date.parse(text.replace(/-/g, "/"));
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  const sortedOrderChats = [...orderChats].sort((a, b) => getChatTimeRank(b.time) - getChatTimeRank(a.time));
+
   function normalizeCaseRichContent(content) {
     const source = String(content || "").trim();
     if (!source) return "";
@@ -1068,21 +1282,23 @@
     }),
     userList: makeTableDef({
       title: "用户列表",
-      description: "查看平台注册用户基础信息和订单情况。",
-      filters: ["全部", "正常", "停用"],
-      stats: [metric("平台注册用户", "8,602"), metric("停用用户", "21"), metric("本月活跃", "2,118"), metric("复购率", "41.7%")],
+      description: "查看平台注册用户基础信息，支持禁言、封号等处置操作。",
+      filters: ["全部", "正常", "禁言", "封号"],
+      stats: [metric("平台注册用户", "8,602"), metric("禁言用户", String(window.MockData.users?.filter((u) => u.punish === "禁言").length || 3)), metric("封号用户", String(window.MockData.users?.filter((u) => u.punish === "封号").length || 2)), metric("本月活跃", "2,118"), metric("复购率", "41.7%")],
       columns: [
         { key: "id", label: "用户编号" },
         { key: "account", label: "账号" },
         { key: "name", label: "姓名" },
         { key: "city", label: "城市" },
-        { key: "status", label: "状态", tag: true },
+        { key: "orders", label: "累计订单" },
+        { key: "status", label: "账号状态", tag: true },
+        { key: "punish", label: "处置状态", tag: true },
       ],
       rows: users,
-      filterBy: "status",
+      filterBy: "punish",
       detail: (row) => ({
         title: `${row.name} / ${row.favorite}`,
-        badges: [row.status],
+        badges: [row.status, row.punish || "正常"],
         facts: [
           ["用户编号", row.id],
           ["账号", row.account],
@@ -1090,6 +1306,10 @@
           ["绑定车辆", `${row.vehicles} 辆`],
           ["累计订单", `${row.orders} 单`],
           ["高频车型", row.favorite],
+          ["账号状态", row.status],
+          ["处置状态", row.punish || "无"],
+          ["禁言原因", row.punishReason || "-"],
+          ["处置到期", row.punishExpire || "-"],
         ],
         timeline: [
           "最近一次登录：2026-04-02 08:18",
@@ -1220,24 +1440,31 @@
     consultationConfig: simpleListDef("咨询方案配置", "用户提交服务订单时的常用需求模板。", consultationTemplates, ["title", "fields", "uses", "status"], ["模板名称", "字段", "使用次数", "状态"]),
     orderList: makeTableDef({
       title: "订单列表",
-      description: "统一查看商品订单与服务订单的全流程状态。",
+      description: "统一查看商品订单与服务订单的全流程状态、支付入账与发票结果。",
       filters: ["全部", "待分配", "施工中", "待发货", "待签收", "已完成"],
-      stats: [metric("今日订单", "128"), metric("服务订单占比", "76%"), metric("平均客单价", "¥ 18,620"), metric("异常订单", "4")],
+      stats: [
+        metric("今日订单", "128"),
+        metric("用户实付", formatCurrency(orders.reduce((sum, item) => sum + priceToNumber(item.userPaidAmount), 0))),
+        metric("待到账", String(orders.filter((item) => item.receiptStatus !== "已到账").length)),
+        metric("待开票", String(orders.filter((item) => item.invoiceStatus === "待开票").length)),
+      ],
       columns: [
         { key: "id", label: "订单号" },
         { key: "displayType", label: "订单类型" },
         { key: "user", label: "用户" },
-        { key: "vehicle", label: "车辆" },
-        { key: "provider", label: "服务商" },
-        { key: "deliveryMethod", label: "交货方式" },
-        { key: "paymentMethod", label: "支付方式" },
+        { key: "originalAmount", label: "订单原价" },
+        { key: "discountAmount", label: "优惠" },
+        { key: "userPaidAmount", label: "用户实付" },
+        { key: "paymentStatus", label: "支付", tag: true },
+        { key: "receiptStatus", label: "到账", tag: true },
+        { key: "invoiceStatus", label: "发票", tag: true },
         { key: "status", label: "订单状态", tag: true },
       ],
       rows: orders,
       filterBy: "status",
       detail: (row) => ({
         title: row.id,
-        badges: [row.status, row.payment, row.displayType],
+        badges: [row.status, row.paymentStatus, row.receiptStatus, row.invoiceStatus, row.displayType],
         facts: [
           ["用户", row.user],
           ["车辆", row.vehicle],
@@ -1247,17 +1474,28 @@
           ["支付方式", row.paymentMethod],
           ["服务商", row.provider],
           ["预约时间", row.appointment],
-          ["报价", row.quote],
+          ["订单原价", row.originalAmount],
+          ["优惠金额", row.discountAmount],
+          ["用户实付", row.userPaidAmount],
+          ["支付状态", row.paymentStatus],
+          ["到账状态", row.receiptStatus],
+          ["发票状态", row.invoiceStatus],
+          ["支付流水号", row.transactionNo],
         ],
-        timeline: row.timeline,
+        timeline: [...(row.financeTimeline || []), ...(row.timeline || [])],
         actions: "orderList",
       }),
     }),
     orderAssign: makeTableDef({
       title: "订单分配",
-      description: "根据用户需求、意向服务商和区域情况进行分配与改派。",
+      description: "根据用户需求、意向服务商和区域情况进行分配与改派；服务商拒单后可重新派单，用户端仍展示待接单。",
       filters: ["全部", "待分配", "施工中", "已完成"],
-      stats: [metric("待分配", "12"), metric("重分配单", "3"), metric("推荐命中率", "88%"), metric("派单平均用时", "28 min")],
+      stats: [
+        metric("待分配", String(orders.filter((item) => item.status === "待分配").length)),
+        metric("待重派", String(orders.filter((item) => item.platformInterventionStatus === "待重派").length)),
+        metric("推荐命中率", "88%"),
+        metric("派单平均用时", "28 min"),
+      ],
       columns: [
         { key: "id", label: "订单号" },
         { key: "user", label: "用户" },
@@ -1270,18 +1508,56 @@
       filterBy: "status",
       detail: (row) => ({
         title: `分配建议 / ${row.id}`,
-        badges: [row.status, row.city, row.intention],
+        badges: [row.status, row.city, row.intention].filter(Boolean),
         facts: [
           ["用户", row.user],
           ["车辆", row.vehicle],
           ["项目", row.service],
           ["意向门店", row.intention],
           ["已分配服务商", row.provider],
+          ["拒单服务商", row.rejectedBy || "-"],
+          ["拒单原因", row.rejectReason || "-"],
           ["建议优先级", row.status === "待分配" ? "高" : "中"],
           ["建议门店", "德驭 / 擎速 / 凌速"],
         ],
         timeline: row.timeline,
         actions: "orderAssign",
+      }),
+    }),
+    chatRecords: makeTableDef({
+      title: "聊天记录",
+      description: "按订单查看用户与服务商之间的沟通记录，用于纠纷追溯与处理跟进。",
+      filters: ["全部"],
+      stats: [
+        metric("会话总数", String(orderChats.length)),
+        metric("最新时间", sortedOrderChats[0]?.time || "-"),
+        metric("关联订单", String(new Set(orderChats.map((item) => item.orderId)).size)),
+        metric("总消息数", String(orderChats.reduce((sum, item) => sum + (item.messages?.length || 0), 0))),
+      ],
+      columns: [
+        { key: "orderId", label: "订单号" },
+        { key: "title", label: "会话" },
+        { key: "user", label: "用户" },
+        { key: "provider", label: "服务商" },
+        { key: "preview", label: "最新消息" },
+        { key: "time", label: "最新时间" },
+      ],
+      rows: sortedOrderChats,
+      filterBy: "",
+      detail: (row) => ({
+        title: row.title,
+        badges: [row.orderId, row.time],
+        facts: [
+          ["订单号", row.orderId],
+          ["会话", row.title],
+          ["用户", row.user],
+          ["服务商", row.provider],
+          ["最新消息", row.preview],
+          ["更新时间", row.time],
+          ["消息条数", `${row.messages?.length || 0} 条`],
+        ],
+        timeline: row.messages?.map((m) => `${m.time} ${m.from === "user" ? "用户" : m.from === "provider" ? "服务商" : "平台"}: ${m.text}`) || [],
+        actions: "chatRecords",
       }),
     }),
     logisticsManage: simpleListDef(
@@ -1291,46 +1567,215 @@
       ["logisticsType", "id", "orderId", "company", "number", "customer", "time", "status", "anomalyPhotoCount"],
       ["类型", "单据号", "订单号", "物流公司", "物流单号", "签收人", "时间", "状态", "异常照片"]
     ),
-    shipping: simpleListDef("发货管理", "商品订单发货信息录入与物流单维护。", shipping, ["id", "orderId", "company", "number", "status"], ["发货单", "订单号", "物流公司", "物流单号", "状态"]),
+    shipping: simpleListDef("发货管理", "商品订单发货信息录入与物流单维护，支持平台和品牌方双录入。", shipping, ["id", "orderId", "company", "number", "entryBy", "status"], ["发货单", "订单号", "物流公司", "物流单号", "录入方", "状态"]),
     signing: simpleListDef("签收管理", "维护订单签收状态、异常备注与异常照片。", signing, ["orderId", "customer", "signTime", "status", "anomalyPhotoCount", "note"], ["订单号", "签收人", "签收时间", "状态", "异常照片", "备注"]),
     settlements: makeTableDef({
-      title: "结算管理",
-      description: "订单完成后，客户支付给服务商，服务商按协议比例向平台支付平台服务费。",
-      filters: ["全部", "待付款", "待确认", "已结清", "已驳回"],
+      title: "服务统计",
+      description: "统计服务商服务次数、推荐用户与订单金额。",
+      filters: ["全部"],
       stats: [
-        metric("待付款", String(settlements.filter((item) => item.status === "待付款").length)),
-        metric("待确认", String(settlements.filter((item) => item.status === "待确认").length)),
-        metric("已结清", String(settlements.filter((item) => item.status === "已结清").length)),
-        metric("本月应收平台服务费", formatCurrency(settlements.reduce((sum, item) => sum + priceToNumber(item.platformReceivable), 0))),
+        metric("服务商总数", String(providers.filter((p) => p.auditStatus === "已通过").length)),
+        metric("服务次数", String(settlements.reduce((sum, item) => sum + Number(item.serviceTimes || item.orders || 0), 0))),
+        metric("推荐用户", String(settlements.reduce((sum, item) => sum + Number(item.referredUsers || item.referralUsers || 0), 0))),
+        metric("订单金额", formatCurrency(settlements.reduce((sum, item) => sum + priceToNumber(item.orderAmount || item.grossAmount || item.amount), 0))),
       ],
       columns: [
-        { key: "id", label: "结算单" },
-        { key: "provider", label: "服务商" },
-        { key: "orders", label: "订单数" },
-        { key: "grossAmount", label: "客户实付服务商金额" },
-        { key: "feeRate", label: "协议比例" },
-        { key: "platformReceivable", label: "应付平台金额" },
-        { key: "paymentTime", label: "申请/付款时间" },
-        { key: "status", label: "付款状态", tag: true },
+        { key: "name", label: "服务商" },
+        { key: "providerRegion", label: "所在区域" },
+        { key: "serviceTimes", label: "服务次数" },
+        { key: "referredUsers", label: "推荐用户" },
+        { key: "orderAmount", label: "订单金额", tag: false },
+        { key: "inviteCode", label: "邀请码", tag: false },
       ],
-      rows: settlements,
+      rows: providers.filter((p) => p.auditStatus === "已通过").map((p) => {
+        const record = settlements.find((item) => item.provider === p.name) || {};
+        const serviceTimes = Number(record.serviceTimes || record.orders || p.monthOrders || 0);
+        const referredUsers = Number(record.referredUsers || record.referralUsers || 0);
+        const orderAmount = record.orderAmount || record.grossAmount || p.currentRevenue || "¥ 0";
+        const invite = window.MockData.providerInvites?.find((i) => i.providerId === p.id);
+        return { ...p, ...record, serviceTimes, referredUsers, orderAmount, inviteCode: invite?.code || "-" };
+      }),
+      filterBy: "",
+      detail: (row) => ({
+        title: row.name,
+        badges: [`${row.score} 分`].filter(Boolean),
+        facts: [
+          ["门店编号", row.id],
+          ["地区", row.providerRegion],
+          ["门店地址", row.locationAddress],
+          ["联系人", row.contact],
+          ["邀请码", row.inviteCode],
+          ["服务次数", `${row.serviceTimes} 次`],
+          ["推荐用户", `${row.referredUsers} 人`],
+          ["订单金额", row.orderAmount],
+          ["营业资质", row.license],
+        ],
+        timeline: row.timeline || [`服务次数：${row.serviceTimes} 次`, `推荐用户：${row.referredUsers} 人`, `订单金额：${row.orderAmount}`],
+        actions: "settlements",
+      }),
+    }),
+    invoiceManage: makeTableDef({
+      title: "发票管理",
+      description: "处理用户提交的开票申请，支持待开票、上传 PDF/图片与回传用户。",
+      filters: ["全部", "待开票", "已开具"],
+      stats: [
+        metric("待开票", String(invoiceRows.filter((i) => i.status === "待开票").length)),
+        metric("已开具", String(invoiceRows.filter((i) => i.status === "已开具").length)),
+        metric("本月申请", String(invoiceRows.length)),
+      ],
+      columns: [
+        { key: "id", label: "发票编号" },
+        { key: "orderId", label: "关联订单" },
+        { key: "user", label: "用户" },
+        { key: "type", label: "发票类型" },
+        { key: "amount", label: "金额" },
+        { key: "method", label: "交付方式" },
+        { key: "status", label: "状态", tag: true },
+      ],
+      rows: invoiceRows,
       filterBy: "status",
       detail: (row) => ({
         title: row.id,
-        badges: [row.status, row.provider],
+        badges: [row.status, row.type],
         facts: [
-          ["服务商", row.provider],
-          ["订单数", `${row.orders} 单`],
-          ["客户已支付给服务商", row.grossAmount],
-          ["协议比例", row.feeRate],
-          ["应付平台服务费", row.platformReceivable],
-          ["服务商付款状态", row.status],
-          ["申请/付款时间", row.paidAt || row.applyTime || "-"],
-          ["付款凭证/备注", row.paymentNote || "-"],
-          ...(row.status === "已驳回" ? [["驳回原因", row.rejectReason || "无"]] : []),
+          ["发票编号", row.id],
+          ["关联订单", row.orderId],
+          ["用户", row.user],
+          ["发票类型", row.type],
+          ["金额", row.amount],
+          ["发票抬头", row.title || "-"],
+          ["税号", row.taxNo || "-"],
+          ["接收邮箱", row.email || "-"],
+          ["联系电话", row.phoneNumber || row.phone || "-"],
+          ["交付方式", row.method],
+          ["附件", row.attachmentName || "未上传"],
+          ["状态", row.status],
+          ["申请时间", row.time || "-"],
+          ["回传时间", row.deliveredAt || "-"],
         ],
-        timeline: row.timeline,
-        actions: "settlements",
+        timeline: row.timeline || [row.time ? `${row.time} 用户提交开票申请` : "待开票"],
+        actions: "invoiceManage",
+      }),
+    }),
+    promotionManage: makeTableDef({
+      title: "活动促销",
+      description: "配置优惠券、折扣活动，管理库存与核销比例。",
+      filters: ["全部", "进行中", "未开始", "已结束"],
+      stats: [
+        metric("进行中", String(window.MockData.promotions?.filter((p) => p.status === "进行中").length || 1)),
+        metric("未开始", String(window.MockData.promotions?.filter((p) => p.status === "未开始").length || 1)),
+        metric("总核销", String(window.MockData.promotions?.reduce((sum, p) => sum + (p.used || 0), 0) || 173)),
+      ],
+      columns: [
+        { key: "id", label: "活动编号" },
+        { key: "name", label: "活动名称" },
+        { key: "type", label: "类型" },
+        { key: "discount", label: "优惠力度" },
+        { key: "scope", label: "适用范围" },
+        { key: "stock", label: "库存" },
+        { key: "used", label: "已核销" },
+        { key: "status", label: "状态", tag: true },
+      ],
+      rows: window.MockData.promotions || [],
+      filterBy: "status",
+      detail: (row) => ({
+        title: row.name,
+        badges: [row.status, row.type],
+        facts: [
+          ["活动编号", row.id],
+          ["活动名称", row.name],
+          ["优惠类型", row.type],
+          ["优惠力度", row.discount],
+          ["适用范围", row.scope],
+          ["开始时间", row.start],
+          ["结束时间", row.end],
+          ["发放总量", `${row.stock} 张`],
+          ["已核销", `${row.used} 张`],
+          ["核销比例", `${Math.round((row.used / row.stock) * 100)}%`],
+        ],
+        timeline: [`${row.start} 活动创建`, `${row.status === "进行中" ? "当前进行中" : row.status}`],
+        redemptions: promotionRedemptions.filter((item) => item.promoId === row.id),
+        actions: "promotionManage",
+      }),
+    }),
+    brandManage: makeTableDef({
+      title: "品牌列表",
+      description: "维护签约品牌信息、Logo、授权文件、销售统计与商品绑定关系。",
+      filters: ["全部", "签约", "待签约", "解约"],
+      stats: [
+        metric("签约品牌", String(window.MockData.brands?.filter((b) => b.status === "签约").length || 6)),
+        metric("总销量", String(window.MockData.brands?.reduce((sum, b) => sum + (b.sales || 0), 0) || 7109)),
+        metric("授权文件", String(window.MockData.brands?.filter((b) => b.authFile).length || 6)),
+        metric("绑定商品", String((window.MockData.products || []).filter((p) => (window.MockData.brands || []).some((b) => b.name === p.brand)).length)),
+      ],
+      columns: [
+        { key: "id", label: "品牌编号" },
+        { key: "name", label: "品牌名称" },
+        { key: "country", label: "国家" },
+        { key: "categories", label: "类目" },
+        { key: "sales", label: "平台销量" },
+        { key: "status", label: "状态", tag: true },
+      ],
+      rows: window.MockData.brands || [],
+      filterBy: "status",
+      detail: (row) => ({
+        title: row.name,
+        badges: [row.status, row.country],
+        facts: [
+          ["品牌编号", row.id],
+          ["品牌名称", row.name],
+          ["品牌简介", row.intro || "-"],
+          ["所属国家", row.country],
+          ["经营类目", Array.isArray(row.categories) ? row.categories.join(" / ") : row.categories],
+          ["平台销量", `${row.sales} 单`],
+          ["授权文件", row.authFile || "-"],
+          ["合作状态", row.status],
+          ["品牌官网", row.website || "-"],
+          ["品牌联系人", row.contact || "-"],
+          ["入驻时间", row.joinedAt || "-"],
+        ],
+        timeline: row.salesHistory?.map((h) => `${h.month} 销量 ${h.sales} 单 / 销售额 ${h.amount}`) || ["暂无销售记录"],
+        actions: "brandManage",
+      }),
+    }),
+    brandAccounts: makeTableDef({
+      title: "品牌方账号",
+      description: "管理签约品牌的子账号，支持查看关联订单、录入物流、确认发货。",
+      filters: ["全部", "正常", "停用"],
+      stats: [
+        metric("正常账号", String(window.MockData.brandAccounts?.filter((b) => b.status === "正常").length || 2)),
+        metric("关联订单", String(window.MockData.brandAccounts?.reduce((sum, b) => sum + (b.orders || 0), 0) || 210)),
+        metric("待发货", String(window.MockData.brandAccounts?.reduce((sum, b) => sum + (b.pending || 0), 0) || 28)),
+      ],
+      columns: [
+        { key: "id", label: "账号编号" },
+        { key: "brandName", label: "关联品牌" },
+        { key: "account", label: "登录账号" },
+        { key: "name", label: "账号名称" },
+        { key: "contact", label: "联系方式" },
+        { key: "orders", label: "关联订单" },
+        { key: "shipped", label: "已发货" },
+        { key: "pending", label: "待发货" },
+        { key: "status", label: "状态", tag: true },
+      ],
+      rows: window.MockData.brandAccounts || [],
+      filterBy: "status",
+      detail: (row) => ({
+        title: row.name,
+        badges: [row.status, row.brandName],
+        facts: [
+          ["账号编号", row.id],
+          ["关联品牌", row.brandName],
+          ["登录账号", row.account],
+          ["账号名称", row.name],
+          ["联系方式", row.contact],
+          ["关联订单", `${row.orders} 单`],
+          ["已发货", `${row.shipped} 单`],
+          ["待发货", `${row.pending} 单`],
+          ["账号状态", row.status],
+        ],
+        timeline: ["2026-01-01 品牌方账号创建"],
+        actions: "brandAccounts",
       }),
     }),
     caseManage: makeTableDef({
@@ -1401,31 +1846,45 @@
     }),
     forumManage: makeTableDef({
       title: "论坛内容管理",
-      description: "按正常论坛信息流展示帖子内容，点击帖子查看详情与评论，并支持发后管理。",
-      filters: ["全部", "正常", "已删除"],
-      stats: [metric("帖子总数", "318"), metric("正常展示", "296"), metric("已删除", "22"), metric("今日新增", "18")],
+      description: "按正常论坛信息流展示帖子内容，支持置顶/加精、禁言封禁、授权商品链接和创作者主页置顶作品。",
+      filters: ["全部", "正常", "已删除", "置顶", "加精", "已授权"],
+      stats: [
+        metric("帖子总数", String(posts.length)),
+        metric("置顶", String(posts.filter((item) => item.topStatus === "置顶").length)),
+        metric("加精", String(posts.filter((item) => item.featuredStatus === "加精").length)),
+        metric("挂商品", String(posts.filter((item) => (item.linkedProducts || []).length).length)),
+      ],
       columns: [
         { key: "id", label: "帖子编号" },
         { key: "title", label: "标题" },
         { key: "author", label: "作者" },
+        { key: "topStatus", label: "置顶", tag: true },
+        { key: "featuredStatus", label: "加精", tag: true },
+        { key: "linkAuthStatus", label: "商品链接", tag: true },
+        { key: "creatorPinned", label: "主页置顶", tag: true },
         { key: "replies", label: "回复数" },
         { key: "likes", label: "点赞数" },
-        { key: "time", label: "发布时间" },
         { key: "status", label: "状态", tag: true },
       ],
       rows: posts,
-      filterBy: "status",
+      filterBy: "forumManage",
       detail: (row) => ({
         title: row.title,
-        badges: [row.status, row.author],
+        badges: [row.status, row.topStatus, row.featuredStatus, row.linkAuthStatus, row.creatorPinned === "是" ? "主页置顶" : "", row.author].filter(Boolean),
         facts: [
           ["帖子编号", row.id],
           ["标题", row.title],
           ["作者", row.author],
           ["发布时间", row.time],
+          ["置顶状态", row.topStatus],
+          ["加精状态", row.featuredStatus],
+          ["商品链接授权", row.linkAuthStatus],
+          ["已挂商品", (row.linkedProducts || []).length ? row.linkedProducts.map((sku) => products.find((item) => item.sku === sku)?.name || sku).join(" / ") : "未挂商品"],
+          ["创作者主页置顶", row.creatorPinned === "是" ? `第 ${row.creatorHomeRank || 1} 位` : "未置顶"],
           ["回复数", `${row.replies}`],
           ["点赞数", `${row.likes}`],
           ["正文内容", row.content],
+          ["治理备注", row.governanceNote || "-"],
           ...(row.status === "已删除" ? [["删除原因", row.deleteReason || "无"]] : []),
         ],
         timeline: row.timeline,
@@ -1989,6 +2448,13 @@
   }
 
   function renderTablePage(def) {
+    if (state.activePage === "invoiceManage") {
+      def.stats = [
+        metric("待开票", String(def.rows.filter((i) => i.status === "待开票").length)),
+        metric("已开具", String(def.rows.filter((i) => i.status === "已开具").length)),
+        metric("本月申请", String(def.rows.length)),
+      ];
+    }
     const rows = filterRows(def.rows, def.filterBy);
     const selected = rows[state.selectedIndex] || rows[0];
     const toolbarActions =
@@ -1996,6 +2462,7 @@
         ? `
           <button class="btn btn-secondary" type="button" data-product-toolbar="create">新增商品</button>
           <button class="btn btn-primary" type="button" data-product-toolbar="edit" ${selected ? "" : "disabled"}>编辑商品</button>
+          <button class="btn btn-secondary" type="button" data-product-toolbar="recommendConfig">推荐位配置</button>
         `
         : state.activePage === "providerAccounts"
           ? `
@@ -2017,6 +2484,26 @@
         : state.activePage === "configs"
           ? `
             <button class="btn btn-primary" type="button" data-config-toolbar="edit" ${selected ? "" : "disabled"}>编辑配置</button>
+          `
+        : state.activePage === "orderAssign"
+          ? `
+            <button class="btn btn-primary" type="button" data-assign-action="auto" ${selected ? "" : "disabled"}>重新派单</button>
+          `
+        : state.activePage === "promotionManage"
+          ? `
+            <button class="btn btn-secondary" type="button" data-promotion-toolbar="create">新增活动</button>
+          `
+        : state.activePage === "brandManage"
+          ? `
+            <button class="btn btn-secondary" type="button" data-brand-toolbar="create">新增品牌</button>
+            <button class="btn btn-primary" type="button" data-brand-toolbar="edit" ${selected ? "" : "disabled"}>编辑品牌</button>
+            <button class="btn btn-secondary" type="button" data-brand-toolbar="toggle" ${selected ? "" : "disabled"}>${selected?.status === "签约" ? "解约" : "签约"}</button>
+          `
+        : state.activePage === "brandAccounts"
+          ? `
+            <button class="btn btn-secondary" type="button" data-brand-account-toolbar="create">新增账号</button>
+            <button class="btn btn-primary" type="button" data-brand-account-toolbar="enable" ${selected && selected.status === "停用" ? "" : "disabled"}>启用</button>
+            <button class="btn btn-secondary" type="button" data-brand-account-toolbar="disable" ${selected && selected.status !== "停用" ? "" : "disabled"}>停用</button>
           `
         : state.activePage === "vehicleMaterials" || state.activePage === "wheelMaterials"
           ? `
@@ -2066,7 +2553,7 @@
         </div>
           <table class="data-table">
             <thead>
-              <tr>${def.columns.map((col) => `<th>${col.label}</th>`).join("")}</tr>
+              <tr>${def.columns.map((col) => `<th>${col.label}</th>`).join("")}${state.activePage === "promotionManage" ? `<th>操作</th>` : ""}</tr>
             </thead>
             <tbody>
               ${
@@ -2075,12 +2562,13 @@
                       .map(
                         (row, index) => `
                           <tr data-row-index="${index}" style="cursor:pointer; ${index === state.selectedIndex ? "background:rgba(255,255,255,0.04);" : ""}">
-                            ${def.columns.map((col) => `<td>${col.tag ? formatTag(row[col.key]) : row[col.key]}</td>`).join("")}
+                            ${def.columns.map((col) => `<td>${col.tag ? formatTag(row[col.key]) : displayValue(row[col.key])}</td>`).join("")}
+                            ${state.activePage === "promotionManage" ? `<td>${renderPromotionRowActions(row, index)}</td>` : ""}
                           </tr>
                         `
                       )
                       .join("")
-                  : `<tr><td colspan="${def.columns.length}" class="muted">没有符合当前筛选条件的数据。</td></tr>`
+                  : `<tr><td colspan="${def.columns.length + (state.activePage === "promotionManage" ? 1 : 0)}" class="muted">没有符合当前筛选条件的数据。</td></tr>`
               }
             </tbody>
           </table>
@@ -2089,6 +2577,17 @@
     `;
 
     bindTableEvents(def, selected);
+  }
+
+  function renderPromotionRowActions(row, index) {
+    const primaryAction = row.status === "进行中" ? "end" : "start";
+    const primaryLabel = row.status === "进行中" ? "结束" : row.status === "已结束" ? "重新开始" : "开始";
+    return `
+      <div class="promotion-row-actions">
+        <button class="btn btn-secondary btn-sm" type="button" data-promotion-row-action="detail" data-row-index="${index}">详情</button>
+        <button class="btn btn-primary btn-sm" type="button" data-promotion-row-action="${primaryAction}" data-row-index="${index}">${primaryLabel}</button>
+      </div>
+    `;
   }
 
   function renderForumManagePage(def) {
@@ -2126,19 +2625,22 @@
                           <div class="forum-thread-head">
                             <div>
                               <h3>${row.title}</h3>
-                              <div class="forum-meta-line">
-                                <span>${row.author}</span>
-                                <span>${row.time}</span>
-                                <span>${row.replies} 回复</span>
-                                <span>${row.likes} 点赞</span>
-                              </div>
+                            <div class="forum-meta-line">
+                              <span>${row.author}</span>
+                              <span>${row.time}</span>
+                              <span>${row.replies} 回复</span>
+                              <span>${row.likes} 点赞</span>
                             </div>
-                            ${formatTag(row.status)}
+                          </div>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+                              ${[row.topStatus, row.featuredStatus, row.linkAuthStatus, row.creatorPinned === "是" ? "主页置顶" : "", row.status].filter(Boolean).map((item) => formatTag(item)).join("")}
+                            </div>
                           </div>
                           <p class="forum-snippet">${row.content}</p>
                           <div class="forum-thread-foot">
                             <span class="pill">${row.id}</span>
                             <span class="pill">${row.author}</span>
+                            <span class="pill">商品 ${(row.linkedProducts || []).length}</span>
                           </div>
                         </article>
                       `
@@ -2218,6 +2720,10 @@
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <button class="btn btn-primary" type="button" data-post-action="manage">${detail.badges.includes("已删除") ? "恢复显示" : "删除帖子"}</button>
+          <button class="btn btn-secondary" type="button" data-post-action="pin">${detail.badges.includes("置顶") ? "取消置顶" : "置顶"}</button>
+          <button class="btn btn-secondary" type="button" data-post-action="feature">${detail.badges.includes("加精") ? "取消加精" : "加精"}</button>
+          <button class="btn btn-secondary" type="button" data-post-action="commerce">商品链接</button>
+          <button class="btn btn-secondary" type="button" data-post-action="creator-pin">${detail.badges.includes("主页置顶") ? "取消主页置顶" : "主页置顶作品"}</button>
         </div>
       </div>
     `;
@@ -2370,6 +2876,40 @@
             `
             : ""
         }
+        ${
+          detail.redemptions
+            ? `
+              <div>
+                <div class="panel-header" style="margin-bottom:12px;">
+                  <div><h3 class="section-title" style="font-size:18px;">核销详情</h3></div>
+                </div>
+                <div class="promotion-redemption-list">
+                  ${
+                    detail.redemptions.length
+                      ? detail.redemptions
+                          .map(
+                            (item) => `
+                              <article>
+                                <div>
+                                  <strong>${item.coupon}</strong>
+                                  <span>${item.user} / ${item.orderId} / ${item.channel}</span>
+                                </div>
+                                <div>
+                                  <b>${item.amount}</b>
+                                  ${formatTag(item.status)}
+                                </div>
+                                <small>${item.time}</small>
+                              </article>
+                            `
+                          )
+                          .join("")
+                      : `<div class="muted">暂无核销记录</div>`
+                  }
+                </div>
+              </div>
+            `
+            : ""
+        }
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           ${
             state.activePage === "providerAudit"
@@ -2390,7 +2930,9 @@
                 `
               : detail.actions === "userList"
                   ? `
-                    <button class="btn btn-primary" type="button" data-user-list-action="toggle">${detail.badges.includes("停用") ? "切换为正常" : "切换为停用"}</button>
+                    <button class="btn btn-primary" type="button" data-user-list-action="toggle">${detail.badges.includes("停用") ? "启用账号" : "停用账号"}</button>
+                    <button class="btn btn-danger" type="button" data-user-list-action="mute">${detail.badges.includes("禁言") ? "解除禁言" : "禁言用户"}</button>
+                    <button class="btn btn-danger" type="button" data-user-list-action="ban">${detail.badges.includes("封号") ? "解除封号" : "封号用户"}</button>
                     <button class="btn btn-secondary" type="button" data-user-list-action="materials">查看详情</button>
                   `
               : detail.actions === "userVehicles"
@@ -2400,14 +2942,20 @@
                 : detail.actions === "orderList"
                   ? `
                     <button class="btn btn-secondary" type="button" data-order-action="detail">查看详情</button>
+                    <button class="btn btn-primary" type="button" data-order-action="finance">流水/对账</button>
+                    <button class="btn btn-secondary" type="button" data-order-action="chat">查看聊天记录</button>
+                  `
+                : detail.actions === "chatRecords"
+                  ? `
+                    <button class="btn btn-primary" type="button" data-chat-action="detail">查看完整对话</button>
                   `
                 : detail.actions === "orderAssign"
                   ? `
-                    <button class="btn btn-primary" type="button" data-assign-action="auto">一键派单</button>
+                    <button class="btn btn-primary" type="button" data-assign-action="auto">重新派单</button>
                   `
                 : detail.actions === "settlements"
                   ? `
-                    <button class="btn btn-primary" type="button" data-settlement-action="audit" ${detail.badges.includes("已结清") ? "disabled" : ""}>${detail.badges.includes("已结清") ? "已结清" : "确认收款"}</button>
+                    <button class="btn btn-primary" type="button" data-settlement-action="audit">统计明细</button>
                   `
                 : detail.actions === "caseManage"
                   ? `
@@ -2424,6 +2972,10 @@
                 : detail.actions === "forumManage"
                   ? `
                     <button class="btn btn-primary" type="button" data-post-action="manage">${detail.badges.includes("已删除") ? "恢复显示" : "删除帖子"}</button>
+                    <button class="btn btn-secondary" type="button" data-post-action="pin">${detail.badges.includes("置顶") ? "取消置顶" : "置顶"}</button>
+                    <button class="btn btn-secondary" type="button" data-post-action="feature">${detail.badges.includes("加精") ? "取消加精" : "加精"}</button>
+                    <button class="btn btn-secondary" type="button" data-post-action="commerce">商品链接</button>
+                    <button class="btn btn-secondary" type="button" data-post-action="creator-pin">${detail.badges.includes("主页置顶") ? "取消主页置顶" : "主页置顶作品"}</button>
                   `
                 : detail.actions === "vehicleMaterials"
                   ? `
@@ -2447,6 +2999,31 @@
                   ? `
                     <button class="btn btn-primary" type="button" data-role-action="toggle">${detail.badges.includes("停用") ? "启用角色" : "停用角色"}</button>
                     <button class="btn btn-secondary" type="button" data-role-action="edit">编辑角色</button>
+                  `
+                : detail.actions === "invoiceManage"
+                  ? `
+                    <button class="btn btn-primary" type="button" data-invoice-action="issue" ${detail.badges.includes("已开具") ? "disabled" : ""}>${detail.badges.includes("已开具") ? "已回传" : "上传并回传"}</button>
+                  `
+                : detail.actions === "promotionManage"
+                  ? `
+                    <button class="btn btn-primary" type="button" data-promotion-action="toggle">${detail.badges.includes("进行中") ? "暂停活动" : "启动活动"}</button>
+                    <button class="btn btn-secondary" type="button" data-promotion-action="redeem">核销详情</button>
+                    <button class="btn btn-secondary" type="button" data-promotion-action="edit">编辑活动</button>
+                    <button class="btn btn-danger" type="button" data-promotion-action="delete">删除活动</button>
+                  `
+                : detail.actions === "brandManage"
+                  ? `
+                    <button class="btn btn-primary" type="button" data-brand-action="toggle">${detail.badges.includes("签约") ? "解约" : "签约"}</button>
+                    <button class="btn btn-secondary" type="button" data-brand-action="products">品牌商品</button>
+                    <button class="btn btn-secondary" type="button" data-brand-action="sales">销售统计</button>
+                    <button class="btn btn-secondary" type="button" data-brand-action="auth">授权文件</button>
+                    <button class="btn btn-secondary" type="button" data-brand-action="edit">编辑品牌</button>
+                  `
+                : detail.actions === "brandAccounts"
+                  ? `
+                    <button class="btn btn-primary" type="button" data-brand-account-action="toggle">${detail.badges.includes("停用") ? "启用账号" : "停用账号"}</button>
+                    <button class="btn btn-secondary" type="button" data-brand-account-action="orders">查看订单</button>
+                    <button class="btn btn-secondary" type="button" data-brand-account-action="edit">编辑账号</button>
                   `
                 : detail.actions === "configs"
                   ? `
@@ -2529,6 +3106,14 @@
           openUserMaterialsModal(selected);
           return;
         }
+        if (button.dataset.userListAction === "mute") {
+          openUserPunishModal(selected, "mute");
+          return;
+        }
+        if (button.dataset.userListAction === "ban") {
+          openUserPunishModal(selected, "ban");
+          return;
+        }
         toggleUserStatus(selected.id);
       });
     });
@@ -2545,7 +3130,30 @@
           openGenericDetailModal(def.detail(selected));
           return;
         }
+        if (button.dataset.orderAction === "finance") {
+          openOrderFinanceModal(selected);
+          return;
+        }
+        if (button.dataset.orderAction === "chat") {
+          const chat = orderChats.find((c) => c.orderId === selected.id);
+          if (chat) {
+            openChatRecordModal(chat);
+          } else {
+            openModal(`
+              <div class="panel-header"><div><h2 class="section-title">聊天记录</h2></div></div>
+              <div class="muted" style="padding:20px 0;">该订单暂无聊天记录。</div>
+              <div style="display:flex; gap:12px; margin-top:18px;"><button class="btn btn-primary" type="button" data-close-modal>关闭</button></div>
+            `);
+          }
+          return;
+        }
         openOrderProcessModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-chat-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        openChatRecordModal(selected);
       });
     });
 
@@ -2553,6 +3161,10 @@
       button.addEventListener("click", () => {
         if (button.dataset.assignAction === "detail") {
           openOrderAssignDetailModal(selected);
+          return;
+        }
+        if (button.dataset.assignAction === "delay") {
+          openOrderDelayModal(selected);
           return;
         }
         openOrderAssignModal(selected);
@@ -2594,6 +3206,23 @@
 
     modalCardEl.querySelectorAll("[data-post-action]").forEach((button) => {
       button.addEventListener("click", () => {
+        const action = button.dataset.postAction;
+        if (action === "pin") {
+          togglePostPin(selected.id);
+          return;
+        }
+        if (action === "feature") {
+          togglePostFeature(selected.id);
+          return;
+        }
+        if (action === "commerce") {
+          openPostCommerceModal(selected);
+          return;
+        }
+        if (action === "creator-pin") {
+          toggleCreatorPinnedPost(selected.id);
+          return;
+        }
         openPostManageModal(selected);
       });
     });
@@ -2645,6 +3274,21 @@
       });
     });
 
+    modalCardEl.querySelectorAll("[data-brand-account-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.brandAccountAction;
+        if (action === "edit") {
+          alert(`编辑品牌方账号: ${selected.id}`);
+          return;
+        }
+        if (action === "orders") {
+          alert(`查看品牌方关联订单: ${selected.brandName}，共 ${selected.orders} 单`);
+          return;
+        }
+        toggleBrandAccountStatus(selected.id);
+      });
+    });
+
     modalCardEl.querySelectorAll("[data-config-action]").forEach((button) => {
       button.addEventListener("click", () => {
         if (button.dataset.configAction === "edit") {
@@ -2652,6 +3296,58 @@
           return;
         }
         toggleConfigStatus(selected.key);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-invoice-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.invoiceAction;
+        if (action === "issue") {
+          openInvoiceIssueModal(selected);
+          return;
+        }
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-promotion-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.promotionAction;
+        if (action === "redeem") {
+          openPromotionRedemptionModal(selected);
+          return;
+        }
+        if (action === "edit") {
+          openPromotionEditorModal("edit", selected);
+          return;
+        }
+        if (action === "delete") {
+          alert(`删除活动: ${selected.id}`);
+          return;
+        }
+        alert(`${detail.badges.includes("进行中") ? "暂停" : "启动"}活动: ${selected.id}`);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-brand-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.brandAction;
+        if (action === "auth") {
+          alert(`查看授权文件: ${selected.id}`);
+          return;
+        }
+        if (action === "edit") {
+          openBrandEditorModal("edit", selected);
+          return;
+        }
+        if (action === "products") {
+          openBrandProductsModal(selected);
+          return;
+        }
+        if (action === "sales") {
+          openBrandSalesModal(selected);
+          return;
+        }
+        toggleBrandStatus(selected.id);
       });
     });
 
@@ -2690,11 +3386,36 @@
       });
     });
 
+    if (state.activePage === "promotionManage") {
+      contentEl.querySelectorAll("[data-promotion-row-action]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const currentRows = filterRows(def.rows, def.filterBy);
+          const rowIndex = Number(button.dataset.rowIndex);
+          const current = currentRows[rowIndex];
+          if (!current) return;
+          state.selectedIndex = rowIndex;
+          const action = button.dataset.promotionRowAction;
+          if (action === "detail") {
+            renderTablePage(def);
+            openPlatformDetailModal(def, current, "drawer");
+            return;
+          }
+          current.status = action === "end" ? "已结束" : "进行中";
+          renderTablePage(def);
+        });
+      });
+    }
+
     if (state.activePage === "productList") {
       contentEl.querySelectorAll("[data-product-toolbar]").forEach((button) => {
         button.addEventListener("click", () => {
           if (button.dataset.productToolbar === "create") {
             openProductEditorModal("create");
+            return;
+          }
+          if (button.dataset.productToolbar === "recommendConfig") {
+            openMallRecommendationModal(selected);
             return;
           }
           if (selected) openProductEditorModal("edit", selected);
@@ -2735,6 +3456,51 @@
           });
         });
       }
+    }
+
+    if (state.activePage === "promotionManage") {
+      contentEl.querySelectorAll("[data-promotion-toolbar]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.promotionToolbar;
+          if (action === "create") {
+            openPromotionEditorModal();
+            return;
+          }
+          if (selected) openPromotionRedemptionModal(selected);
+        });
+      });
+    }
+
+    if (state.activePage === "brandManage") {
+      contentEl.querySelectorAll("[data-brand-toolbar]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.brandToolbar;
+          if (action === "create") {
+            openBrandEditorModal("create");
+            return;
+          }
+          if (!selected) return;
+          if (action === "edit") {
+            openBrandEditorModal("edit", selected);
+            return;
+          }
+          toggleBrandStatus(selected.id);
+        });
+      });
+    }
+
+    if (state.activePage === "brandAccounts") {
+      contentEl.querySelectorAll("[data-brand-account-toolbar]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.brandAccountToolbar;
+          if (action === "create") {
+            openBrandAccountEditorModal();
+            return;
+          }
+          if (!selected) return;
+          setBrandAccountStatus(selected.id, action === "enable" ? "正常" : "停用");
+        });
+      });
     }
 
     if (state.activePage === "caseManage") {
@@ -2880,7 +3646,32 @@
             openGenericDetailModal(def.detail(selected));
             return;
           }
+          if (button.dataset.orderAction === "finance") {
+            openOrderFinanceModal(selected);
+            return;
+          }
+          if (button.dataset.orderAction === "chat") {
+            const chat = orderChats.find((c) => c.orderId === selected.id);
+            if (chat) {
+              openChatRecordModal(chat);
+            } else {
+              openModal(`
+                <div class="panel-header"><div><h2 class="section-title">聊天记录</h2></div></div>
+                <div class="muted" style="padding:20px 0;">该订单暂无聊天记录。</div>
+                <div style="display:flex; gap:12px; margin-top:18px;"><button class="btn btn-primary" type="button" data-close-modal>关闭</button></div>
+              `);
+            }
+            return;
+          }
           openOrderProcessModal(selected);
+        });
+      });
+    }
+
+    if (state.activePage === "chatRecords" && selected) {
+      contentEl.querySelectorAll("[data-chat-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          openChatRecordModal(selected);
         });
       });
     }
@@ -2890,6 +3681,10 @@
         button.addEventListener("click", () => {
           if (button.dataset.assignAction === "detail") {
             openOrderAssignDetailModal(selected);
+            return;
+          }
+          if (button.dataset.assignAction === "delay") {
+            openOrderDelayModal(selected);
             return;
           }
           openOrderAssignModal(selected);
@@ -3279,6 +4074,30 @@
       });
     }
 
+    const savePromotionBtn = modalCardEl.querySelector("[data-save-promotion]");
+    if (savePromotionBtn) {
+      savePromotionBtn.addEventListener("click", () => {
+        savePromotion(savePromotionBtn.dataset.mode || "create", savePromotionBtn.dataset.id || "");
+      });
+    }
+
+    const saveBrandBtn = modalCardEl.querySelector("[data-save-brand]");
+    if (saveBrandBtn) {
+      saveBrandBtn.addEventListener("click", () => {
+        saveBrand(saveBrandBtn.dataset.mode, saveBrandBtn.dataset.id);
+      });
+    }
+
+    const saveBrandAccountBtn = modalCardEl.querySelector("[data-save-brand-account]");
+    if (saveBrandAccountBtn) {
+      saveBrandAccountBtn.addEventListener("click", saveBrandAccount);
+    }
+
+    const saveMallRecommendationBtn = modalCardEl.querySelector("[data-save-mall-recommendation]");
+    if (saveMallRecommendationBtn) {
+      saveMallRecommendationBtn.addEventListener("click", saveMallRecommendation);
+    }
+
     modalCardEl.querySelectorAll("[data-order-process]").forEach((button) => {
       button.addEventListener("click", () => {
         const mode = button.dataset.orderProcess;
@@ -3323,11 +4142,33 @@
           order.provider = target.name;
           order.progress = "已派单";
           order.status = "施工中";
-          appendOrderTimeline(order, `平台派单给 ${target.name}，订单状态更新为施工中`);
+          order.platformInterventionStatus = "";
+          order.platformInterventionAction = "";
+          order.userVisibleStatus = "已接单";
+          order.userVisibleProgress = `平台已重新分配给 ${target.name}`;
+          appendOrderTimeline(order, `平台重新派单给 ${target.name}，订单状态更新为施工中`);
           openFeedbackModal("派单成功", `${order.id} 已分配给 ${target.name}，当前状态已更新为施工中。`);
         }
       });
     });
+
+    const assignDelayBtn = modalCardEl.querySelector("[data-submit-assign-delay]");
+    if (assignDelayBtn) {
+      assignDelayBtn.addEventListener("click", () => {
+        const order = orders.find((item) => item.id === assignDelayBtn.dataset.orderId);
+        if (!order) return;
+        const deadline = modalCardEl.querySelector('[data-assign-delay-field="deadline"]')?.value || "";
+        const note = modalCardEl.querySelector('[data-assign-delay-field="note"]')?.value.trim() || "";
+        order.platformInterventionStatus = "已延期";
+        order.platformInterventionAction = "延期处理";
+        order.userVisibleStatus = "待接单";
+        order.userVisibleProgress = "已提交需求，平台正在安排可接单服务商。";
+        order.delayDeadline = deadline ? deadline.replace("T", " ") : order.delayDeadline || "2026-04-03 18:00";
+        order.progress = "平台延期处理中";
+        appendOrderTimeline(order, `平台延期处理至 ${order.delayDeadline}。${note}`);
+        openFeedbackModal("延期已记录", `${order.id} 已进入延期处理，用户端仍显示待接单。`);
+      });
+    }
 
     modalCardEl.querySelectorAll("[data-settlement-decision]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -3487,6 +4328,20 @@
     if (submitCommentRestoreBtn) {
       submitCommentRestoreBtn.addEventListener("click", () => {
         submitCommentManage(submitCommentRestoreBtn.dataset.commentId, "restore");
+      });
+    }
+
+    const savePostCommerceBtn = modalCardEl.querySelector("[data-save-post-commerce]");
+    if (savePostCommerceBtn) {
+      savePostCommerceBtn.addEventListener("click", () => {
+        savePostCommerce(savePostCommerceBtn.dataset.postId);
+      });
+    }
+
+    const submitUserPunishBtn = modalCardEl.querySelector("[data-submit-user-punish]");
+    if (submitUserPunishBtn) {
+      submitUserPunishBtn.addEventListener("click", () => {
+        submitUserPunish(submitUserPunishBtn.dataset.userId, submitUserPunishBtn.dataset.punishType);
       });
     }
 
@@ -4010,13 +4865,13 @@
 
   function openOrderAssignModal(row) {
     const recommendations = providers
-      .filter((item) => item.status === "正常营业")
+      .filter((item) => item.status === "正常营业" && item.name !== row.rejectedBy)
       .slice(0, 4);
     openModal(`
       <div class="panel-header">
         <div>
           <span class="eyebrow">Assignment Center</span>
-          <h2 class="section-title">一键派单</h2>
+          <h2 class="section-title">重新派单</h2>
           <p class="section-subtitle">${row.id} 路 ${row.user} 路 ${row.service}</p>
         </div>
       </div>
@@ -4058,6 +4913,9 @@
         <div class="doc-item"><strong>城市</strong><div class="muted">${row.city}</div></div>
         <div class="doc-item"><strong>意向门店</strong><div class="muted">${row.intention}</div></div>
         <div class="doc-item"><strong>当前进度</strong><div class="muted">${row.progress}</div></div>
+        <div class="doc-item"><strong>用户端状态</strong><div class="muted">${row.userVisibleStatus || row.status}</div></div>
+        <div class="doc-item"><strong>拒单服务商</strong><div class="muted">${row.rejectedBy || "-"}</div></div>
+        <div class="doc-item"><strong>拒单原因</strong><div class="muted">${row.rejectReason || "-"}</div></div>
       </div>
       <div style="margin-top:18px;">
         <div class="panel-header" style="margin-bottom:12px;">
@@ -4069,6 +4927,32 @@
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-primary" type="button" data-close-modal>关闭</button>
+      </div>
+    `);
+  }
+
+  function openOrderDelayModal(row) {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Assignment Delay</span>
+          <h2 class="section-title">延期处理</h2>
+          <p class="section-subtitle">${row.id} / 用户端保持待接单，平台继续介入。</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <label class="field-label" for="assign-delay-deadline">延期截止时间</label>
+          <input class="input" id="assign-delay-deadline" data-assign-delay-field="deadline" type="datetime-local" value="2026-04-03T18:00">
+        </div>
+        <div class="field-group field-group-full">
+          <label class="field-label" for="assign-delay-note">平台备注</label>
+          <textarea class="input" id="assign-delay-note" data-assign-delay-field="note" rows="3">服务商拒单后平台介入，继续为用户匹配可接单门店；用户端暂不展示拒单原因。</textarea>
+        </div>
+      </div>
+      <div class="admin-action-row">
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+        <button class="btn btn-primary" type="button" data-submit-assign-delay data-order-id="${row.id}">确认延期</button>
       </div>
     `);
   }
@@ -4399,6 +5283,572 @@
     `);
   }
 
+  const promotionScopeOptions = ["轮毂", "车衣", "制动", "排气", "内饰", "底盘", "保养精品"];
+
+  function normalizePromotionRule(row = {}) {
+    const type = row.type || "满减";
+    if (row.rule && typeof row.rule === "object") {
+      return {
+        minAmount: Number(row.rule.minAmount || 0),
+        reduceAmount: Number(row.rule.reduceAmount || 0),
+        discountRate: Number(row.rule.discountRate || 0),
+        couponAmount: Number(row.rule.couponAmount || 0),
+      };
+    }
+    const text = String(row.discount || "");
+    if (type === "折扣") return { discountRate: Number(text.match(/(\d+(?:\.\d+)?)/)?.[1] || 85) };
+    if (type === "优惠券") return { minAmount: Number(text.match(/满(\d+)/)?.[1] || 0), couponAmount: Number(text.match(/减(\d+)|券(\d+)/)?.[1] || text.match(/减(\d+)|券(\d+)/)?.[2] || 0) };
+    return { minAmount: Number(text.match(/满(\d+)/)?.[1] || 20000), reduceAmount: Number(text.match(/减(\d+)/)?.[1] || 3000) };
+  }
+
+  function normalizePromotionScopes(row = {}) {
+    if (Array.isArray(row.scopeCategories) && row.scopeCategories.length) return row.scopeCategories;
+    const scope = String(row.scope || "");
+    return promotionScopeOptions.filter((item) => scope.includes(item));
+  }
+
+  function formatPromotionDiscount(type, rule) {
+    if (type === "折扣") return `${Number(rule.discountRate || 0)}折`;
+    if (type === "优惠券") return rule.minAmount ? `满${Number(rule.minAmount)}可用，券${Number(rule.couponAmount || 0)}` : `券${Number(rule.couponAmount || 0)}`;
+    return `满${Number(rule.minAmount || 0)}减${Number(rule.reduceAmount || 0)}`;
+  }
+
+  function formatPromotionScope(scopeCategories) {
+    return scopeCategories.length ? scopeCategories.join(" / ") : "全部类目";
+  }
+
+  function calculatePromotionDiscount(promotion, amount, category) {
+    const rule = normalizePromotionRule(promotion);
+    const scopes = normalizePromotionScopes(promotion);
+    const amountValue = Number(amount || 0);
+    if (scopes.length && category && !scopes.includes(category)) return 0;
+    if (promotion.type === "折扣") return Math.max(0, Math.round(amountValue * (1 - Number(rule.discountRate || 100) / 100)));
+    if (promotion.type === "优惠券") return amountValue >= Number(rule.minAmount || 0) ? Number(rule.couponAmount || 0) : 0;
+    return amountValue >= Number(rule.minAmount || 0) ? Number(rule.reduceAmount || 0) : 0;
+  }
+
+  function renderPromotionRuleFields(type, rule = {}) {
+    if (type === "折扣") {
+      return `
+        <div class="field-group">
+          <label class="field-label">折扣值</label>
+          <input class="input" data-promotion-rule="discountRate" type="number" min="1" max="99" step="0.1" value="${rule.discountRate || 85}" />
+          <div class="muted" style="margin-top:6px;">例如 85 表示 85 折。</div>
+        </div>
+      `;
+    }
+    if (type === "优惠券") {
+      return `
+        <div class="field-group">
+          <label class="field-label">使用门槛</label>
+          <input class="input" data-promotion-rule="minAmount" type="number" min="0" step="100" value="${rule.minAmount || 0}" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">券面金额</label>
+          <input class="input" data-promotion-rule="couponAmount" type="number" min="1" step="100" value="${rule.couponAmount || 1000}" />
+        </div>
+      `;
+    }
+    return `
+      <div class="field-group">
+        <label class="field-label">满额门槛</label>
+        <input class="input" data-promotion-rule="minAmount" type="number" min="1" step="100" value="${rule.minAmount || 20000}" />
+      </div>
+      <div class="field-group">
+        <label class="field-label">减免金额</label>
+        <input class="input" data-promotion-rule="reduceAmount" type="number" min="1" step="100" value="${rule.reduceAmount || 3000}" />
+      </div>
+    `;
+  }
+
+  function refreshPromotionRuleEditor(type) {
+    const target = modalCardEl.querySelector("[data-promotion-rule-panel]");
+    if (!target) return;
+    target.innerHTML = renderPromotionRuleFields(type, normalizePromotionRule({ type }));
+  }
+
+  function openPromotionEditorModal(mode = "create", row = {}) {
+    const isEdit = mode === "edit";
+    const nextId = `PROMO-${String((window.MockData.promotions || []).length + 1).padStart(3, "0")}`;
+    const type = row.type || "满减";
+    const rule = normalizePromotionRule(row);
+    const scopes = normalizePromotionScopes(row);
+    openModal(`
+      <div class="platform-detail-modal">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Promotion</span>
+            <h2 class="section-title">${isEdit ? "编辑活动" : "新增活动"}</h2>
+          </div>
+          <button class="btn btn-secondary" type="button" data-close-modal>关闭</button>
+        </div>
+        <div class="form-grid">
+          <div class="field-group">
+            <label class="field-label">活动编号</label>
+            <input class="input" data-promotion-field="id" value="${row.id || nextId}" ${isEdit ? "readonly" : ""} />
+          </div>
+          <div class="field-group">
+            <label class="field-label">活动名称</label>
+            <input class="input" data-promotion-field="name" value="${row.name || "夏季改装焕新礼"}" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">活动类型</label>
+            <select class="input" data-promotion-field="type">
+              ${["满减", "折扣", "优惠券"].map((item) => `<option value="${item}" ${item === type ? "selected" : ""}>${item}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">库存</label>
+            <input class="input" data-promotion-field="stock" type="number" min="1" value="${row.stock || 300}" />
+          </div>
+          <div class="field-group field-group-full">
+            <label class="field-label">优惠规则</label>
+            <div class="form-grid" data-promotion-rule-panel>
+              ${renderPromotionRuleFields(type, rule)}
+            </div>
+          </div>
+          <div class="field-group field-group-full">
+            <label class="field-label">适用范围</label>
+            <div class="promotion-scope-grid">
+              ${promotionScopeOptions.map((item) => `
+                <label class="promotion-scope-option">
+                  <input type="checkbox" data-promotion-scope value="${item}" ${scopes.includes(item) ? "checked" : ""} />
+                  <span>${item}</span>
+                </label>
+              `).join("")}
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">开始时间</label>
+            <input class="input" data-promotion-field="start" type="date" value="${row.start || "2026-06-01"}" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">结束时间</label>
+            <input class="input" data-promotion-field="end" type="date" value="${row.end || "2026-06-30"}" />
+          </div>
+        </div>
+        <div class="platform-detail-modal-footer">
+          <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+          <button class="btn btn-primary" type="button" data-save-promotion data-mode="${mode}" data-id="${row.id || ""}">保存活动</button>
+        </div>
+      </div>
+    `);
+    modalCardEl.querySelector('[data-promotion-field="type"]')?.addEventListener("change", (event) => {
+      refreshPromotionRuleEditor(event.target.value);
+    });
+  }
+
+  function openPromotionRedemptionModal(row) {
+    const rows = promotionRedemptions.filter((item) => item.promoId === row.id);
+    openModal(`
+      <div class="platform-detail-modal">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Redemption</span>
+            <h2 class="section-title">${row.name} 核销详情</h2>
+          </div>
+          <button class="btn btn-secondary" type="button" data-close-modal>关闭</button>
+        </div>
+        <section class="promotion-redemption-summary">
+          <article><span>已核销</span><strong>${row.used || 0}</strong></article>
+          <article><span>发放库存</span><strong>${row.stock || 0}</strong></article>
+          <article><span>核销比例</span><strong>${row.stock ? Math.round((row.used / row.stock) * 100) : 0}%</strong></article>
+        </section>
+        <div class="promotion-redemption-list">
+          ${
+            rows.length
+              ? rows
+                  .map(
+                    (item) => `
+                      <article>
+                        <div>
+                          <strong>${item.coupon}</strong>
+                          <span>${item.user} / ${item.orderId} / ${item.channel}</span>
+                        </div>
+                        <div>
+                          <b>${item.amount}</b>
+                          ${formatTag(item.status)}
+                        </div>
+                        <small>${item.time}</small>
+                      </article>
+                    `
+                  )
+                  .join("")
+              : `<div class="muted">暂无核销记录</div>`
+          }
+        </div>
+        <div class="platform-detail-modal-footer">
+          <button class="btn btn-secondary" type="button" data-close-modal>关闭</button>
+        </div>
+      </div>
+    `);
+  }
+
+  function savePromotion(mode = "create", originalId = "") {
+    const getValue = (field) => String(modalCardEl.querySelector(`[data-promotion-field="${field}"]`)?.value || "").trim();
+    const type = getValue("type");
+    const rule = {};
+    modalCardEl.querySelectorAll("[data-promotion-rule]").forEach((input) => {
+      rule[input.dataset.promotionRule] = Number(input.value || 0);
+    });
+    const scopeCategories = Array.from(modalCardEl.querySelectorAll("[data-promotion-scope]:checked")).map((input) => input.value);
+    const payload = {
+      id: getValue("id"),
+      name: getValue("name"),
+      type,
+      rule,
+      discount: formatPromotionDiscount(type, rule),
+      scopeCategories,
+      scope: formatPromotionScope(scopeCategories),
+      start: getValue("start"),
+      end: getValue("end"),
+      stock: Number(getValue("stock") || 0),
+      used: mode === "edit" ? Number((window.MockData.promotions || []).find((item) => item.id === originalId)?.used || 0) : 0,
+      status: mode === "edit" ? ((window.MockData.promotions || []).find((item) => item.id === originalId)?.status || "未开始") : "未开始",
+    };
+    if (!payload.id || !payload.name) {
+      openFeedbackModal("活动信息不完整", "请填写活动编号和活动名称。");
+      return;
+    }
+    if (payload.stock <= 0) {
+      openFeedbackModal("库存不合法", "活动库存必须大于 0。");
+      return;
+    }
+    if (type === "满减" && (!rule.minAmount || !rule.reduceAmount || rule.reduceAmount >= rule.minAmount)) {
+      openFeedbackModal("优惠规则不合法", "满减活动需要填写门槛和减免金额，且减免金额必须小于门槛金额。");
+      return;
+    }
+    if (type === "折扣" && (!rule.discountRate || rule.discountRate <= 0 || rule.discountRate >= 100)) {
+      openFeedbackModal("优惠规则不合法", "折扣值必须大于 0 且小于 100，例如 85 表示 85 折。");
+      return;
+    }
+    if (type === "优惠券" && !rule.couponAmount) {
+      openFeedbackModal("优惠规则不合法", "优惠券必须填写券面金额。");
+      return;
+    }
+    if (mode === "edit") {
+      window.MockData.promotions = (window.MockData.promotions || []).map((item) => (item.id === originalId ? payload : item));
+    } else {
+      window.MockData.promotions = [payload, ...(window.MockData.promotions || [])];
+    }
+    state.selectedIndex = 0;
+    closeModal();
+    renderPage();
+    openFeedbackModal(mode === "edit" ? "活动已更新" : "活动已新增", `${payload.name} 已保存，系统将按结构化规则识别优惠逻辑。`);
+  }
+
+  function openBrandEditorModal(mode = "create", row = {}) {
+    const isEdit = mode === "edit";
+    const nextId = `BR-${String((window.MockData.brands || []).length + 1).padStart(3, "0")}`;
+    const brandCategoryOptions = Array.from(
+      new Set([
+        "轮毂",
+        "轮胎",
+        "排气",
+        "制动",
+        "车衣",
+        "改色膜",
+        "动力",
+        "底盘",
+        "内饰",
+        ...((window.MockData.products || []).map((item) => item.category).filter(Boolean)),
+        ...((window.MockData.brands || []).flatMap((item) => Array.isArray(item.categories) ? item.categories : [item.categories]).filter(Boolean)),
+      ])
+    );
+    const selectedCategories = Array.isArray(row.categories)
+      ? row.categories
+      : String(row.categories || "轮毂").split(/[、/,，|]/).map((item) => item.trim()).filter(Boolean);
+    openModal(`
+      <div class="platform-detail-modal">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Brand</span>
+            <h2 class="section-title">${isEdit ? "编辑品牌" : "新增品牌"}</h2>
+          </div>
+          <button class="btn btn-secondary" type="button" data-close-modal>关闭</button>
+        </div>
+        <div class="form-grid">
+          <div class="field-group">
+            <label class="field-label">品牌编号</label>
+            <input class="input" data-brand-field="id" value="${isEdit ? row.id : nextId}" ${isEdit ? "disabled" : ""} />
+          </div>
+          <div class="field-group">
+            <label class="field-label">品牌名称</label>
+            <input class="input" data-brand-field="name" value="${row.name || "Racing Forge"}" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">国家/地区</label>
+            <input class="input" data-brand-field="country" value="${row.country || "德国"}" />
+          </div>
+          <div class="field-group field-group-full">
+            <label class="field-label">经营类目</label>
+            <div class="promotion-scope-grid">
+              ${brandCategoryOptions.map((item) => `
+                <label class="promotion-scope-option">
+                  <input type="checkbox" data-brand-category value="${item}" ${selectedCategories.includes(item) ? "checked" : ""} />
+                  <span>${item}</span>
+                </label>
+              `).join("")}
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">平台销量</label>
+            <div class="readonly-field">${Number(row.sales || 0)} 单</div>
+            <div class="muted" style="margin-top:6px;">由订单成交数据统计，不支持手动修改。</div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">授权文件</label>
+            <div class="readonly-field">${row.authFile || "未上传"}</div>
+            <label class="upload-panel compact-upload" style="margin-top:10px;">
+              <input class="upload-input" data-brand-auth-file type="file" accept=".pdf,image/*" />
+              <strong>${row.authFile ? "更换授权文件" : "上传授权文件"}</strong>
+              <small>支持 PDF 或图片，系统只保存文件名和 MIME 类型。</small>
+            </label>
+          </div>
+          <div class="field-group">
+            <label class="field-label">品牌官网</label>
+            <input class="input" data-brand-field="website" value="${row.website || ""}" placeholder="https://example.com" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">品牌联系人</label>
+            <input class="input" data-brand-field="contact" value="${row.contact || ""}" placeholder="email@example.com" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">入驻时间</label>
+            <input class="input" data-brand-field="joinedAt" type="date" value="${row.joinedAt || ""}" />
+          </div>
+          <div class="field-group" style="grid-column:1/-1">
+            <label class="field-label">品牌简介</label>
+            <textarea class="input" data-brand-field="intro" rows="3" placeholder="请输入品牌简介">${row.intro || ""}</textarea>
+          </div>
+          <div class="field-group">
+            <label class="field-label">合作状态</label>
+            <select class="input" data-brand-field="status">
+              <option value="待签约" ${row.status === "待签约" ? "selected" : ""}>待签约</option>
+              <option value="签约" ${row.status === "签约" ? "selected" : ""}>签约</option>
+              <option value="解约" ${row.status === "解约" ? "selected" : ""}>解约</option>
+            </select>
+          </div>
+        </div>
+        <div class="platform-detail-modal-footer">
+          <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+          <button class="btn btn-primary" type="button" data-save-brand data-mode="${mode}" data-id="${row.id || ""}">保存品牌</button>
+        </div>
+      </div>
+    `);
+  }
+
+  function saveBrand(mode = "create", sourceId = "") {
+    const getValue = (field) => String(modalCardEl.querySelector(`[data-brand-field="${field}"]`)?.value || "").trim();
+    const name = getValue("name");
+    const selectedCategories = Array.from(modalCardEl.querySelectorAll("[data-brand-category]:checked")).map((input) => input.value);
+    const existing = (window.MockData.brands || []).find((item) => item.id === sourceId);
+    const authFile = modalCardEl.querySelector("[data-brand-auth-file]")?.files?.[0];
+    const payload = {
+      id: mode === "edit" ? sourceId : getValue("id"),
+      name,
+      logo: `${name || "brand"}-logo`.toLowerCase().replace(/\s+/g, "-"),
+      logoUrl: `https://placehold.co/120x60/1a1a2e/e5e7ea?text=${encodeURIComponent(name || "Brand")}`,
+      country: getValue("country"),
+      categories: selectedCategories,
+      sales: mode === "edit" ? Number((window.MockData.brands || []).find((item) => item.id === sourceId)?.sales || 0) : 0,
+      status: getValue("status") || "待签约",
+      authFile: authFile?.name || existing?.authFile || "",
+      authFileType: authFile?.type || existing?.authFileType || "",
+      website: getValue("website"),
+      contact: getValue("contact"),
+      joinedAt: getValue("joinedAt"),
+      intro: getValue("intro"),
+    };
+    if (!payload.id || !payload.name) {
+      openFeedbackModal("品牌信息不完整", "请填写品牌编号和品牌名称。");
+      return;
+    }
+    if (!payload.categories.length) {
+      openFeedbackModal("经营类目不完整", "请至少选择一个经营类目。");
+      return;
+    }
+    if (!payload.authFile) {
+      openFeedbackModal("缺少授权文件", "请上传品牌授权文件后再保存。");
+      return;
+    }
+    const rows = window.MockData.brands || [];
+    if (mode === "edit") {
+      const target = rows.find((item) => item.id === sourceId);
+      if (!target) return;
+      Object.assign(target, payload);
+    } else {
+      rows.unshift(payload);
+      window.MockData.brands = rows;
+      state.selectedIndex = 0;
+    }
+    closeModal();
+    renderPage();
+    openFeedbackModal(mode === "edit" ? "品牌已更新" : "品牌已新增", `${payload.name} 已保存到品牌列表。`);
+  }
+
+  function openBrandProductsModal(brand) {
+    const boundProducts = (window.MockData.products || []).filter((p) => p.brand === brand.name);
+    openModal(`
+      <div class="platform-detail-modal">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Brand Products / ${brand.id}</span>
+            <h2 class="section-title">${brand.name} 绑定商品</h2>
+            <p class="section-subtitle">共 ${boundProducts.length} 件商品绑定该品牌</p>
+          </div>
+        </div>
+        <div class="brand-products-grid">
+          ${boundProducts.length
+            ? boundProducts.map((p) => `
+              <article class="brand-product-card">
+                <div class="brand-product-image">
+                  <div class="brand-product-placeholder">${p.name.slice(0, 2)}</div>
+                </div>
+                <div class="brand-product-info">
+                  <strong>${p.name}</strong>
+                  <span class="muted">${p.sku}</span>
+                  <div class="brand-product-meta">
+                    <span>${p.category}</span>
+                    <span>${p.price}</span>
+                    <span>库存 ${p.stock}</span>
+                  </div>
+                  <div>${formatTag(p.status)}</div>
+                </div>
+              </article>
+            `).join("")
+            : `<div class="muted" style="padding:24px 0;">暂无绑定商品。</div>`
+          }
+        </div>
+        <div style="display:flex; gap:12px; margin-top:18px;">
+          <button class="btn btn-primary" type="button" data-close-modal>关闭</button>
+        </div>
+      </div>
+    `);
+  }
+
+  function openBrandSalesModal(brand) {
+    const history = brand.salesHistory || [];
+    const maxSales = Math.max(...history.map((h) => h.sales), 1);
+    openModal(`
+      <div class="platform-detail-modal">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Brand Sales / ${brand.id}</span>
+            <h2 class="section-title">${brand.name} 销售统计</h2>
+            <p class="section-subtitle">累计销量 ${brand.sales} 单</p>
+          </div>
+        </div>
+        <div class="brand-sales-chart">
+          ${history.map((h) => `
+            <div class="brand-sales-bar-group">
+              <div class="brand-sales-bar-track">
+                <div class="brand-sales-bar" style="height:${Math.max((h.sales / maxSales) * 160, 4)}px"></div>
+              </div>
+              <span class="brand-sales-bar-label">${h.month}</span>
+              <span class="brand-sales-bar-value">${h.sales}</span>
+            </div>
+          `).join("")}
+        </div>
+        <div class="brand-sales-table-wrap">
+          <table class="data-table brand-sales-table">
+            <thead>
+              <tr><th>月份</th><th>销量（单）</th><th>销售额</th><th>环比</th></tr>
+            </thead>
+            <tbody>
+              ${history.map((h, i) => {
+                const prev = history[i - 1];
+                const growth = prev ? `${((h.sales - prev.sales) / prev.sales * 100).toFixed(1)}%` : "-";
+                const growthClass = prev && h.sales > prev.sales ? "accent" : prev && h.sales < prev.sales ? "danger" : "muted";
+                return `<tr><td>${h.month}</td><td>${h.sales}</td><td>${h.amount}</td><td class="${growthClass}">${growth}</td></tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex; gap:12px; margin-top:18px;">
+          <button class="btn btn-primary" type="button" data-close-modal>关闭</button>
+        </div>
+      </div>
+    `);
+  }
+
+  function openBrandAccountEditorModal() {
+    const nextId = `BA-${String((window.MockData.brandAccounts || []).length + 1).padStart(3, "0")}`;
+    const brandRows = window.MockData.brands || [];
+    openModal(`
+      <div class="platform-detail-modal">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Brand Account</span>
+            <h2 class="section-title">新增品牌方账号</h2>
+          </div>
+          <button class="btn btn-secondary" type="button" data-close-modal>关闭</button>
+        </div>
+        <div class="form-grid">
+          <div class="field-group">
+            <label class="field-label">账号编号</label>
+            <input class="input" data-brand-account-field="id" value="${nextId}" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">关联品牌</label>
+            <select class="input" data-brand-account-field="brandId">
+              ${brandRows.map((item) => `<option value="${item.id}">${item.name}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">登录账号</label>
+            <input class="input" data-brand-account-field="account" value="brand_admin" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">账号名称</label>
+            <input class="input" data-brand-account-field="name" value="品牌官方运营" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">联系方式</label>
+            <input class="input" data-brand-account-field="contact" value="brand@example.com" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">状态</label>
+            <select class="input" data-brand-account-field="status">
+              <option value="正常">正常</option>
+              <option value="停用">停用</option>
+            </select>
+          </div>
+        </div>
+        <div class="platform-detail-modal-footer">
+          <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+          <button class="btn btn-primary" type="button" data-save-brand-account>保存账号</button>
+        </div>
+      </div>
+    `);
+  }
+
+  function saveBrandAccount() {
+    const getValue = (field) => String(modalCardEl.querySelector(`[data-brand-account-field="${field}"]`)?.value || "").trim();
+    const brand = (window.MockData.brands || []).find((item) => item.id === getValue("brandId")) || {};
+    const payload = {
+      id: getValue("id"),
+      brandId: getValue("brandId"),
+      brandName: brand.name || "品牌方",
+      account: getValue("account"),
+      name: getValue("name"),
+      contact: getValue("contact"),
+      status: getValue("status") || "正常",
+      orders: 0,
+      shipped: 0,
+      pending: 0,
+    };
+    if (!payload.id || !payload.brandId || !payload.account) {
+      openFeedbackModal("账号信息不完整", "请填写账号编号、关联品牌和登录账号。");
+      return;
+    }
+    window.MockData.brandAccounts = [payload, ...(window.MockData.brandAccounts || [])];
+    state.selectedIndex = 0;
+    closeModal();
+    renderPage();
+    openFeedbackModal("品牌方账号已新增", `${payload.name} 已创建，当前状态：${payload.status}。`);
+  }
+
   function openShippingEditModal(row) {
     openModal(`
       <div class="panel-header">
@@ -4533,15 +5983,79 @@
     });
   }
 
+  function openMallRecommendationModal(product = null) {
+    const rows = getMallRecommendationRows();
+    const current = rows.find((item) => item.slot === "mallHero") || rows[0] || {};
+    const selectedSku = product?.sku || current.sku || products[0]?.sku || "";
+    const selectedProduct = products.find((item) => item.sku === selectedSku) || product || products[0] || {};
+    openModal(`
+      <div class="platform-detail-modal">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Mall Recommendation</span>
+            <h2 class="section-title">商城推荐位配置</h2>
+            <p class="section-subtitle">用户 App 商城首页“本周推荐”由这里配置。</p>
+          </div>
+          <button class="btn btn-secondary" type="button" data-close-modal>关闭</button>
+        </div>
+        <div class="form-grid">
+          <div class="field-group">
+            <label class="field-label">推荐商品</label>
+            <select class="select" data-mall-recommend-field="sku">
+              ${products.map((item) => `<option value="${item.sku}" ${item.sku === selectedSku ? "selected" : ""}>${item.name} / ${item.brand}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">状态</label>
+            <select class="select" data-mall-recommend-field="status">
+              ${["启用", "停用"].map((item) => `<option value="${item}" ${(current.status || "启用") === item ? "selected" : ""}>${item}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">角标</label>
+            <input class="input" data-mall-recommend-field="label" value="${current.label || "本周推荐"}" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">排序</label>
+            <input class="input" data-mall-recommend-field="sort" type="number" min="1" value="${current.sort || 1}" />
+          </div>
+          <div class="field-group field-group-full">
+            <label class="field-label">推荐标题</label>
+            <input class="input" data-mall-recommend-field="title" value="${current.title || selectedProduct.name || "精选商品"}" />
+          </div>
+          <div class="field-group field-group-full">
+            <label class="field-label">推荐文案</label>
+            <textarea class="textarea" data-mall-recommend-field="description" rows="3">${current.description || selectedProduct.description || ""}</textarea>
+          </div>
+        </div>
+        <div class="platform-detail-modal-footer">
+          <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+          <button class="btn btn-primary" type="button" data-save-mall-recommendation>保存推荐位</button>
+        </div>
+      </div>
+    `);
+  }
+
   function openProductEditorModal(mode, row) {
     const isEdit = mode === "edit";
     const selectedFitments = parseProductFitmentValue(isEdit ? row.fitment : "宝马-3系-330i / 奔驰-C级-C260L");
-    const categoryOptions = categories
-      .map((item) => {
-        const indent = item.level === 1 ? "└ " : "";
-        const selected = (isEdit ? row.category : "锻造轮毂") === item.name ? "selected" : "";
-        return `<option value="${item.name}" ${selected}>${indent}${item.name}</option>`;
-      })
+    const brandRows = window.MockData.brands || [];
+    const selectedBrand = isEdit ? row.brand : (brandRows[0]?.name || "");
+    const brandOptions = [
+      ...brandRows.map((item) => item.name),
+      ...(selectedBrand && !brandRows.some((item) => item.name === selectedBrand) ? [selectedBrand] : []),
+    ]
+      .filter(Boolean)
+      .map((name) => `<option value="${name}" ${name === selectedBrand ? "selected" : ""}>${name}</option>`)
+      .join("");
+    const getBrandCategories = (brandName) => {
+      const brand = brandRows.find((item) => item.name === brandName);
+      if (Array.isArray(brand?.categories) && brand.categories.length) return brand.categories;
+      return categories.filter((item) => item.level === 0).map((item) => item.name);
+    };
+    const selectedCategory = isEdit ? row.category : (getBrandCategories(selectedBrand)[0] || "");
+    const categoryOptions = getBrandCategories(selectedBrand)
+      .map((name) => `<option value="${name}" ${selectedCategory === name ? "selected" : ""}>${name}</option>`)
       .join("");
     openModal(`
       <div class="panel-header">
@@ -4562,7 +6076,7 @@
         </div>
         <div class="field-group">
           <div class="field-label">品牌</div>
-          <input class="input" data-product-field="brand" placeholder="请输入品牌" value="${isEdit ? row.brand : "OZ Racing"}" />
+          <select class="select" data-product-field="brand">${brandOptions}</select>
         </div>
         <div class="field-group">
           <div class="field-label">类目</div>
@@ -4605,6 +6119,12 @@
         <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
       </div>
     `);
+    const brandSelect = modalCardEl.querySelector('[data-product-field="brand"]');
+    const categorySelect = modalCardEl.querySelector('[data-product-field="category"]');
+    brandSelect?.addEventListener("change", () => {
+      const options = getBrandCategories(brandSelect.value);
+      categorySelect.innerHTML = options.map((name) => `<option value="${name}">${name}</option>`).join("");
+    });
   }
 
   function openVehicleModelEditorModal(mode, row) {
@@ -4841,31 +6361,31 @@
   }
 
   function submitSettlementAudit(settlementId, decision, reason = "") {
-    const target = settlements.find((item) => item.id === settlementId);
+    const target = settlements.find((item) => item.id === settlementId) || providers.find((item) => item.id === settlementId);
     if (!target) return;
 
     if (decision === "reject" && !reason) {
-      openFeedbackModal("请填写驳回原因", "驳回付款记录前需要填写明确原因，方便服务商后续修正。");
+      openFeedbackModal("请填写调整原因", "调整统计记录前需要填写明确原因，方便后续复核。");
       return;
     }
 
     if (decision === "approve") {
-      target.status = "已结清";
-      target.paymentStatus = "已结清";
+      target.status = "已归档";
       target.rejectReason = "";
-      target.paymentNote = target.paymentNote || "平台已确认收到服务商支付的平台服务费。";
+      target.paymentNote = target.paymentNote || "运营已确认本期服务统计。";
       target.paidAt = target.paidAt || getNowStamp();
-      target.timeline.unshift(`${getNowStamp()} 平台确认收款，服务商已按协议结清平台服务费`);
-      openFeedbackModal("收款已确认", `${target.id} 已更新为已结清。`);
+      target.timeline = target.timeline || [];
+      target.timeline.unshift(`${getNowStamp()} 平台确认服务统计`);
+      openFeedbackModal("统计已归档", `${target.id || target.name} 已更新为已归档。`);
       return;
     }
 
-    target.status = "已驳回";
-    target.paymentStatus = "已驳回";
+    target.status = "待复核";
     target.rejectReason = reason;
-    target.paymentNote = `付款记录被驳回：${reason}`;
-    target.timeline.unshift(`${getNowStamp()} 平台驳回付款记录。驳回原因：${reason}`);
-    openFeedbackModal("付款记录已驳回", `${target.id} 已记录驳回原因。`);
+    target.paymentNote = `统计记录调整：${reason}`;
+    target.timeline = target.timeline || [];
+    target.timeline.unshift(`${getNowStamp()} 平台调整统计记录。原因：${reason}`);
+    openFeedbackModal("统计记录已调整", `${target.id || target.name} 已记录调整原因。`);
   }
 
   function submitCaseAudit(caseId, decision, reason = "") {
@@ -4976,6 +6496,90 @@
     openFeedbackModal("帖子已恢复", `${target.id} 已恢复正常显示。`);
   }
 
+  function togglePostPin(postId) {
+    const target = posts.find((item) => item.id === postId);
+    if (!target) return;
+    target.topStatus = target.topStatus === "置顶" ? "未置顶" : "置顶";
+    target.timeline.unshift(`${getNowStamp()} 平台将帖子置顶状态更新为：${target.topStatus}`);
+    renderPage();
+    openFeedbackModal("置顶状态已更新", `${target.id} 当前为${target.topStatus}。`);
+  }
+
+  function togglePostFeature(postId) {
+    const target = posts.find((item) => item.id === postId);
+    if (!target) return;
+    target.featuredStatus = target.featuredStatus === "加精" ? "未加精" : "加精";
+    target.timeline.unshift(`${getNowStamp()} 平台将帖子加精状态更新为：${target.featuredStatus}`);
+    renderPage();
+    openFeedbackModal("加精状态已更新", `${target.id} 当前为${target.featuredStatus}。`);
+  }
+
+  function toggleCreatorPinnedPost(postId) {
+    const target = posts.find((item) => item.id === postId);
+    if (!target) return;
+    const nextPinned = target.creatorPinned === "是" ? "否" : "是";
+    if (nextPinned === "是") {
+      posts
+        .filter((item) => item.author === target.author && item.id !== target.id)
+        .forEach((item) => {
+          item.creatorPinned = "否";
+          item.creatorHomeRank = 0;
+        });
+    }
+    target.creatorPinned = nextPinned;
+    target.creatorHomeRank = nextPinned === "是" ? 1 : 0;
+    target.timeline.unshift(`${getNowStamp()} 平台将创作者主页置顶作品更新为：${target.creatorPinned === "是" ? "已置顶" : "已取消"}`);
+    renderPage();
+    openFeedbackModal("创作者主页已更新", `${target.author} 的主页置顶作品已${target.creatorPinned === "是" ? "设置" : "取消"}。`);
+  }
+
+  function savePostCommerce(postId) {
+    const target = posts.find((item) => item.id === postId);
+    if (!target) return;
+    const selectedProducts = Array.from(modalCardEl.querySelectorAll("[data-post-product]:checked")).map((input) => input.value);
+    const authStatus = modalCardEl.querySelector("[data-post-commerce-auth]")?.value || "未授权";
+    const note = modalCardEl.querySelector("[data-post-commerce-note]")?.value.trim() || "";
+    if (authStatus !== "已授权" && selectedProducts.length) {
+      openFeedbackModal("账号未授权", "只有授权账号才允许在帖子内挂载商品链接。");
+      return;
+    }
+    target.linkAuthStatus = authStatus;
+    target.linkedProducts = selectedProducts;
+    target.governanceNote = note || target.governanceNote;
+    target.timeline.unshift(`${getNowStamp()} 平台更新商品链接：${selectedProducts.length ? selectedProducts.join(" / ") : "未挂商品"}，授权状态：${authStatus}`);
+    renderPage();
+    openFeedbackModal("商品链接已更新", `${target.id} 已保存商品链接与授权状态。`);
+  }
+
+  function submitUserPunish(userId, type) {
+    const target = users.find((item) => item.id === userId);
+    if (!target) return;
+    const reason = modalCardEl.querySelector("[data-user-punish-reason]")?.value.trim() || "";
+    const duration = modalCardEl.querySelector("[data-user-punish-duration]")?.value || "";
+    if (!reason) {
+      openFeedbackModal("请填写处理原因", "禁言或封禁前需要填写原因，方便用户申诉与后台追溯。");
+      return;
+    }
+    if (type === "mute") {
+      target.punish = "禁言";
+      target.punishReason = reason;
+      target.punishExpire = duration === "永久" ? "永久" : duration;
+      target.timeline = target.timeline || [];
+      target.timeline.unshift(`${getNowStamp()} 平台禁言用户，周期：${target.punishExpire}，原因：${reason}`);
+      renderPage();
+      openFeedbackModal("用户已禁言", `${target.name} 禁言周期：${target.punishExpire}。`);
+      return;
+    }
+    target.punish = "封号";
+    target.status = "停用";
+    target.punishReason = reason;
+    target.punishExpire = "永久";
+    target.timeline = target.timeline || [];
+    target.timeline.unshift(`${getNowStamp()} 平台封禁用户。原因：${reason}`);
+    renderPage();
+    openFeedbackModal("用户已封禁", `${target.name} 已封禁并停用账号。`);
+  }
+
   function submitCommentManage(commentId, action, reason = "") {
     const target = comments.find((item) => item.id === commentId);
     if (!target) return;
@@ -5016,6 +6620,31 @@
     target.updatedAt = "2026-04-03 17:30";
     target.timeline.unshift(`2026-04-03 17:30 平台将角色状态更新为：${target.status}`);
     openFeedbackModal("角色状态已更新", `${target.name} 当前状态：${target.status}。`);
+  }
+
+  function toggleBrandAccountStatus(accountId) {
+    const target = (window.MockData.brandAccounts || []).find((item) => item.id === accountId);
+    if (!target) return;
+
+    setBrandAccountStatus(accountId, target.status === "停用" ? "正常" : "停用");
+  }
+
+  function setBrandAccountStatus(accountId, status) {
+    const target = (window.MockData.brandAccounts || []).find((item) => item.id === accountId);
+    if (!target) return;
+
+    target.status = status;
+    renderPage();
+    openFeedbackModal("品牌方账号状态已更新", `${target.name} 当前状态：${target.status}。`);
+  }
+
+  function toggleBrandStatus(brandId) {
+    const target = (window.MockData.brands || []).find((item) => item.id === brandId);
+    if (!target) return;
+
+    target.status = target.status === "签约" ? "解约" : "签约";
+    renderPage();
+    openFeedbackModal("品牌合作状态已更新", `${target.name} 当前状态：${target.status}。`);
   }
 
   function toggleConfigStatus(configKey) {
@@ -5187,6 +6816,37 @@
     openFeedbackModal("用户状态已更新", `${target.name} 当前状态：${target.status}。`);
   }
 
+  function toggleUserPunish(userId, type) {
+    const target = users.find((item) => item.id === userId);
+    if (!target) return;
+
+    if (type === "mute") {
+      if (target.punish === "禁言") {
+        target.punish = "";
+        target.punishReason = "";
+        target.punishExpire = "";
+        openFeedbackModal("禁言已解除", `${target.name} 已恢复正常发言权限。`);
+      } else {
+        target.punish = "禁言";
+        target.punishReason = target.punishReason || "多次发布违规内容";
+        target.punishExpire = target.punishExpire || "2026-06-25";
+        openFeedbackModal("用户已被禁言", `${target.name} 禁言原因：${target.punishReason}，到期时间：${target.punishExpire}。`);
+      }
+    } else if (type === "ban") {
+      if (target.punish === "封号") {
+        target.punish = "";
+        target.punishReason = "";
+        target.punishExpire = "";
+        openFeedbackModal("封号已解除", `${target.name} 账号已恢复正常。`);
+      } else {
+        target.punish = "封号";
+        target.punishReason = target.punishReason || "严重违规";
+        target.punishExpire = target.punishExpire || "永久";
+        openFeedbackModal("用户已被封号", `${target.name} 封号原因：${target.punishReason}。`);
+      }
+    }
+  }
+
   function saveProduct(mode, sourceSku) {
     const getValue = (field) => {
       const el = modalCardEl.querySelector(`[data-product-field="${field}"]`);
@@ -5207,8 +6867,13 @@
       status: getValue("status"),
     };
 
-    if (!payload.sku || !payload.name || !payload.brand || !payload.fitment) {
-      openFeedbackModal("信息不完整", "请至少填写 SKU、商品名称、品牌，并选择一个适配车型后再提交。");
+    if (!payload.sku || !payload.name || !payload.brand || !payload.category || !payload.fitment) {
+      openFeedbackModal("信息不完整", "请至少填写 SKU、商品名称、品牌、类目，并选择一个适配车型后再提交。");
+      return;
+    }
+
+    if (!(window.MockData.brands || []).some((item) => item.name === payload.brand)) {
+      openFeedbackModal("品牌无效", "请选择品牌列表中已维护的品牌。");
       return;
     }
 
@@ -5222,6 +6887,31 @@
 
     products.unshift(payload);
     openFeedbackModal("商品已新增", `${payload.name} 已加入商品列表。`);
+  }
+
+  function saveMallRecommendation() {
+    const getValue = (field) => String(modalCardEl.querySelector(`[data-mall-recommend-field="${field}"]`)?.value || "").trim();
+    const sku = getValue("sku");
+    const product = products.find((item) => item.sku === sku);
+    if (!product) {
+      openFeedbackModal("推荐商品无效", "请选择商品列表中的商品。");
+      return;
+    }
+    const row = {
+      id: "MREC-001",
+      slot: "mallHero",
+      sku,
+      label: getValue("label") || "本周推荐",
+      title: getValue("title") || product.name,
+      description: getValue("description") || product.description || "",
+      sort: Number(getValue("sort") || 1),
+      status: getValue("status") || "启用",
+      updatedAt: getNowStamp(),
+    };
+    persistMallRecommendationRows([row]);
+    closeModal();
+    renderPage();
+    openFeedbackModal("推荐位已保存", `${product.name} 已配置到用户 App 商城推荐位。`);
   }
 
   function saveProviderAccount(mode, sourceId) {
@@ -5462,27 +7152,77 @@
     openFeedbackModal("服务项目已新增", `${payload.name} 已加入服务项目列表。`);
   }
 
+  function getInvitedUserRows(row) {
+    const inviteCode = row.inviteCode || window.MockData.providerInvites?.find((item) => item.providerName === (row.name || row.provider))?.code || "-";
+    const count = Number(row.referredUsers || row.referralUsers || 0);
+    if (!count || inviteCode === "-") return [];
+    const existing = (window.MockData.userAccounts || [])
+      .filter((item) => item.inviteCode === inviteCode || item.inviteProviderName === (row.name || row.provider))
+      .map((item, index) => ({
+        id: item.id || `U-${inviteCode}-${index + 1}`,
+        nickname: item.nickname || item.name || "用户",
+        phone: item.phone || "-",
+        registeredAt: item.registeredAt || `2026-04-${String(Math.max(1, 2 - index)).padStart(2, "0")} 10:${String(18 + index).padStart(2, "0")}`,
+      }));
+    const names = ["周恺", "林澈", "陈予安", "许知行", "赵一鸣", "何嘉宁", "孙若瑜", "吴昊然", "郑亦辰", "唐雨薇", "蒋明哲", "韩沐阳", "宋知夏", "余景行", "方念", "高远", "马亦凡", "罗清越", "叶晨", "丁然", "白予", "江禾", "夏宁", "邹言", "任星", "顾北"];
+    const generated = Array.from({ length: Math.max(0, count - existing.length) }, (_, index) => {
+      const day = 2 + Math.floor(index / 4);
+      const hour = 9 + (index % 8);
+      const minute = (index * 7 + 12) % 60;
+      return {
+        id: `U-${inviteCode}-${String(index + 1).padStart(3, "0")}`,
+        nickname: names[index % names.length],
+        phone: `13${(600000000 + index * 3791).toString().padStart(9, "0").slice(0, 9)}`,
+        registeredAt: `2026-04-${String(day).padStart(2, "0")} ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+      };
+    });
+    return [...existing, ...generated].slice(0, count);
+  }
+
   function openSettlementAuditModal(row) {
+    const invitedUsers = getInvitedUserRows(row);
     openModal(`
       <div class="panel-header">
         <div>
-          <span class="eyebrow">Settlement Payment</span>
-          <h2 class="section-title">确认平台服务费收款</h2>
-          <p class="section-subtitle">${row.id} / ${row.provider} / 应收 ${row.platformReceivable}</p>
+          <span class="eyebrow">Service Stats</span>
+          <h2 class="section-title">服务统计明细</h2>
+          <p class="section-subtitle">${row.name || row.provider} / 服务 ${row.serviceTimes || row.orders || 0} 次 / 订单金额 ${row.orderAmount || row.grossAmount || row.currentRevenue || "¥ 0"}</p>
         </div>
       </div>
-      <div class="action-grid">
-        <button class="action-tile" type="button" data-settlement-decision="approve" data-settlement-id="${row.id}">
-          <strong>确认收款</strong>
-          <p>确认服务商已按协议比例支付平台服务费，并将状态更新为已结清。</p>
-        </button>
-        <button class="action-tile" type="button" data-settlement-decision="reject" data-settlement-id="${row.id}">
-          <strong>驳回付款记录</strong>
-          <p>付款凭证或金额不一致时驳回，并填写原因供服务商修正。</p>
-        </button>
+      <div class="detail-grid">
+        <div><span>服务次数</span><strong>${row.serviceTimes || row.orders || 0} 次</strong></div>
+        <div><span>推荐用户</span><strong>${row.referredUsers || row.referralUsers || 0} 人</strong></div>
+        <div><span>订单金额</span><strong>${row.orderAmount || row.grossAmount || row.currentRevenue || "¥ 0"}</strong></div>
+        <div><span>邀请码</span><strong>${row.inviteCode || "-"}</strong></div>
+      </div>
+      <div class="table-card" style="margin-top:18px;">
+        <div class="finance-kv-title" style="margin-bottom:12px;">邀请用户列表</div>
+        <table class="data-table">
+          <thead>
+            <tr><th>用户ID</th><th>用户</th><th>手机号</th><th>注册时间</th></tr>
+          </thead>
+          <tbody>
+            ${
+              invitedUsers.length
+                ? invitedUsers
+                    .map(
+                      (item) => `
+                        <tr>
+                          <td>${escapeHtml(item.id)}</td>
+                          <td>${escapeHtml(item.nickname)}</td>
+                          <td>${escapeHtml(item.phone)}</td>
+                          <td>${escapeHtml(item.registeredAt)}</td>
+                        </tr>
+                      `
+                    )
+                    .join("")
+                : `<tr><td colspan="4" class="muted">暂无邀请用户记录。</td></tr>`
+            }
+          </tbody>
+        </table>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
-        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+        <button class="btn btn-primary" type="button" data-close-modal>关闭</button>
       </div>
     `);
   }
@@ -5493,17 +7233,17 @@
     openModal(`
       <div class="panel-header">
         <div>
-          <span class="eyebrow">Settlement Reject</span>
-          <h2 class="section-title">驳回付款记录</h2>
-          <p class="section-subtitle">${target.id} / ${target.provider} / 请填写驳回原因</p>
+          <span class="eyebrow">Stats Adjust</span>
+          <h2 class="section-title">调整统计记录</h2>
+          <p class="section-subtitle">${target.id} / ${target.provider} / 请填写调整原因</p>
         </div>
       </div>
       <div class="field-group field-group-full">
-        <div class="field-label">驳回原因</div>
-        <textarea class="textarea" data-settlement-reject-reason>付款金额或凭证与应付平台服务费不一致，请修正后重新提交。</textarea>
+        <div class="field-label">调整原因</div>
+        <textarea class="textarea" data-settlement-reject-reason>服务次数、推荐用户或订单金额需要复核，请运营确认后更新。</textarea>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
-        <button class="btn btn-primary" type="button" data-submit-settlement-reject data-settlement-id="${target.id}">确认驳回</button>
+        <button class="btn btn-primary" type="button" data-submit-settlement-reject data-settlement-id="${target.id}">确认调整</button>
         <button class="btn btn-secondary" type="button" data-close-modal>返回</button>
       </div>
     `);
@@ -5877,6 +7617,85 @@
     `);
   }
 
+  function openPostCommerceModal(row) {
+    const isAuthorized = row.linkAuthStatus === "已授权" || authorizedCommerceAccounts.includes(row.author);
+    const selected = new Set(row.linkedProducts || []);
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Commerce Link</span>
+          <h2 class="section-title">授权账号挂商品链接</h2>
+          <p class="section-subtitle">${row.id} / ${row.author} / 当前状态：${row.linkAuthStatus || "未授权"}</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <label class="field-label" for="post-commerce-auth">商品链接权限</label>
+          <select class="select" id="post-commerce-auth" data-post-commerce-auth>
+            <option value="已授权" ${isAuthorized ? "selected" : ""}>已授权</option>
+            <option value="未授权" ${isAuthorized ? "" : "selected"}>未授权</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="post-commerce-note">治理备注</label>
+          <input class="input" id="post-commerce-note" data-post-commerce-note value="${row.governanceNote || ""}" />
+        </div>
+      </div>
+      <div class="doc-list" style="margin-top:16px;">
+        ${products.slice(0, 6).map((item) => `
+          <label class="doc-item" style="cursor:pointer;">
+            <strong><input type="checkbox" data-post-product value="${item.sku}" ${selected.has(item.sku) ? "checked" : ""}> ${item.name}</strong>
+            <div class="muted">${item.brand} / ${item.category} / ${item.price}</div>
+          </label>
+        `).join("")}
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-save-post-commerce data-post-id="${row.id}">保存商品链接</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
+  function openUserPunishModal(row, type) {
+    const isMute = type === "mute";
+    if (isMute && row.punish === "禁言") {
+      toggleUserPunish(row.id, "mute");
+      return;
+    }
+    if (!isMute && row.punish === "封号") {
+      toggleUserPunish(row.id, "ban");
+      return;
+    }
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Forum Sanction</span>
+          <h2 class="section-title">${isMute ? "设置禁言周期" : "封禁用户"}</h2>
+          <p class="section-subtitle">${row.id} / ${row.name} / ${isMute ? "选择周期并填写原因" : "封禁后账号将停用"}</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <label class="field-label" for="user-punish-duration">处理周期</label>
+          <select class="select" id="user-punish-duration" data-user-punish-duration ${isMute ? "" : "disabled"}>
+            <option value="3 天">3 天</option>
+            <option value="7 天" selected>7 天</option>
+            <option value="30 天">30 天</option>
+            <option value="永久">永久</option>
+          </select>
+        </div>
+        <div class="field-group field-group-full">
+          <label class="field-label" for="user-punish-reason">处理原因</label>
+          <textarea class="textarea" id="user-punish-reason" data-user-punish-reason>${isMute ? "发布违规导流、攻击性表达或重复刷屏内容，按社区规则禁言处理。" : "严重违反社区规则或规避治理，封禁账号并保留处理记录。"}</textarea>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-submit-user-punish data-user-id="${row.id}" data-punish-type="${type}">${isMute ? "确认禁言" : "确认封禁"}</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
   function openCommentManageModal(row) {
     if (row.status === "已删除") {
       openModal(`
@@ -6201,6 +8020,183 @@
     openFeedbackModal("分类已删除", `${removedLabel} 已从商品分类列表中移除。`);
   }
 
+  function persistInvoiceRow(row) {
+    const clean = { ...row };
+    delete clean.__invoiceSource;
+    delete clean.rejectReason;
+    const rows = readStorageRows(INVOICE_STORAGE_KEY);
+    const index = rows.findIndex((item) => item.id === row.id);
+    if (index >= 0) {
+      rows[index] = clean;
+    } else {
+      rows.unshift(clean);
+    }
+    writeStorageRows(INVOICE_STORAGE_KEY, rows.slice(0, 50));
+    row.__invoiceSource = "local";
+    syncOrderInvoiceStatuses();
+  }
+
+  function pushInvoiceTimeline(row, text) {
+    row.timeline = row.timeline || [];
+    row.timeline.unshift(`${getNowStamp()} ${text}`);
+  }
+
+  function inferInvoiceAttachmentType(file) {
+    if (!file) return "";
+    if (file.type) return file.type;
+    return /\.pdf$/i.test(file.name || "") ? "application/pdf" : "image/*";
+  }
+
+  function openInvoiceIssueModal(row) {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Invoice Delivery</span>
+          <h2 class="section-title">上传并回传发票</h2>
+          <p class="section-subtitle">${row.id} / ${row.orderId} / ${row.user}</p>
+        </div>
+      </div>
+      <form class="provider-complete-form" data-invoice-issue-form style="margin-top:18px;">
+        <div class="form-grid">
+          <div class="field-group">
+            <label class="field-label" for="invoice-delivery-method">回传方式</label>
+            <select class="input" id="invoice-delivery-method" data-invoice-field="method">
+              ${["电子发票", "邮箱回传", "站内回传", "二维码"].map((item) => `<option value="${item}" ${item === row.method ? "selected" : ""}>${item}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="invoice-file">发票 PDF / 图片</label>
+            <input class="input" id="invoice-file" data-invoice-field="file" type="file" accept="application/pdf,image/*" ${row.attachmentName ? "" : "required"} />
+          </div>
+          <div class="field-group field-group-full">
+            <label class="field-label" for="invoice-note">回传备注</label>
+            <textarea class="input" id="invoice-note" data-invoice-field="note" rows="3" placeholder="例如：已发送至用户邮箱，并同步站内消息。">${escapeHtml(row.deliveryNote || "")}</textarea>
+          </div>
+          <div class="field-group field-group-full">
+            <span class="field-label">当前附件</span>
+            <div class="muted">${row.attachmentName ? escapeHtml(row.attachmentName) : "未上传"}</div>
+          </div>
+        </div>
+        <div class="admin-action-row">
+          <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+          <button class="btn btn-primary" type="submit">确认回传用户</button>
+        </div>
+      </form>
+    `);
+
+    const form = modalCardEl.querySelector("[data-invoice-issue-form]");
+    form?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const file = modalCardEl.querySelector('[data-invoice-field="file"]')?.files?.[0];
+      if (!file && !row.attachmentName) {
+        openFeedbackModal("缺少发票附件", "请上传 PDF 或图片后再回传用户。");
+        return;
+      }
+      row.method = modalCardEl.querySelector('[data-invoice-field="method"]')?.value || "电子发票";
+      row.deliveryNote = modalCardEl.querySelector('[data-invoice-field="note"]')?.value.trim() || "";
+      row.attachmentName = file?.name || row.attachmentName;
+      row.attachmentType = inferInvoiceAttachmentType(file) || row.attachmentType;
+      row.status = "已开具";
+      row.deliveredAt = getNowStamp();
+      pushInvoiceTimeline(row, `平台上传发票附件并通过${row.method}回传用户：${row.attachmentName}`);
+      persistInvoiceRow(row);
+      openFeedbackModal("发票已回传", `${row.id} 已更新为已开具，用户可在用户 App 下载发票。`);
+    });
+  }
+
+  function openOrderFinanceModal(row) {
+    const invoiceId = invoiceRows.find((item) => item.orderId === row.id)?.id || "-";
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Order Finance</span>
+          <h2 class="section-title">订单流水</h2>
+          <p class="section-subtitle">${row.id} / ${row.user} / ${row.service}</p>
+        </div>
+      </div>
+
+      <div class="finance-summary">
+        <div class="finance-amount-card">
+          <div class="finance-amount-label">用户实付</div>
+          <div class="finance-amount-value">${escapeHtml(row.userPaidAmount || "¥ 0")}</div>
+          <div class="finance-amount-meta">
+            ${row.originalAmount ? `<span>原价 ${escapeHtml(row.originalAmount)}</span>` : ""}
+            ${row.discountAmount ? `<span>优惠 ${escapeHtml(row.discountAmount)}</span>` : ""}
+          </div>
+        </div>
+        <div class="finance-status-grid">
+          <div class="finance-status-item">
+            <span class="finance-status-label">支付状态</span>
+            ${formatTag(row.paymentStatus)}
+          </div>
+          <div class="finance-status-item">
+            <span class="finance-status-label">到账状态</span>
+            ${formatTag(row.receiptStatus)}
+          </div>
+          <div class="finance-status-item">
+            <span class="finance-status-label">发票状态</span>
+            ${formatTag(row.invoiceStatus)}
+          </div>
+        </div>
+      </div>
+
+      <div class="finance-kv-section">
+        <div class="finance-kv-col">
+          <div class="finance-kv-title">支付信息</div>
+          <div class="kv-list">
+            <div class="kv-row"><span class="muted">支付方式</span><strong>${escapeHtml(row.paymentMethod || "-")}</strong></div>
+            <div class="kv-row"><span class="muted">支付流水号</span><strong>${escapeHtml(row.transactionNo || "-")}</strong></div>
+            <div class="kv-row"><span class="muted">发票编号</span><strong>${escapeHtml(invoiceId)}</strong></div>
+          </div>
+        </div>
+        <div class="finance-kv-col">
+          <div class="finance-kv-title">到账说明</div>
+          <div class="finance-note">${escapeHtml(row.receiptStatus === "已到账" ? "渠道清分已入账，资金已到账。" : "等待支付渠道清分或财务入账确认。")}</div>
+        </div>
+      </div>
+
+      <div class="table-card" style="margin-top:22px;">
+        <div class="finance-kv-title" style="margin-bottom:12px;">资金流水明细</div>
+        <table class="data-table">
+          <thead>
+            <tr><th>流水类型</th><th>金额</th><th>状态</th><th>编号/批次</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>用户支付</td>
+              <td>${escapeHtml(row.userPaidAmount)}</td>
+              <td>${formatTag(row.paymentStatus)}</td>
+              <td>${escapeHtml(row.transactionNo)}</td>
+              <td>${escapeHtml(row.paymentMethod || "-")}</td>
+            </tr>
+            <tr>
+              <td>平台到账</td>
+              <td>${escapeHtml(row.userPaidAmount)}</td>
+              <td>${formatTag(row.receiptStatus)}</td>
+              <td>${escapeHtml(row.transactionNo)}</td>
+              <td>${escapeHtml(row.receiptStatus === "已到账" ? "渠道清分已入账" : "等待渠道清分或财务确认")}</td>
+            </tr>
+            <tr>
+              <td>发票闭环</td>
+              <td>${escapeHtml(row.userPaidAmount)}</td>
+              <td>${formatTag(row.invoiceStatus)}</td>
+              <td>${escapeHtml(invoiceId)}</td>
+              <td>${escapeHtml(row.invoiceStatus === "未申请" ? "用户暂未申请发票" : "发票状态已同步发票管理")}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="timeline" style="margin-top:22px;">
+        ${(row.financeTimeline || ["暂无财务轨迹"]).map((item) => `<div class="timeline-item">${escapeHtml(item)}</div>`).join("")}
+      </div>
+
+      <div style="display:flex; gap:12px; margin-top:22px;">
+        <button class="btn btn-primary" type="button" data-close-modal>关闭</button>
+      </div>
+    `);
+  }
+
   function openFeedbackModal(title, message) {
     openModal(`
       <div class="panel-header">
@@ -6225,6 +8221,61 @@
     }
   }
 
+  function openChatRecordModal(chat) {
+    const order = orders.find((o) => o.id === chat.orderId);
+    const bubbles = chat.messages?.map((message) => {
+      const isUser = message.from === "user";
+      const isProvider = message.from === "provider";
+      const roleLabel = isUser ? "用户" : isProvider ? "服务商" : "平台";
+      const alignClass = isUser ? "user-bubble" : isProvider ? "provider-bubble" : "platform-bubble";
+      return `
+        <div class="chat-bubble ${alignClass}">
+          <div class="chat-bubble-meta">
+            <span class="chat-role">${roleLabel}</span>
+            <span class="chat-time">${message.time}</span>
+          </div>
+          <div class="chat-text">${message.text}</div>
+        </div>
+      `;
+    }).join("") || '<div class="muted">暂无消息</div>';
+
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Order Chat / ${chat.orderId}</span>
+          <h2 class="section-title">${chat.title}</h2>
+          <p class="section-subtitle">${chat.user} · ${chat.provider}</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+        ${formatTag(chat.orderId)}
+        ${formatTag(chat.time)}
+      </div>
+      <div class="chat-record-panel">
+        ${bubbles}
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-close-modal>关闭</button>
+        ${order ? `<button class="btn btn-secondary" type="button" data-close-modal data-goto-order="${order.id}">跳转订单</button>` : ""}
+      </div>
+    `);
+
+    modalCardEl.querySelectorAll("[data-goto-order]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        closeModal();
+        state.activePage = "orderList";
+        state.activeFilter = "全部";
+        const orderRows = filterRows(defs.orderList.rows, defs.orderList.filterBy);
+        const idx = orderRows.findIndex((o) => o.id === btn.dataset.gotoOrder);
+        state.selectedIndex = idx >= 0 ? idx : 0;
+        const parentGroup = menu.find((item) => item.children?.some((c) => c.id === "orderList"));
+        if (parentGroup) state.expandedGroups[parentGroup.id] = true;
+        renderSidebar();
+        renderPage();
+      });
+    });
+  }
+
   function filterRows(rows, filterBy) {
     let result = [...rows];
 
@@ -6237,6 +8288,18 @@
         } else if (displayFilters.includes(state.activeFilter)) {
           result = result.filter((row) => row.display === state.activeFilter);
         }
+      } else if (filterBy === "forumManage") {
+        if (["正常", "已删除"].includes(state.activeFilter)) {
+          result = result.filter((row) => row.status === state.activeFilter);
+        } else if (state.activeFilter === "置顶") {
+          result = result.filter((row) => row.topStatus === "置顶");
+        } else if (state.activeFilter === "加精") {
+          result = result.filter((row) => row.featuredStatus === "加精");
+        } else if (state.activeFilter === "已授权") {
+          result = result.filter((row) => row.linkAuthStatus === "已授权");
+        }
+      } else if (filterBy === "punish" && state.activeFilter === "正常") {
+        result = result.filter((row) => !row.punish && row.status === "正常");
       } else {
         result = result.filter((row) => row[filterBy] === state.activeFilter);
       }
@@ -6281,6 +8344,12 @@
       "已停用",
       "施工中",
       "待支付",
+      "置顶",
+      "未置顶",
+      "加精",
+      "未加精",
+      "已授权",
+      "未授权",
     ].includes(value);
   }
 
@@ -6303,6 +8372,3 @@
   renderSidebar();
   renderPage();
 })();
-
-
-

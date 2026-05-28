@@ -299,6 +299,24 @@
           <div class="provider-join-benefits">
             ${store.certifications.map((item) => `<span class="pill">${item}</span>`).join("")}
           </div>
+          <div class="provider-join-status">
+            <article>
+              <span>当前状态</span>
+              <strong>${store.contractStatus}</strong>
+            </article>
+            <article>
+              <span>审核资料</span>
+              <strong>6 项待提交</strong>
+            </article>
+            <article>
+              <span>服务区域</span>
+              <strong>${store.city}</strong>
+            </article>
+          </div>
+          <div class="provider-join-next">
+            <strong>下一步</strong>
+            <p>补齐资质、合同、施工环境和案例素材后，提交平台审核。</p>
+          </div>
         </aside>
       </section>
     `;
@@ -325,9 +343,9 @@
     const showcaseStats = store.stats.slice(0, 4);
 
     contentEl.innerHTML = `
-      <section class="stack">
-        <section class="showcase-hero">
-          <article class="panel showcase-cover showcase-cover-premium" style="min-height:520px;">
+      <section class="stack showcase-page">
+        <section class="showcase-hero showcase-hero-refined">
+          <article class="panel showcase-cover showcase-cover-premium">
             <div class="showcase-store-head">
               <div>
                 <h1 class="showcase-store-title">${store.name}</h1>
@@ -362,6 +380,7 @@
               </div>
             </div>
           </article>
+          <aside class="showcase-rail">
           <article class="panel showcase-side showcase-case-panel">
             <div class="panel-header showcase-case-head">
               <div>
@@ -384,10 +403,29 @@
                 : `<div class="muted">当前暂无案例数据。</div>`
             }
           </article>
+          <article class="panel provider-display-panel showcase-contact-panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="section-title">联系与转化</h2>
+              </div>
+            </div>
+            <div class="provider-ad-cta showcase-contact-card">
+              <strong>服务热线 ${store.hotline}</strong>
+              <p>支持预约到店看车、案例讲解、实车方案报价。</p>
+              <div class="showcase-contact-tags">
+                ${store.certifications.map((item) => `<span class="pill">${item}</span>`).join("")}
+              </div>
+            </div>
+            <div class="showcase-contact-actions">
+              <button class="btn btn-primary" type="button" data-provider-switch="cases">去维护案例</button>
+              <button class="btn btn-secondary" type="button" data-provider-showcase-contact>联系平台</button>
+            </div>
+          </article>
+          </aside>
         </section>
 
-        <section class="provider-display-grid provider-display-grid-premium">
-          <article class="panel provider-display-panel">
+        <section class="provider-display-grid provider-display-grid-premium showcase-info-grid">
+          <article class="panel provider-display-panel showcase-location-panel">
             <div class="panel-header">
               <div>
                 <h2 class="section-title">主推服务</h2>
@@ -423,24 +461,6 @@
                 <div class="provider-display-item"><div><strong>${store.address}</strong><p>详细地址</p></div><span class="tag info">可导航</span></div>
                 <div class="provider-display-item"><div><strong>${store.hours}</strong><p>营业时间</p></div><span class="tag success">欢迎到店</span></div>
               </div>
-            </div>
-          </article>
-          <article class="panel provider-display-panel">
-            <div class="panel-header">
-              <div>
-                <h2 class="section-title">联系与转化</h2>
-              </div>
-            </div>
-            <div class="provider-ad-cta showcase-contact-card">
-              <strong>服务热线 ${store.hotline}</strong>
-              <p>支持预约到店看车、案例讲解、实车方案报价。</p>
-              <div class="showcase-contact-tags">
-                ${store.certifications.map((item) => `<span class="pill">${item}</span>`).join("")}
-              </div>
-            </div>
-            <div class="showcase-contact-actions">
-              <button class="btn btn-primary" type="button" data-provider-switch="cases">去维护案例</button>
-              <button class="btn btn-secondary" type="button" data-provider-showcase-contact>联系平台</button>
             </div>
           </article>
         </section>

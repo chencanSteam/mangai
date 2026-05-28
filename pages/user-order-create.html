@@ -41,13 +41,67 @@
                       <strong id="orderQuantityText">1 件</strong>
                     </article>
                     <article>
+                      <span>商品金额</span>
+                      <strong id="orderGoodsPrice">¥0</strong>
+                    </article>
+                    <article>
+                      <span>改装服务费</span>
+                      <strong id="orderServiceFee">待门店确认</strong>
+                    </article>
+                    <article>
                       <span>合计金额</span>
                       <strong id="orderTotalPrice">¥0</strong>
                     </article>
                   </div>
+                  <div class="order-price-note" style="margin-top:10px; font-size:12px; color:var(--muted);">* 以上价格不含改装施工费用，施工费由门店根据实际情况报价。</div>
                 </section>
 
                 <form class="order-create-form" id="orderCreateForm">
+                  <div class="field-group field-group-full">
+                    <label class="field-label">配送方式</label>
+                    <div class="order-delivery-options">
+                      <label class="order-delivery-option active">
+                        <input type="radio" name="deliveryType" value="self" checked />
+                        <span class="order-delivery-title">平台自提</span>
+                        <span class="order-delivery-desc">快递发货，自行取货</span>
+                      </label>
+                      <label class="order-delivery-option">
+                        <input type="radio" name="deliveryType" value="provider" />
+                        <span class="order-delivery-title">指定服务商</span>
+                        <span class="order-delivery-desc">寄到门店，预约安装</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="field-group field-group-full" id="providerSelectGroup" style="display:none;">
+                    <label class="field-label" for="orderProvider">意向服务商</label>
+                    <select class="input" id="orderProvider" name="orderProvider">
+                      <option value="">选择服务商（可选）</option>
+                      <option value="御驰 Performance Studio">御驰 Performance Studio</option>
+                      <option value="擎速 Motorsport Lab">擎速 Motorsport Lab</option>
+                      <option value="凌速 High Spec Garage">凌速 High Spec Garage</option>
+                    </select>
+                  </div>
+                  <div class="field-group field-group-full">
+                    <label class="field-label">支付方式</label>
+                    <div class="order-pay-options">
+                      <label class="order-pay-option active">
+                        <input type="radio" name="paymentMethod" value="alipay" checked />
+                        <span class="order-pay-title">支付宝</span>
+                      </label>
+                      <label class="order-pay-option">
+                        <input type="radio" name="paymentMethod" value="wechat" />
+                        <span class="order-pay-title">微信支付</span>
+                      </label>
+                      <label class="order-pay-option">
+                        <input type="radio" name="paymentMethod" value="bank" />
+                        <span class="order-pay-title">银行卡</span>
+                      </label>
+                      <label class="order-pay-option">
+                        <input type="radio" name="paymentMethod" value="credit" />
+                        <span class="order-pay-title">金融授信</span>
+                      </label>
+                    </div>
+                  </div>
                   <div class="field-group">
                     <label class="field-label" for="orderVehicle">车辆信息</label>
                     <input class="input" id="orderVehicle" name="orderVehicle" type="text" value="宝马 G20 330i" required />
@@ -89,10 +143,10 @@
               </div>
             </section>
             <nav class="bottom-nav">
-              <button type="button" data-user-nav="home"><span>首页</span></button>
+              <button type="button" data-user-nav="forum"><span>社区</span></button>
               <button class="active" type="button" data-user-nav="mall"><span>商城</span></button>
               <button type="button" data-user-nav="garage"><span>爱车</span></button>
-              <button type="button" data-user-nav="forum"><span>论坛</span></button>
+              <button type="button" data-user-nav="messages"><span>消息</span></button>
               <button type="button" data-user-nav="me"><span>我的</span></button>
             </nav>
           </div>
@@ -119,6 +173,8 @@
       const orderPriceEl = document.getElementById("orderPrice");
       const orderQuantityTextEl = document.getElementById("orderQuantityText");
       const orderTotalPriceEl = document.getElementById("orderTotalPrice");
+      const orderGoodsPriceEl = document.getElementById("orderGoodsPrice");
+      const orderServiceFeeEl = document.getElementById("orderServiceFee");
       const orderRecipientInput = document.getElementById("orderRecipientInput");
       const orderQuantityInput = document.getElementById("orderQuantity");
       const orderAddressInput = document.getElementById("orderAddress");
@@ -136,8 +192,12 @@
       orderPriceEl.textContent = price;
       orderQuantityInput.value = String(initialQuantity);
 
-      orderBackLink.href = `user-app.html?tab=mall&mallPage=${encodeURIComponent(mallPage)}`;
-      orderContinueLink.href = `user-app.html?tab=mall&mallPage=${encodeURIComponent(mallPage)}`;
+      const returnTab = mallPage === "garage" ? "garage" : "mall";
+      orderBackLink.href = returnTab === "garage" ? "user-app.html?tab=garage" : `user-app.html?tab=mall&mallPage=${encodeURIComponent(mallPage)}`;
+      orderContinueLink.href = orderBackLink.href;
+      document.querySelectorAll("[data-user-nav]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.userNav === returnTab);
+      });
 
       document.querySelectorAll("[data-user-nav]").forEach((button) => {
         button.addEventListener("click", () => {
@@ -185,13 +245,33 @@
 
       function syncSummary() {
         const quantity = Math.max(1, Number(orderQuantityInput.value || 1));
+        const goodsTotal = priceToNumber(price) * quantity;
         orderQuantityTextEl.textContent = `${quantity} 件`;
-        orderTotalPriceEl.textContent = formatCurrency(priceToNumber(price) * quantity);
+        orderGoodsPriceEl.textContent = formatCurrency(goodsTotal);
+        orderTotalPriceEl.textContent = formatCurrency(goodsTotal);
       }
 
       orderQuantityInput.addEventListener("input", syncSummary);
       orderAddressInput.addEventListener("input", syncSummary);
       syncSummary();
+
+      // Delivery type toggle
+      document.querySelectorAll('input[name="deliveryType"]').forEach((radio) => {
+        radio.addEventListener("change", () => {
+          const providerGroup = document.getElementById("providerSelectGroup");
+          document.querySelectorAll(".order-delivery-option").forEach((label) => label.classList.remove("active"));
+          radio.closest(".order-delivery-option").classList.add("active");
+          providerGroup.style.display = radio.value === "provider" ? "block" : "none";
+        });
+      });
+
+      // Payment method toggle
+      document.querySelectorAll('input[name="paymentMethod"]').forEach((radio) => {
+        radio.addEventListener("change", () => {
+          document.querySelectorAll(".order-pay-option").forEach((label) => label.classList.remove("active"));
+          radio.closest(".order-pay-option").classList.add("active");
+        });
+      });
 
       orderCreateForm.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -202,30 +282,39 @@
         const address = String(formData.get("orderAddress") || "").trim();
         const note = String(formData.get("orderNote") || "").trim();
         const quantity = Math.max(1, Number(formData.get("orderQuantity") || 1));
+        const deliveryType = String(formData.get("deliveryType") || "self");
+        const provider = String(formData.get("orderProvider") || "").trim();
+        const paymentMethod = String(formData.get("paymentMethod") || "alipay");
         if (!vehicle || !recipient || !phone || !address || !note) return;
 
         const orderId = `UO-${Date.now().toString().slice(-6)}`;
-        const totalPrice = formatCurrency(priceToNumber(price) * quantity);
+        const goodsTotal = priceToNumber(price) * quantity;
+        const totalPrice = formatCurrency(goodsTotal);
+        const displayType = deliveryType === "provider" ? (provider ? `指定服务商：${provider}` : "待分配服务商") : "平台自提";
+        const payMethodText = ({ alipay: "\u652f\u4ed8\u5b9d", wechat: "\u5fae\u4fe1\u652f\u4ed8", bank: "\u94f6\u884c\u5361", credit: "\u91d1\u878d\u6388\u4fe1" })[paymentMethod] || "\u652f\u4ed8\u5b9d";
         const nextOrders = [
           {
             id: orderId,
             type: "商品订单",
-            displayType: "快递配送",
+            displayType,
             user: "当前用户",
             vehicle,
             service: `${name} x${quantity}`,
-            provider: "平台仓",
+            provider: deliveryType === "provider" ? (provider || "待分配") : "平台仓",
             city: "上海",
             quote: totalPrice,
+            goodsPrice: formatCurrency(goodsTotal),
+            serviceFee: "待门店确认",
             payment: "已支付",
-            paymentMethod: "支付宝",
+            paymentMethod: payMethodText,
             status: "待发货",
-            progress: `商品已付款，等待平台发货，快递将配送至 ${address}，备注：${note}`,
+            progress: `商品已付款，${deliveryType === "provider" ? "将配送至指定服务商门店" : "等待平台发货，快递将配送至"} ${address}，备注：${note}`,
             appointment: "等待发货",
-            intention: "无",
+            intention: provider || "无",
             address,
             recipient,
             phone,
+            deliveryType,
           },
           ...readOrders(),
         ].slice(0, 20);
@@ -238,7 +327,7 @@
 
         orderCreateForm.hidden = true;
         orderSuccess.hidden = false;
-        orderSuccessText.textContent = `${name} 已下单成功，订单编号 ${orderId}。`;
+        orderSuccessText.textContent = `${name} 已下单成功，订单编号 ${orderId}。${deliveryType === "provider" ? "商品将配送至您指定的服务商门店。" : ""}`;
         orderCenterLink.href = `user-app.html?tab=me&meTab=orders&orderId=${encodeURIComponent(orderId)}&feedback=${encodeURIComponent(`${name} 已下单成功。`)}`;
       });
     </script>
