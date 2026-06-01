@@ -40,6 +40,18 @@
     return (data.products || []).filter((item) => item.brand === account.brandName);
   }
 
+  function productSales(item) {
+    const brand = (data.brands || []).find((row) => row.name === item.brand);
+    return item.sales || item.sold || item.salesCount || brand?.sales || 0;
+  }
+
+  function orderReceiverInfo(order) {
+    const recipient = order.recipient || order.receiver || order.user;
+    const phone = order.recipientPhone || order.receiverPhone || order.phone || order.mobile;
+    const address = order.address || order.receiveAddress || order.shippingAddress || order.destination || order.city;
+    return [recipient, phone, address].filter(Boolean).join(" / ") || "-";
+  }
+
   function baseBrandOrders() {
     const productNames = brandProducts().map((item) => item.name);
     return (data.orders || []).filter((order) => productNames.some((name) => safe(order.service, "").includes(name)) || safe(order.service, "").includes(account.brandName));
@@ -71,7 +83,7 @@
 
   function renderOrderTable(rows, shipped) {
     if (!rows.length) return `<div class="brand-web-empty">暂无${shipped ? "已发货" : "待发货"}订单</div>`;
-    return `<div class="brand-web-table">${rows.map((order) => `<article class="brand-web-row"><div><strong>${escapeHtml(order.id)}</strong><span>${escapeHtml(order.service)}</span></div><div><span>用户</span><strong>${escapeHtml(order.user)}</strong></div><div><span>金额</span><strong>${escapeHtml(order.quote)}</strong></div><div><span>状态</span><strong>${escapeHtml(isShipped(order) ? "已发货" : safe(order.status, "待发货"))}</strong></div>${shipped ? `<div><span>物流</span><strong>${escapeHtml(order.shipment?.carrier || order.shippingCompany || "-")} ${escapeHtml(order.shipment?.trackingNo || order.shippingNo || "")}</strong></div>` : `<button class="btn btn-secondary" type="button" data-brand-tab="pending">去发货</button>`}</article>`).join("")}</div>`;
+    return `<div class="brand-web-table">${rows.map((order) => `<article class="brand-web-row"><div><strong>${escapeHtml(order.id)}</strong><span>${escapeHtml(order.service)}</span></div><div><span>用户</span><strong>${escapeHtml(order.user)}</strong></div><div><span>金额</span><strong>${escapeHtml(order.quote)}</strong></div><div><span>状态</span><strong>${escapeHtml(isShipped(order) ? "已发货" : safe(order.status, "待发货"))}</strong></div><div class="brand-web-destination"><span>收件信息</span><strong>${escapeHtml(orderReceiverInfo(order))}</strong></div>${shipped ? `<div><span>物流</span><strong>${escapeHtml(order.shipment?.carrier || order.shippingCompany || "-")} ${escapeHtml(order.shipment?.trackingNo || order.shippingNo || "")}</strong></div>` : `<button class="btn btn-secondary" type="button" data-brand-tab="pending">去发货</button>`}</article>`).join("")}</div>`;
   }
 
   function renderPending() {
@@ -89,7 +101,7 @@
 
   function renderProducts() {
     const rows = brandProducts();
-    return `<div class="brand-web-stack"><section class="brand-web-panel"><div class="brand-web-section-head"><div><span class="eyebrow">Products</span><h2>商品概览</h2></div><span class="pill">仅展示</span></div><div class="brand-web-products">${rows.map((item) => `<article><span>${escapeHtml(item.category)}</span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.fitment)} / 库存 ${escapeHtml(item.stock)}</small><b>${escapeHtml(item.price)}</b></article>`).join("")}</div></section></div>`;
+    return `<div class="brand-web-stack"><section class="brand-web-panel"><div class="brand-web-section-head"><div><span class="eyebrow">Products</span><h2>商品概览</h2></div><span class="pill">仅展示</span></div><div class="brand-web-products">${rows.map((item) => `<article><span>${escapeHtml(item.category)}</span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.fitment)} / 库存 ${escapeHtml(item.stock)} / 销量 ${escapeHtml(productSales(item))}</small></article>`).join("")}</div></section></div>`;
   }
 
   function renderAccount() {

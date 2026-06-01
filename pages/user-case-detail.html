@@ -5,78 +5,155 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>改装案例详情 - 满改平台</title>
     <link rel="stylesheet" href="../assets/css/styles.css" />
+    <style>
+      .cd-page { padding: 0 16px 140px; }
+      .cd-header { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+      .cd-header button { width: 32px; height: 32px; border-radius: 50%; background: rgba(0,0,0,0.4); border: none; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+      .cd-author-row { display: flex; align-items: center; gap: 10px; margin: 8px 0 16px; }
+      .cd-author-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, rgba(255,106,0,0.3), rgba(255,140,50,0.15)); display: flex; align-items: center; justify-content: center; font-size: 14px; color: #fff; }
+      .cd-author-body { flex: 1; }
+      .cd-author-body strong { display: block; font-size: 14px; }
+      .cd-author-body span { font-size: 12px; color: var(--text-muted); }
+      .cd-title { font-size: 20px; font-weight: 600; line-height: 1.45; margin: 0 0 12px; }
+      .cd-tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+      .cd-tag { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); font-size: 12px; }
+      .cd-content { font-size: 15px; line-height: 1.85; color: rgba(255,255,255,0.88); }
+      .cd-content p { margin: 0 0 14px; }
+      .cd-content h3 { font-size: 16px; font-weight: 600; margin: 20px 0 10px; color: #fff; }
+      .cd-content ul { margin: 0 0 14px; padding-left: 20px; }
+      .cd-content li { margin-bottom: 6px; }
+      .cd-content blockquote { margin: 14px 0; padding: 10px 14px; border-left: 3px solid rgba(255,106,0,0.5); background: rgba(255,106,0,0.06); border-radius: 0 8px 8px 0; color: rgba(255,255,255,0.8); }
+      .cd-media { margin: 14px 0; border-radius: 14px; overflow: hidden; background: linear-gradient(135deg, #1a2028, #2a3440); display: flex; align-items: center; justify-content: center; min-height: 180px; }
+      .cd-media-caption { padding: 8px 12px; font-size: 12px; color: var(--text-muted); text-align: center; }
+      .cd-product-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+      .cd-product-card { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); text-decoration: none; color: inherit; }
+      .cd-product-card:hover { background: rgba(255,255,255,0.07); }
+      .cd-product-visual { width: 48px; height: 48px; border-radius: 10px; background: linear-gradient(135deg, rgba(255,106,0,0.2), rgba(255,140,50,0.1)); display: flex; align-items: center; justify-content: center; font-size: 12px; color: rgba(255,255,255,0.6); flex-shrink: 0; }
+      .cd-product-body { flex: 1; min-width: 0; }
+      .cd-product-body strong { display: block; font-size: 14px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .cd-product-body span { display: block; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .cd-product-price { font-size: 14px; font-weight: 600; color: #ff6a00; flex-shrink: 0; }
+      .cd-product-arrow { color: var(--text-muted); font-size: 14px; margin-left: 4px; }
+      .cd-action-bar { display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
+      .cd-action-bar button { flex: 1; padding: 10px 0; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #fff; font-size: 13px; cursor: pointer; }
+      .cd-action-bar button.primary { background: rgba(255,106,0,0.15); border-color: rgba(255,106,0,0.3); color: #ff7a1a; }
+      .cd-empty { text-align: center; padding: 40px 0; color: var(--text-muted); font-size: 14px; }
+    </style>
   </head>
-  <body>
+  <body data-page="user-case-detail">
     <main class="page-shell phone-stage">
       <div class="phone-wrap">
         <div class="phone-frame">
-          <div class="phone-screen">
+          <div class="phone-screen" data-mobile-shell="user">
             <div class="android-status"><span>9:41</span><span>5G 92%</span></div>
-            <header class="android-topbar">
-              <span class="eyebrow">Case Detail</span>
-              <h2>改装案例详情</h2>
-              <div class="muted">精选改装方案与施工亮点展示</div>
-            </header>
             <section class="screen-content">
-              <div class="stack">
-                <section class="hero-banner">
-                  <div class="eyebrow">PREMIUM MOD</div>
-                  <h3 style="margin:10px 0 8px; font-size:28px; font-family:var(--font-display);">保时捷 911 GT3 RS 碳纤维宽体方案</h3>
-                  <p class="muted">围绕赛道姿态、空气动力学与轻量化升级打造的完整案例。</p>
-                </section>
-                <section class="admin-detail-card">
-                  <div class="eyebrow">Case Summary</div>
-                  <h3>案例信息</h3>
-                  <div class="admin-kv-list">
-                    <div><span>车型</span><strong>保时捷 911 GT3 RS</strong></div>
-                    <div><span>风格</span><strong>赛道宽体风</strong></div>
-                    <div><span>改装类型</span><strong>轮毂改造</strong></div>
-                    <div><span>预算区间</span><strong>¥168,000</strong></div>
-                    <div><span>服务商</span><strong>MAN GAI Performance Lab</strong></div>
-                  </div>
-                </section>
-                <section class="mobile-list">
-                  <article class="mobile-item">
-                    <strong>图片展示</strong>
-                    <div style="margin-top:12px; height:180px; border-radius:18px; display:grid; place-items:center; color:#9ca5b2; border:1px dashed rgba(255,255,255,0.16); background:rgba(255,255,255,0.03);">案例图片占位</div>
-                    <div class="muted" style="margin-top:8px;">这里预留主图、施工过程图和完工效果图展示区域。</div>
-                  </article>
-                  <article class="mobile-item">
-                    <strong>视频展示</strong>
-                    <div style="margin-top:12px; height:180px; border-radius:18px; display:grid; place-items:center; color:#9ca5b2; border:1px dashed rgba(255,255,255,0.16); background:rgba(255,255,255,0.03);">案例视频占位</div>
-                    <div class="muted" style="margin-top:8px;">这里预留施工记录视频、完工动态展示和路试短片区域。</div>
-                  </article>
-                </section>
-                <section class="mobile-list">
-                  <article class="mobile-item">
-                    <strong>方案亮点</strong>
-                    <div class="muted" style="margin-top:8px;">碳纤维前唇、侧裙、后扩散器与尾翼联动升级，兼顾高速稳定性与视觉攻击感。</div>
-                  </article>
-                  <article class="mobile-item">
-                    <strong>施工内容</strong>
-                    <div class="muted" style="margin-top:8px;">宽体包围安装、轮毂与制动避让校核、车身姿态调校、尾段排气优化。</div>
-                  </article>
-                  <article class="mobile-item">
-                    <strong>完工效果</strong>
-                    <div class="muted" style="margin-top:8px;">整体姿态更贴近赛道使用场景，同时保留街道可用性和整车协调感。</div>
-                  </article>
-                </section>
-                <div class="admin-action-row">
-                  <a class="btn btn-secondary" href="user-app.html">返回首页</a>
-                  <a class="btn btn-primary" href="user-app.html">立即咨询</a>
+              <div class="cd-page" id="cdPage">
+                <div class="cd-header">
+                  <button type="button" id="cdBackBtn">‹</button>
                 </div>
+
+                <div id="cdContentArea"></div>
               </div>
             </section>
             <nav class="bottom-nav">
-              <button type="button" onclick="location.href='user-app.html?tab=forum'"><span>社区</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=mall'"><span>商城</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=garage'"><span>爱车</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=messages'"><span>消息</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=me'"><span>我的</span></button>
+              <button type="button" data-user-nav="forum"><span>社区</span></button>
+              <button type="button" data-user-nav="mall"><span>商城</span></button>
+              <button type="button" data-user-nav="garage"><span>爱车</span></button>
+              <button type="button" data-user-nav="messages"><span>消息</span></button>
+              <button type="button" data-user-nav="me"><span>我的</span></button>
             </nav>
           </div>
         </div>
       </div>
     </main>
+    <script src="../assets/js/mock-data.js"></script>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const caseId = params.get("id") || "";
+      const allCases = window.MockData?.cases || [];
+      const allProducts = window.MockData?.products || [];
+      const caseItem = allCases.find((c) => c.id === caseId);
+
+      if (!caseItem) {
+        document.getElementById("cdPage").innerHTML = '<div class="cd-empty">案例不存在或已被移除</div>';
+      } else {
+        const c = caseItem;
+        const linkedSkus = Array.isArray(c.linkedProducts) ? c.linkedProducts : [];
+        const linkedProducts = linkedSkus.map((sku) => allProducts.find((p) => p.sku === sku)).filter(Boolean);
+
+        // 把案例内容组装成帖子风格的富文本 HTML
+        let contentHtml = "";
+
+        // 开篇描述
+        if (c.description) {
+          contentHtml += `<p>${c.description}</p>`;
+        }
+
+        // 方案亮点
+        if (Array.isArray(c.highlights) && c.highlights.length > 0) {
+          contentHtml += `<h3>方案亮点</h3><ul>${c.highlights.map((h) => `<li>${h}</li>`).join("")}</ul>`;
+        }
+
+        // 图片
+        if (Array.isArray(c.images) && c.images.length > 0) {
+          c.images.forEach((img) => {
+            contentHtml += `<div class="cd-media"></div><div class="cd-media-caption">${img.caption || ""}</div>`;
+          });
+        }
+
+        // 视频
+        if (c.video) {
+          contentHtml += `<div class="cd-media" style="min-height:200px;"></div><div class="cd-media-caption">${c.video.caption || "视频记录"} ${c.video.duration ? `· ${c.video.duration}` : ""}</div>`;
+        }
+
+        // 施工内容
+        if (Array.isArray(c.construction) && c.construction.length > 0) {
+          contentHtml += `<h3>施工过程</h3><ul>${c.construction.map((step) => `<li>${step}</li>`).join("")}</ul>`;
+        }
+
+        // 完工效果
+        if (c.result) {
+          contentHtml += `<h3>完工效果</h3><blockquote>${c.result}</blockquote>`;
+        }
+
+        // 关联商品
+        const productsHtml = linkedProducts.length > 0
+          ? `<div class="cd-product-list">${linkedProducts.map((p) => `<a class="cd-product-card" href="user-product-detail.html?sku=${encodeURIComponent(p.sku)}&name=${encodeURIComponent(p.name)}&price=${encodeURIComponent(p.price)}&brand=${encodeURIComponent(p.brand)}&fitment=${encodeURIComponent(p.fitment || "")}&mallPage=${encodeURIComponent(p.category || "all")}"><div class="cd-product-visual">${p.category || "商品"}</div><div class="cd-product-body"><strong>${p.name}</strong><span>${p.brand} · ${p.fitment || "适配多车型"}</span></div><div class="cd-product-price">${p.price}</div><div class="cd-product-arrow">›</div></a>`).join("")}</div>`
+          : "";
+
+        const tags = [c.modType, c.model, c.style].filter(Boolean).map((t) => `<span class="cd-tag">${t}</span>`).join("");
+
+        document.getElementById("cdContentArea").innerHTML = `
+          <div class="cd-author-row">
+            <div class="cd-author-avatar">🏪</div>
+            <div class="cd-author-body">
+              <strong>${c.provider || "服务商"}</strong>
+              <span>${c.model || ""} · ${c.cost || ""}</span>
+            </div>
+          </div>
+          <h1 class="cd-title">${c.title || "案例标题"}</h1>
+          <div class="cd-tag-row">${tags}</div>
+          <div class="cd-content">${contentHtml}</div>
+          ${productsHtml}
+          <div class="cd-action-bar">
+            <button type="button">👍 点赞</button>
+            <button type="button">💬 评论</button>
+            <button type="button" class="primary">⭐ 收藏</button>
+          </div>
+        `;
+      }
+
+      document.getElementById("cdBackBtn").addEventListener("click", () => {
+        history.length > 1 ? history.back() : (location.href = "user-app.html?tab=forum&forumCategory=case");
+      });
+
+      document.querySelectorAll("[data-user-nav]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const target = button.dataset.userNav || "home";
+          const suffix = target === "mall" ? "?tab=mall" : `?tab=${encodeURIComponent(target)}`;
+          window.location.href = `user-app.html${suffix}`;
+        });
+      });
+    </script>
   </body>
 </html>

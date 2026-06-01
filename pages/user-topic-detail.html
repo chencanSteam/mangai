@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>帖子详情 - 满改平台</title>
-    <link rel="stylesheet" href="../assets/css/styles.css" />
+    <link rel="stylesheet" href="../assets/css/styles.css?v=topic-engage-ui-20260528" />
   </head>
   <body>
     <main class="page-shell phone-stage">
@@ -28,6 +28,18 @@
                       <div><span>发布时间</span><strong>2026-04-07 21:30</strong></div>
                       <div><span>分类</span><strong>热门话题 / 社区热帖</strong></div>
                       <div><span>浏览量</span><strong>8.6w</strong></div>
+                    </div>
+                    <div class="topic-engage-bar">
+                      <button class="topic-engage-btn" type="button" id="topicLikeBtn" aria-pressed="false">
+                        <i>赞</i>
+                        <span id="topicLikeLabel">点赞</span>
+                        <strong>总点赞 <b id="topicLikeCount">98</b></strong>
+                      </button>
+                      <button class="topic-engage-btn" type="button" id="topicCollectBtn" aria-pressed="false">
+                        <i>藏</i>
+                        <span id="topicCollectLabel">收藏</span>
+                        <strong>总收藏 <b id="topicCollectCount">26</b></strong>
+                      </button>
                     </div>
                   </div>
                   <div class="topic-hero-visual" data-tone="night"></div>
@@ -57,15 +69,11 @@
                   <div class="topic-article-body">
                     <p>昨晚这场巡游真的太顶了，我们从延安中路一路开到外滩，路上刚好下过一点小雨，地面反光特别漂亮，几台宽体车在路灯下面一字排开的时候，现场那种氛围比照片里还要夸张。最吸睛的还是前面那台黑色 G 系，轮毂、车身高度和前后包围的比例拿捏得特别准，静态看有姿态，开起来又不会显得太夸张。</p>
                     <p>我现场认真看了几台车的细节，大家这次改得都很克制，没有那种堆很多件但不协调的感觉。轮毂尺寸基本都在 19 寸左右，胎壁也没有故意做得特别薄，所以整车姿态会更耐看。排气声浪那台白色车也很有记忆点，低转安静，高转一拉上去就很有层次。要是后面有人想看具体清单，我可以再单独整理一版，把轮毂数据、避震方案和包围件品牌一起发出来。</p>
-                    <div class="topic-highlight-row">
-                      <div class="topic-highlight-card">
-                        <span>热议点</span>
-                        <strong>轮毂尺寸与避震高度的协调</strong>
-                      </div>
-                      <div class="topic-highlight-card">
-                        <span>关注点</span>
-                        <strong>街拍质感和实用通勤之间的平衡</strong>
-                      </div>
+                    <div class="topic-tag-row">
+                      <span class="topic-tag">#轮毂尺寸</span>
+                      <span class="topic-tag">#避震高度</span>
+                      <span class="topic-tag">#街拍质感</span>
+                      <span class="topic-tag">#实用通勤</span>
                     </div>
                   </div>
                 </section>
@@ -168,8 +176,107 @@
         const cancelBtn = document.getElementById("topicReplyCancel");
         const submitBtn = document.getElementById("topicReplySubmit");
         const feedback = document.getElementById("topicReplyFeedback");
+        const likeBtn = document.getElementById("topicLikeBtn");
+        const collectBtn = document.getElementById("topicCollectBtn");
+        const likeLabelEl = document.getElementById("topicLikeLabel");
+        const collectLabelEl = document.getElementById("topicCollectLabel");
+        const likeCountEl = document.getElementById("topicLikeCount");
+        const collectCountEl = document.getElementById("topicCollectCount");
+        const topicKey = new URLSearchParams(window.location.search).get("topic") || "night-cruise-review";
+        const engageKey = `mockTopicEngage:${topicKey}`;
+        const replyKey = `mockTopicReplies:${topicKey}`;
+        const commentList = document.querySelector(".topic-comment-list");
+        const commentCount = document.querySelector(".topic-comment-count");
+
+        function readEngageState() {
+          try {
+            return JSON.parse(localStorage.getItem(engageKey) || "{}") || {};
+          } catch (error) {
+            return {};
+          }
+        }
+
+        function writeEngageState(state) {
+          localStorage.setItem(engageKey, JSON.stringify(state));
+        }
+
+        function readReplyRows() {
+          try {
+            const rows = JSON.parse(localStorage.getItem(replyKey) || "[]");
+            return Array.isArray(rows) ? rows : [];
+          } catch (error) {
+            return [];
+          }
+        }
+
+        function writeReplyRows(rows) {
+          localStorage.setItem(replyKey, JSON.stringify(rows));
+        }
+
+        function renderReplyRows() {
+          if (!commentList) return;
+          commentList.querySelectorAll("[data-own-reply]").forEach((node) => node.remove());
+          const rows = readReplyRows().filter((item) => item.status !== "deleted");
+          rows.forEach((item) => {
+            const article = document.createElement("article");
+            article.className = "topic-comment-item";
+            article.dataset.ownReply = "1";
+            article.innerHTML = `<div class="topic-comment-avatar">我</div><div class="topic-comment-body"><div class="topic-comment-head"><strong>我</strong><span>${item.time || "刚刚"}</span><button class="topic-comment-delete" type="button" data-delete-reply="${item.id}">删除</button></div><p></p></div>`;
+            article.querySelector("p").textContent = item.content || "";
+            commentList.prepend(article);
+          });
+          if (commentCount) commentCount.textContent = `${24 + rows.length} 条讨论`;
+        }
+
+        function syncEngageState() {
+          if (!likeBtn || !collectBtn || !likeLabelEl || !collectLabelEl || !likeCountEl || !collectCountEl) return;
+          const state = readEngageState();
+          const liked = !!state.liked;
+          const collected = !!state.collected;
+          likeBtn.classList.toggle("active", liked);
+          collectBtn.classList.toggle("active", collected);
+          likeBtn.setAttribute("aria-pressed", liked ? "true" : "false");
+          collectBtn.setAttribute("aria-pressed", collected ? "true" : "false");
+          likeLabelEl.textContent = liked ? "已点赞" : "点赞";
+          collectLabelEl.textContent = collected ? "已收藏" : "收藏";
+          likeCountEl.textContent = String(98 + (liked ? 1 : 0));
+          collectCountEl.textContent = String(26 + (collected ? 1 : 0));
+        }
+
+        if (likeBtn) {
+          likeBtn.addEventListener("click", function () {
+            const state = readEngageState();
+            state.liked = !state.liked;
+            writeEngageState(state);
+            syncEngageState();
+          });
+        }
+
+        if (collectBtn) {
+          collectBtn.addEventListener("click", function () {
+            const state = readEngageState();
+            state.collected = !state.collected;
+            writeEngageState(state);
+            syncEngageState();
+          });
+        }
 
         if (!input || !cancelBtn || !submitBtn || !feedback) return;
+
+        syncEngageState();
+        renderReplyRows();
+
+        if (commentList) {
+          commentList.addEventListener("click", function (event) {
+            const button = event.target.closest("[data-delete-reply]");
+            if (!button) return;
+            const id = button.dataset.deleteReply;
+            writeReplyRows(readReplyRows().map((item) => item.id === id ? { ...item, status: "deleted" } : item));
+            feedback.textContent = "评论已删除。";
+            feedback.hidden = false;
+            renderReplyRows();
+          });
+        }
 
         cancelBtn.addEventListener("click", function () {
           input.value = "";
@@ -185,6 +292,11 @@
           }
           feedback.textContent = "回复已发布，已同步到帖子互动区。";
           feedback.hidden = false;
+          writeReplyRows([
+            { id: `R-${Date.now()}`, content: value, time: "刚刚", owner: "current", status: "normal" },
+            ...readReplyRows(),
+          ]);
+          renderReplyRows();
           input.value = "";
         });
       })();

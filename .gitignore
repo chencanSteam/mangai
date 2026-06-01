@@ -1,2 +1,6 @@
 .tmp-*.log
 /scripts/.state/
+node_modules/
+docx_extract/
+outputs/
+*~

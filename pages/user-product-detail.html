@@ -5,6 +5,88 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>商品详情 - 满改平台</title>
     <link rel="stylesheet" href="../assets/css/styles.css" />
+    <style>
+      .pd-page { padding-bottom: 80px; }
+      .pd-header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: linear-gradient(180deg, rgba(14,18,24,0.9) 0%, transparent 100%); }
+      .pd-header button { width: 32px; height: 32px; border-radius: 50%; background: rgba(0,0,0,0.4); border: none; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+      .pd-media { position: relative; aspect-ratio: 1 / 1; background: linear-gradient(135deg, #1a2028, #2a3440); display: flex; align-items: center; justify-content: center; margin: -46px 0 0; }
+      .pd-media-dots { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+      .pd-media-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); }
+      .pd-media-dots i.active { background: #ff6a00; }
+      .pd-body { padding: 0 16px; }
+      .pd-price-row { display: flex; align-items: baseline; gap: 10px; margin: 14px 0 10px; }
+      .pd-price-main { font-size: 32px; font-weight: 700; color: #ff6a00; font-family: var(--font-display); }
+      .pd-price-main small { font-size: 14px; font-weight: 400; }
+      .pd-price-origin { font-size: 13px; color: var(--text-muted); text-decoration: line-through; }
+      .pd-title-row { margin-bottom: 12px; }
+      .pd-title-row h1 { font-size: 18px; font-weight: 600; line-height: 1.5; margin: 0 0 8px; }
+      .pd-fitment-tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; background: rgba(74,168,255,0.1); border: 1px solid rgba(74,168,255,0.25); color: #4aa8ff; font-size: 12px; }
+      .pd-params-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 14px; scrollbar-width: none; }
+      .pd-params-scroll::-webkit-scrollbar { display: none; }
+      .pd-param-item { flex: 0 0 auto; min-width: 72px; text-align: center; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); }
+      .pd-param-item span { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+      .pd-param-item strong { display: block; font-size: 14px; color: #fff; }
+      .pd-store-card { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 14px; }
+      .pd-store-icon { width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, rgba(255,106,0,0.2), rgba(255,140,50,0.1)); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+      .pd-store-body { flex: 1; min-width: 0; }
+      .pd-store-body strong { display: block; font-size: 14px; margin-bottom: 4px; }
+      .pd-store-body span { display: block; font-size: 12px; color: var(--text-muted); }
+      .pd-store-arrow { color: var(--text-muted); font-size: 14px; }
+      .pd-section { margin-bottom: 14px; }
+      .pd-section-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; }
+      .pd-section-head h3 { font-size: 16px; margin: 0; }
+      .pd-section-body { padding: 0 0 4px; }
+      .pd-kv-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+      .pd-kv-row:last-child { border-bottom: none; }
+      .pd-kv-row span { color: var(--text-muted); font-size: 13px; }
+      .pd-kv-row strong { color: #fff; font-size: 13px; font-weight: 400; text-align: right; max-width: 60%; }
+      .pd-effect-card { display: block; padding: 14px; border-radius: 14px; background: rgba(255,106,0,0.06); border: 1px solid rgba(255,106,0,0.12); text-decoration: none; cursor: pointer; margin-bottom: 10px; }
+      .pd-effect-card:hover { background: rgba(255,106,0,0.1); border-color: rgba(255,106,0,0.2); }
+      .pd-effect-card p { margin: 0; font-size: 14px; line-height: 1.7; color: rgba(255,255,255,0.85); }
+      .pd-case-list { display: flex; flex-direction: column; gap: 10px; }
+      .pd-case-card { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); text-decoration: none; color: inherit; }
+      .pd-case-card:hover { background: rgba(255,255,255,0.07); }
+      .pd-case-visual { width: 48px; height: 48px; border-radius: 10px; background: linear-gradient(135deg, rgba(255,106,0,0.2), rgba(255,140,50,0.1)); display: flex; align-items: center; justify-content: center; font-size: 12px; color: rgba(255,255,255,0.6); flex-shrink: 0; }
+      .pd-case-body { flex: 1; min-width: 0; }
+      .pd-case-body strong { display: block; font-size: 14px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .pd-case-body span { display: block; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .pd-case-arrow { color: var(--text-muted); font-size: 14px; margin-left: 4px; }
+      .pd-page { padding-bottom: 220px; }
+      .pd-bottom-bar { position: absolute; bottom: 72px; left: 0; right: 0; z-index: 30; display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: rgba(14,18,24,0.95); border-top: 1px solid rgba(255,255,255,0.06); backdrop-filter: blur(12px); }
+      .pd-bottom-bar .btn { flex: 1; padding: 12px 0; font-size: 14px; }
+      .pd-bottom-bar .btn-icon { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+      .pd-feedback { position: absolute; bottom: 118px; left: 16px; right: 16px; z-index: 40; padding: 12px 16px; border-radius: 12px; background: rgba(20,24,31,0.95); border: 1px solid rgba(255,255,255,0.08); font-size: 13px; text-align: center; }
+      /* 商品评价 */
+      .pd-review-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 12px; }
+      .pd-review-score { display: flex; align-items: baseline; gap: 6px; }
+      .pd-review-score strong { font-size: 36px; font-family: var(--font-display); color: #ff6a00; line-height: 1; }
+      .pd-review-score span { font-size: 13px; color: var(--text-muted); }
+      .pd-review-stars { color: #ff6a00; font-size: 14px; letter-spacing: 2px; }
+      .pd-review-count { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+      .pd-review-rate { text-align: right; }
+      .pd-review-rate div { font-size: 18px; font-weight: 700; color: #ff6a00; line-height: 1; }
+      .pd-review-rate span { font-size: 12px; color: var(--text-muted); }
+      .pd-review-tags { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px; scrollbar-width: none; }
+      .pd-review-tags::-webkit-scrollbar { display: none; }
+      .pd-review-tag { flex: 0 0 auto; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); color: var(--text-muted); font-size: 12px; cursor: pointer; transition: 0.2s ease; }
+      .pd-review-tag.active { background: rgba(255,106,0,0.15); border-color: rgba(255,106,0,0.3); color: #ff6a00; }
+      .pd-review-tag:hover { border-color: rgba(255,106,0,0.2); }
+      .pd-review-list { display: flex; flex-direction: column; gap: 12px; }
+      .pd-review-item { padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+      .pd-review-user { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+      .pd-review-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, rgba(255,106,0,0.25), rgba(255,140,50,0.15)); display: flex; align-items: center; justify-content: center; font-size: 12px; color: rgba(255,255,255,0.8); flex-shrink: 0; }
+      .pd-review-meta { flex: 1; min-width: 0; }
+      .pd-review-meta strong { display: block; font-size: 13px; font-weight: 600; }
+      .pd-review-meta span { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+      .pd-review-stars-row { color: #ff6a00; font-size: 12px; letter-spacing: 1px; margin-bottom: 8px; }
+      .pd-review-content { font-size: 13px; line-height: 1.7; color: rgba(255,255,255,0.85); margin-bottom: 8px; }
+      .pd-review-item-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+      .pd-review-item-tag { padding: 3px 8px; border-radius: 6px; background: rgba(255,106,0,0.08); border: 1px solid rgba(255,106,0,0.12); color: rgba(255,106,0,0.9); font-size: 11px; }
+      .pd-review-foot { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-muted); }
+      .pd-review-like { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; transition: color 0.2s; }
+      .pd-review-like:hover { color: #ff6a00; }
+      .pd-review-empty { text-align: center; padding: 24px 0; color: var(--text-muted); font-size: 13px; }
+    </style>
   </head>
   <body data-page="user-product-detail">
     <main class="page-shell phone-stage">
@@ -12,66 +94,78 @@
         <div class="phone-frame">
           <div class="phone-screen" data-mobile-shell="user">
             <div class="android-status"><span>9:41</span><span>5G 92%</span></div>
-            <header class="android-topbar product-detail-topbar">
-              <h2>商品详情</h2>
-            </header>
-            <section class="screen-content">
-              <div class="stack product-detail-page">
-                <section class="product-detail-hero">
-                  <div class="product-detail-visual">
-                    <span class="product-detail-sku" id="productSku">SKU</span>
+            <section class="screen-content" style="padding:0;">
+              <div class="pd-page">
+                <!-- 大图区 -->
+                <div class="pd-media" id="pdMedia">
+                  <div class="pd-media-dots"><i class="active"></i><i></i><i></i></div>
+                </div>
+
+                <!-- 返回按钮 -->
+                <div class="pd-header">
+                  <button type="button" id="pdBackBtn">‹</button>
+                </div>
+
+                <div class="pd-body">
+                  <!-- 价格区 -->
+                  <div class="pd-price-row">
+                    <div class="pd-price-main" id="pdPrice">¥0</div>
+                    <div class="pd-price-origin" id="pdPriceOrigin" style="display:none;"></div>
                   </div>
-                  <div class="product-detail-head">
-                    <h3 id="productName">改装商品</h3>
-                    <p id="productFitment">适配车型信息</p>
-                    <div class="product-detail-price-line">
-                      <strong id="productPrice">¥0</strong>
-                      <span id="productBrand">-</span>
+
+                  <!-- 标题 + 适配 -->
+                  <div class="pd-title-row">
+                    <h1 id="pdName">改装商品</h1>
+                    <span class="pd-fitment-tag" id="pdFitment">适配车型信息</span>
+                  </div>
+
+                  <!-- 核心参数 -->
+                  <div class="pd-params-scroll" id="pdParams">
+                    <div class="pd-param-item"><span>品牌</span><strong id="pdParamBrand">-</strong></div>
+                    <div class="pd-param-item"><span>库存</span><strong id="pdParamStock">-</strong></div>
+                    <div class="pd-param-item"><span>状态</span><strong id="pdParamStatus">-</strong></div>
+                  </div>
+
+                  <!-- 规格参数 -->
+                  <div class="pd-section">
+                    <div class="pd-section-head"><h3>规格参数</h3></div>
+                    <div class="pd-section-body">
+                      <div class="pd-kv-row"><span>规格参数</span><strong id="pdSpec">-</strong></div>
+                      <div class="pd-kv-row"><span>适配车型</span><strong id="pdModel">-</strong></div>
                     </div>
                   </div>
-                </section>
 
-                <section class="product-detail-summary">
-                  <div class="product-detail-section-head">
-                    <h3>商品信息</h3>
-                  </div>
-                  <div class="product-detail-kv-grid">
-                    <article>
-                      <span>品牌</span>
-                      <strong id="productBrandSecondary">-</strong>
-                    </article>
-                    <article>
-                      <span>价格</span>
-                      <strong id="productPriceSecondary">¥0</strong>
-                    </article>
-                    <article>
-                      <span>适配车型</span>
-                      <strong id="productModel">-</strong>
-                    </article>
-                    <article>
-                      <span>状态</span>
-                      <strong>在售</strong>
-                    </article>
-                  </div>
-                </section>
 
-                <section class="product-detail-gallery">
-                  <div class="product-detail-section-head">
-                    <h3>商品图片</h3>
-                  </div>
-                  <div class="product-detail-gallery-frame">
-                    <div class="product-detail-gallery-visual"></div>
-                  </div>
-                </section>
 
-                <div class="product-detail-action-bar">
-                  <a class="btn btn-secondary" id="productBackLink" href="user-app.html">返回商城</a>
-                  <button class="btn btn-secondary" id="productCartButton" type="button">加入购物车</button>
-                  <a class="btn btn-primary product-detail-action-main" id="productOrderLink" href="user-app.html">立即下单</a>
+                  <!-- 案例效果 / 相关案例 -->
+                  <div class="pd-section" id="pdCaseSection">
+                    <div class="pd-section-head"><h3>相关案例</h3></div>
+                    <div class="pd-section-body" id="pdCaseBody">
+                      <div class="pd-case-list" id="pdCaseList"></div>
+                    </div>
+                  </div>
+
+                  <!-- 商品评价 -->
+                  <div class="pd-section" id="pdReviewSection">
+                    <div class="pd-section-head"><h3>商品评价</h3></div>
+                    <div class="pd-section-body" id="pdReviewBody">
+                      <div class="pd-review-summary" id="pdReviewSummary"></div>
+                      <div class="pd-review-tags" id="pdReviewTags"></div>
+                      <div class="pd-review-list" id="pdReviewList"></div>
+                    </div>
+                  </div>
                 </div>
-                <div class="product-detail-feedback" id="productCartFeedback" hidden></div>
+
               </div>
             </section>
+            <!-- 底部操作栏 -->
+            <div class="pd-bottom-bar">
+              <button class="btn-icon" type="button" id="pdBackBtn2" title="返回">‹</button>
+              <button class="btn-icon" type="button" id="pdCollectBtn" title="收藏">☆</button>
+              <button class="btn btn-secondary" type="button" id="pdCartBtn">加入购物车</button>
+              <a class="btn btn-primary" id="pdOrderBtn" href="user-app.html">立即下单</a>
+            </div>
+            <div class="pd-feedback" id="pdFeedback" hidden></div>
             <nav class="bottom-nav">
               <button type="button" data-user-nav="forum"><span>社区</span></button>
               <button class="active" type="button" data-user-nav="mall"><span>商城</span></button>
@@ -83,8 +177,10 @@
         </div>
       </div>
     </main>
+    <script src="../assets/js/mock-data.js"></script>
     <script>
       const CART_STORAGE_KEY = "mockUserCart";
+      const COLLECTIONS_STORAGE_KEY = "mockUserCollections";
       const params = new URLSearchParams(location.search);
       const sku = params.get("sku") || "SKU";
       const name = params.get("name") || "改装商品";
@@ -92,19 +188,51 @@
       const brand = params.get("brand") || "-";
       const fitment = params.get("fitment") || "适配车型信息";
       const mallPage = params.get("mallPage") || "exterior";
-      const productBackLink = document.getElementById("productBackLink");
 
-      document.getElementById("productSku").textContent = sku;
-      document.getElementById("productName").textContent = name;
-      document.getElementById("productFitment").textContent = fitment;
-      document.getElementById("productBrand").textContent = brand;
-      document.getElementById("productBrandSecondary").textContent = brand;
-      document.getElementById("productPrice").textContent = price;
-      document.getElementById("productPriceSecondary").textContent = price;
-      document.getElementById("productModel").textContent = fitment;
-      productBackLink.href = `user-app.html?tab=mall&mallPage=${encodeURIComponent(mallPage)}`;
-      document.getElementById("productOrderLink").href = `user-order-create.html?sku=${encodeURIComponent(sku)}&name=${encodeURIComponent(name)}&price=${encodeURIComponent(price)}&brand=${encodeURIComponent(brand)}&fitment=${encodeURIComponent(fitment)}&mallPage=${encodeURIComponent(mallPage)}&quantity=1`;
+      const allProducts = window.MockData?.products || [];
+      const matched = allProducts.find((p) => p.sku === sku);
+      const product = matched || {};
+      const p = product;
 
+      // 填充数据
+      document.getElementById("pdName").textContent = p.name || name;
+      document.getElementById("pdFitment").textContent = p.fitment || fitment;
+      document.getElementById("pdPrice").textContent = p.price || price;
+      document.getElementById("pdParamBrand").textContent = p.brand || brand;
+      document.getElementById("pdParamStock").textContent = p.stock !== undefined ? `${p.stock} 件` : "有货";
+      document.getElementById("pdParamStatus").textContent = p.status || "在售";
+      document.getElementById("pdSpec").textContent = p.spec || "-";
+      document.getElementById("pdModel").textContent = p.fitment || fitment;
+
+      // 查找并渲染关联案例
+      const allCases = window.MockData?.cases || [];
+      const relatedCases = allCases.filter((c) => Array.isArray(c.linkedProducts) && c.linkedProducts.includes(p.sku || sku));
+      const caseListEl = document.getElementById("pdCaseList");
+      if (relatedCases.length > 0) {
+        caseListEl.innerHTML = relatedCases.map((c) => {
+          return `<a class="pd-case-card" href="user-case-detail.html?id=${encodeURIComponent(c.id)}">
+            <div class="pd-case-visual">案例</div>
+            <div class="pd-case-body">
+              <strong>${c.title}</strong>
+              <span>${c.model} · ${c.provider}</span>
+            </div>
+            <div class="pd-case-arrow">›</div>
+          </a>`;
+        }).join("");
+      } else {
+        // 没有关联案例时展示商品自身的 caseEffect 描述
+        document.getElementById("pdCaseBody").innerHTML = `<div class="pd-effect-card"><p>${p.caseEffect || "暂无相关案例"}</p></div>`;
+      }
+
+      // 下单链接
+      document.getElementById("pdOrderBtn").href = `user-order-create.html?sku=${encodeURIComponent(p.sku || sku)}&name=${encodeURIComponent(p.name || name)}&price=${encodeURIComponent(p.price || price)}&brand=${encodeURIComponent(p.brand || brand)}&fitment=${encodeURIComponent(p.fitment || fitment)}&mallPage=${encodeURIComponent(mallPage)}&quantity=1`;
+
+      // 返回按钮
+      const backUrl = `user-app.html?tab=mall&mallPage=${encodeURIComponent(mallPage)}`;
+      document.getElementById("pdBackBtn").addEventListener("click", () => { window.location.href = backUrl; });
+      document.getElementById("pdBackBtn2").addEventListener("click", () => { window.location.href = backUrl; });
+
+      // 底部导航
       document.querySelectorAll("[data-user-nav]").forEach((button) => {
         button.addEventListener("click", () => {
           const target = button.dataset.userNav || "home";
@@ -113,49 +241,124 @@
         });
       });
 
-      const cartButton = document.getElementById("productCartButton");
-      const cartFeedback = document.getElementById("productCartFeedback");
+      // 购物车
+      function readCart() { try { const raw = window.localStorage.getItem(CART_STORAGE_KEY); const list = JSON.parse(raw || "[]"); return Array.isArray(list) ? list : []; } catch (e) { return []; } }
+      function writeCart(list) { window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(list)); }
+      function readCollections() { try { const raw = window.localStorage.getItem(COLLECTIONS_STORAGE_KEY); const list = JSON.parse(raw || "[]"); return Array.isArray(list) ? list : []; } catch (e) { return []; } }
+      function writeCollections(list) { window.localStorage.setItem(COLLECTIONS_STORAGE_KEY, JSON.stringify(list)); }
 
-      function readCart() {
-        try {
-          const raw = window.localStorage.getItem(CART_STORAGE_KEY);
-          const list = JSON.parse(raw || "[]");
-          return Array.isArray(list) ? list : [];
-        } catch (error) {
-          return [];
+      const feedbackEl = document.getElementById("pdFeedback");
+      function showFeedback(text) { feedbackEl.hidden = false; feedbackEl.textContent = text; setTimeout(() => { feedbackEl.hidden = true; }, 2500); }
+
+      const collectBtn = document.getElementById("pdCollectBtn");
+      function syncCollect() {
+        const isCollected = readCollections().some((item) => item.sku === sku);
+        collectBtn.textContent = isCollected ? "★" : "☆";
+        collectBtn.style.color = isCollected ? "#f5a623" : "";
+      }
+      collectBtn.addEventListener("click", () => {
+        const collections = readCollections();
+        const exists = collections.some((item) => item.sku === sku);
+        if (exists) {
+          writeCollections(collections.filter((item) => item.sku !== sku));
+          showFeedback(`${p.name || name} 已取消收藏`);
+        } else {
+          collections.push({ sku, name: p.name || name, price: p.price || price, brand: p.brand || brand, fitment: p.fitment || fitment, mallPage, status: "上架", collectedAt: new Date().toISOString() });
+          writeCollections(collections);
+          showFeedback(`${p.name || name} 已加入收藏`);
         }
-      }
+        syncCollect();
+      });
 
-      function writeCart(list) {
-        window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(list));
-      }
-
-      function showCartFeedback(text) {
-        cartFeedback.hidden = false;
-        cartFeedback.textContent = text;
-      }
-
-      cartButton.addEventListener("click", () => {
+      document.getElementById("pdCartBtn").addEventListener("click", () => {
         const cart = readCart();
         const target = cart.find((item) => item.sku === sku);
-        if (target) {
-          target.quantity += 1;
-        } else {
-          cart.push({
-            sku,
-            name,
-            price,
-            brand,
-            fitment,
-            mallPage,
-            quantity: 1,
-          });
-        }
+        if (target) { target.quantity += 1; } else { cart.push({ sku, name: p.name || name, price: p.price || price, brand: p.brand || brand, fitment: p.fitment || fitment, mallPage, quantity: 1 }); }
         writeCart(cart);
-        const totalQuantity = cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-        const currentQuantity = cart.find((item) => item.sku === sku)?.quantity || 1;
-        showCartFeedback(`${name} 已加入购物车，当前商品 ${currentQuantity} 件，购物车共 ${totalQuantity} 件。`);
+        const total = cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+        showFeedback(`已加入购物车，购物车共 ${total} 件`);
       });
+
+      syncCollect();
+
+      // 商品评价
+      (function renderReviews() {
+        const reviews = (window.MockData?.productReviews || []).filter((r) => r.sku === (p.sku || sku));
+        const summaryEl = document.getElementById("pdReviewSummary");
+        const tagsEl = document.getElementById("pdReviewTags");
+        const listEl = document.getElementById("pdReviewList");
+
+        if (reviews.length === 0) {
+          summaryEl.style.display = "none";
+          tagsEl.style.display = "none";
+          listEl.innerHTML = '<div class="pd-review-empty">暂无评价</div>';
+          return;
+        }
+
+        const avgRating = (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1);
+        const recommendRate = Math.round((reviews.filter((r) => r.isRecommended).length / reviews.length) * 100);
+        const allTags = reviews.flatMap((r) => r.tags || []);
+        const tagCounts = {};
+        allTags.forEach((t) => { tagCounts[t] = (tagCounts[t] || 0) + 1; });
+        const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+        summaryEl.innerHTML = `
+          <div>
+            <div class="pd-review-score"><strong>${avgRating}</strong><span>分</span></div>
+            <div class="pd-review-stars">${"★".repeat(Math.round(avgRating))}${"☆".repeat(5 - Math.round(avgRating))}</div>
+            <div class="pd-review-count">${reviews.length} 条评价</div>
+          </div>
+          <div class="pd-review-rate">
+            <div>${recommendRate}%</div>
+            <span>推荐率</span>
+          </div>
+        `;
+
+        tagsEl.innerHTML = [
+          { tag: "全部", count: reviews.length },
+          ...topTags.map(([tag, count]) => ({ tag, count })),
+        ].map((item, idx) => `
+          <button class="pd-review-tag ${idx === 0 ? "active" : ""}" data-tag="${item.tag}" type="button">${item.tag} (${item.count})</button>
+        `).join("");
+
+        let currentTag = "全部";
+        function filterAndRender() {
+          const filtered = currentTag === "全部" ? reviews : reviews.filter((r) => (r.tags || []).includes(currentTag));
+          if (filtered.length === 0) {
+            listEl.innerHTML = '<div class="pd-review-empty">暂无该标签的评价</div>';
+            return;
+          }
+          listEl.innerHTML = filtered.map((r) => `
+            <div class="pd-review-item">
+              <div class="pd-review-user">
+                <div class="pd-review-avatar">${(r.user || "用").charAt(0)}</div>
+                <div class="pd-review-meta">
+                  <strong>${r.user || "匿名用户"}</strong>
+                  <span>${r.vehicle || ""}</span>
+                </div>
+              </div>
+              <div class="pd-review-stars-row">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</div>
+              <div class="pd-review-content">${r.content || ""}</div>
+              ${(r.tags || []).length ? `<div class="pd-review-item-tags">${r.tags.map((t) => `<span class="pd-review-item-tag">${t}</span>`).join("")}</div>` : ""}
+              <div class="pd-review-foot">
+                <span>${r.time || ""}</span>
+                <span class="pd-review-like">♡ ${r.likes || 0}</span>
+              </div>
+            </div>
+          `).join("");
+        }
+
+        tagsEl.querySelectorAll(".pd-review-tag").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            tagsEl.querySelectorAll(".pd-review-tag").forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            currentTag = btn.dataset.tag;
+            filterAndRender();
+          });
+        });
+
+        filterAndRender();
+      })();
     </script>
   </body>
 </html>

@@ -10,7 +10,6 @@
     products,
     categories,
     services,
-    consultationTemplates,
     orders,
     orderChats,
     shipping,
@@ -65,7 +64,6 @@
       label: "服务项目管理",
       children: [
         { id: "serviceList", label: "服务项目列表" },
-        { id: "consultationConfig", label: "咨询方案配置" },
       ],
     },
     {
@@ -74,6 +72,7 @@
       children: [
         { id: "orderList", label: "订单列表" },
         { id: "orderAssign", label: "订单分配", badge: orders.filter((item) => item.status === "待分配").length },
+        { id: "afterSaleList", label: "售后订单", badge: orders.filter((item) => item.afterSaleStatus === "待平台审核").length },
         { id: "chatRecords", label: "聊天记录", badge: orderChats.length },
       ],
     },
@@ -95,7 +94,6 @@
       label: "论坛管理",
       children: [
         { id: "forumBoards", label: "版面维护" },
-        { id: "forumTopics", label: "话题维护" },
         { id: "forumModerators", label: "版主申请" },
         { id: "forumManage", label: "内容管理" },
       ],
@@ -149,17 +147,8 @@
     { id: "RC-240415-001", promoId: "PROMO-002", coupon: "PPF-2000-0001", user: "梁栘", orderId: "UO-240320", amount: "¥ 2,000", channel: "平台录入", time: "待开始", status: "待核销" },
   ];
 
-  const forumBoards = [
-    { id: "BOARD-01", name: "性能改装", summary: "围绕动力、制动、底盘等深度改装内容维护。", currentModerators: "御驰 Performance Studio、平台巡检", status: "启用" },
-    { id: "BOARD-02", name: "姿态玩家", summary: "围绕轮组、车身姿态和街道风格交流。", currentModerators: "平台巡检", status: "启用" },
-    { id: "BOARD-03", name: "新能源升级", summary: "聚焦新能源车型外观、轮组和精品升级。", currentModerators: "暂无", status: "停用" },
-  ];
+  const forumBoards = window.MockData.forumBoards || [];
 
-  const forumTopics = [
-    { id: "TOPIC-01", name: "轮毂数据避让", board: "性能改装", sort: 10, cover: "轮毂与制动细节图", status: "启用" },
-    { id: "TOPIC-02", name: "城市姿态案例", board: "姿态玩家", sort: 20, cover: "街道夜景案例图", status: "启用" },
-    { id: "TOPIC-03", name: "电车低风阻方案", board: "新能源升级", sort: 30, cover: "新能源轮组主图", status: "启用" },
-  ];
 
   const forumModerators = [
     { id: "MOD-APPLY-01", account: "御驰 Performance Studio", accountType: "服务商账号", board: "性能改装", reason: "门店长期发布性能升级案例，希望维护板块内容秩序。", status: "待审核" },
@@ -1291,23 +1280,27 @@
         { key: "name", label: "姓名" },
         { key: "city", label: "城市" },
         { key: "orders", label: "累计订单" },
+        { key: "totalSpent", label: "累计消费" },
         { key: "status", label: "账号状态", tag: true },
         { key: "punish", label: "处置状态", tag: true },
+        { key: "canLinkProduct", label: "挂链权限", tag: true },
       ],
       rows: users,
       filterBy: "punish",
       detail: (row) => ({
         title: `${row.name} / ${row.favorite}`,
-        badges: [row.status, row.punish || "正常"],
+        badges: [row.status, row.punish || "正常", row.canLinkProduct || "未授权"],
         facts: [
           ["用户编号", row.id],
           ["账号", row.account],
           ["城市", row.city],
           ["绑定车辆", `${row.vehicles} 辆`],
           ["累计订单", `${row.orders} 单`],
+          ["累计消费", row.totalSpent || "-"],
           ["高频车型", row.favorite],
           ["账号状态", row.status],
           ["处置状态", row.punish || "无"],
+          ["挂链权限", row.canLinkProduct || "未授权"],
           ["禁言原因", row.punishReason || "-"],
           ["处置到期", row.punishExpire || "-"],
         ],
@@ -1380,14 +1373,14 @@
       detail: (row) => ({
         title: row.name,
         badges: [row.status, row.category, row.brand],
+        image: row.image || "",
         facts: [
-          ["SKU", row.sku],
           ["类目", row.category],
           ["品牌", row.brand],
           ["价格", row.price],
           ["库存", `${row.stock}`],
           ["适配车型", row.fitment],
-          ["图片", row.image || "待补充商品图片"],
+          ["规格参数", row.spec || "-"],
           ["说明", row.description || "商品说明待补充"],
         ],
         timeline: [
@@ -1395,6 +1388,7 @@
           "2026-03-22 更新适配车型",
           "2026-04-01 同步库存与销售标签",
         ],
+        actions: "productList",
       }),
     }),
     productCategories: simpleListDef("商品分类", "商品分类与层级维护。", categories, ["name", "sort", "status"], ["分类名称", "排序", "状态"]),
@@ -1437,7 +1431,6 @@
       }),
     }),
     serviceList: simpleListDef("服务项目列表", "可供用户下单选择的服务项目。", services, ["code", "name", "area", "basePrice", "floatRatio", "desc", "status"], ["编码", "项目名称", "区域", "基准价", "价格浮动比例", "说明", "状态"]),
-    consultationConfig: simpleListDef("咨询方案配置", "用户提交服务订单时的常用需求模板。", consultationTemplates, ["title", "fields", "uses", "status"], ["模板名称", "字段", "使用次数", "状态"]),
     orderList: makeTableDef({
       title: "订单列表",
       description: "统一查看商品订单与服务订单的全流程状态、支付入账与发票结果。",
@@ -1473,7 +1466,7 @@
           ["交货方式", row.deliveryMethod],
           ["支付方式", row.paymentMethod],
           ["服务商", row.provider],
-          ["预约时间", row.appointment],
+          ["预约安装时间", row.appointment],
           ["订单原价", row.originalAmount],
           ["优惠金额", row.discountAmount],
           ["用户实付", row.userPaidAmount],
@@ -1484,6 +1477,45 @@
         ],
         timeline: [...(row.financeTimeline || []), ...(row.timeline || [])],
         actions: "orderList",
+      }),
+    }),
+    afterSaleList: makeTableDef({
+      title: "售后订单",
+      description: "查看用户提交的售后申请，支持审核通过或驳回。",
+      filters: ["全部", "待审核", "已通过", "已驳回"],
+      stats: [
+        metric("待审核", String(orders.filter((item) => item.afterSaleStatus === "待平台审核").length)),
+        metric("今日申请", String(orders.filter((item) => item.afterSaleType && item.afterSaleTime && new Date(item.afterSaleTime).toDateString() === new Date().toDateString()).length)),
+        metric("已通过", String(orders.filter((item) => item.afterSaleStatus === "已通过").length)),
+        metric("已驳回", String(orders.filter((item) => item.afterSaleStatus === "已驳回").length)),
+      ],
+      columns: [
+        { key: "id", label: "订单号" },
+        { key: "user", label: "用户" },
+        { key: "service", label: "商品/服务" },
+        { key: "afterSaleType", label: "售后类型" },
+        { key: "afterSaleStatus", label: "售后状态", tag: true },
+        { key: "afterSaleTime", label: "申请时间" },
+      ],
+      rows: orders,
+      filterBy: "afterSaleStatus",
+      detail: (row) => ({
+        title: row.id,
+        badges: [row.afterSaleStatus, row.displayType, row.status].filter(Boolean),
+        facts: [
+          ["用户", row.user],
+          ["车辆", row.vehicle],
+          ["商品/服务", row.service],
+          ["订单类型", row.displayType],
+          ["订单金额", row.quote],
+          ["支付方式", row.paymentMethod],
+          ["售后类型", row.afterSaleType],
+          ["售后原因", row.afterSaleReason],
+          ["售后状态", row.afterSaleStatus],
+          ["申请时间", row.afterSaleTime],
+        ],
+        timeline: [...(row.timeline || [])],
+        actions: "afterSaleList",
       }),
     }),
     orderAssign: makeTableDef({
@@ -1815,7 +1847,6 @@
       }),
     }),
     forumBoards: simpleListDef("版面维护", "维护论坛版面名称、当前版主和状态。", forumBoards, ["name", "currentModerators", "status"], ["版面名称", "当前版主", "状态"]),
-    forumTopics: simpleListDef("话题维护", "维护论坛话题名称、所属版面、排序和封面说明。", forumTopics, ["name", "board", "sort", "status"], ["话题名称", "所属版面", "排序", "状态"]),
     forumModerators: makeTableDef({
       title: "版主申请",
       description: "服务商账号与平台账号可申请成为版主，并对各自板块进行维护。",
@@ -2284,7 +2315,6 @@
       </div>
       <div class="kv-list visitor-detail-kv">
         <div class="kv-row"><span class="muted">访客编号</span><strong>${row.id}</strong></div>
-        <div class="kv-row"><span class="muted">来源</span><strong>${row.source}</strong></div>
         <div class="kv-row"><span class="muted">城市</span><strong>${row.city}</strong></div>
         <div class="kv-row"><span class="muted">设备</span><strong>${row.device}</strong></div>
         <div class="kv-row"><span class="muted">首次访问</span><strong>${row.firstVisit}</strong></div>
@@ -2359,7 +2389,7 @@
                           <div class="visitor-session-head">
                             <div>
                               <strong>${row.fingerprint}</strong>
-                              <span>${row.source} / ${row.city}</span>
+                              <span>${row.city}</span>
                             </div>
                           </div>
                           <div class="visitor-session-meta">
@@ -2553,7 +2583,7 @@
         </div>
           <table class="data-table">
             <thead>
-              <tr>${def.columns.map((col) => `<th>${col.label}</th>`).join("")}${state.activePage === "promotionManage" ? `<th>操作</th>` : ""}</tr>
+              <tr>${def.columns.map((col) => `<th>${col.label}</th>`).join("")}${state.activePage === "promotionManage" || state.activePage === "productList" ? `<th>操作</th>` : ""}</tr>
             </thead>
             <tbody>
               ${
@@ -2563,12 +2593,12 @@
                         (row, index) => `
                           <tr data-row-index="${index}" style="cursor:pointer; ${index === state.selectedIndex ? "background:rgba(255,255,255,0.04);" : ""}">
                             ${def.columns.map((col) => `<td>${col.tag ? formatTag(row[col.key]) : displayValue(row[col.key])}</td>`).join("")}
-                            ${state.activePage === "promotionManage" ? `<td>${renderPromotionRowActions(row, index)}</td>` : ""}
+                            ${state.activePage === "promotionManage" ? `<td>${renderPromotionRowActions(row, index)}</td>` : state.activePage === "productList" ? `<td style="display:flex; gap:6px; flex-wrap:nowrap;"><button class="btn btn-primary btn-sm" type="button" data-product-row-action="stock" data-row-index="${index}">修改库存</button><button class="btn btn-danger btn-sm" type="button" data-product-row-action="delete" data-row-index="${index}">删除</button></td>` : ""}
                           </tr>
                         `
                       )
                       .join("")
-                  : `<tr><td colspan="${def.columns.length + (state.activePage === "promotionManage" ? 1 : 0)}" class="muted">没有符合当前筛选条件的数据。</td></tr>`
+                  : `<tr><td colspan="${def.columns.length + (state.activePage === "promotionManage" || state.activePage === "productList" ? 1 : 0)}" class="muted">没有符合当前筛选条件的数据。</td></tr>`
               }
             </tbody>
           </table>
@@ -2744,23 +2774,11 @@
             <button class="btn btn-primary" type="button" data-forum-board-toolbar="edit" ${selected ? "" : "disabled"}>编辑</button>
             <button class="btn btn-danger" type="button" data-forum-board-toolbar="delete" ${selected ? "" : "disabled"}>删除</button>
           `
-        : state.activePage === "forumTopics"
-          ? `
-            <button class="btn btn-secondary" type="button" data-forum-topic-toolbar="create">新增</button>
-            <button class="btn btn-primary" type="button" data-forum-topic-toolbar="edit" ${selected ? "" : "disabled"}>编辑</button>
-            <button class="btn btn-danger" type="button" data-forum-topic-toolbar="delete" ${selected ? "" : "disabled"}>删除</button>
-          `
         : state.activePage === "serviceList"
           ? `
             <button class="btn btn-secondary" type="button" data-service-toolbar="create">新增</button>
             <button class="btn btn-primary" type="button" data-service-toolbar="edit" ${selected ? "" : "disabled"}>编辑</button>
             <button class="btn btn-danger" type="button" data-service-toolbar="delete" ${selected ? "" : "disabled"}>删除</button>
-          `
-          : state.activePage === "consultationConfig"
-            ? `
-              <button class="btn btn-secondary" type="button" data-template-toolbar="create">新增</button>
-              <button class="btn btn-primary" type="button" data-template-toolbar="edit" ${selected ? "" : "disabled"}>编辑</button>
-            <button class="btn btn-danger" type="button" data-template-toolbar="delete" ${selected ? "" : "disabled"}>删除</button>
           `
         : state.activePage === "logisticsManage"
           ? selected?.type === "shipping"
@@ -2823,6 +2841,12 @@
   }
 
   function renderDrawer(detail) {
+    const hasValidImage = detail.image && (detail.image.startsWith("data:") || detail.image.startsWith("http"));
+    const imageHtml = hasValidImage
+      ? `<div class="drawer-image-preview"><img src="${detail.image}" alt="${escapeHtml(detail.title)}" /></div>`
+      : detail.title
+      ? `<div class="drawer-image-preview"><div class="drawer-image-placeholder">${detail.title.slice(0, 2)}</div></div>`
+      : "";
     return `
       <div class="panel-header">
         <div>
@@ -2832,6 +2856,7 @@
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
         ${detail.badges.map((item) => formatTag(item)).join("")}
       </div>
+      ${imageHtml}
       <div class="drawer-meta">
         <div class="kv-list">
           ${detail.facts
@@ -2912,11 +2937,17 @@
         }
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           ${
-            state.activePage === "providerAudit"
+            state.activePage === "productList"
               ? `
-                <button class="btn btn-secondary" type="button" data-provider-action="materials">查看详情</button>
+                <button class="btn btn-danger" type="button" data-product-action="delete">删除商品</button>
               `
-              : detail.actions === "providerList"
+              : state.activePage === "providerAudit"
+                ? `
+                  <button class="btn btn-primary" type="button" data-audit-action="approve">审核通过</button>
+                  <button class="btn btn-warning" type="button" data-audit-action="supplement">要求补充</button>
+                  <button class="btn btn-danger" type="button" data-audit-action="reject">驳回申请</button>
+                `
+                : detail.actions === "providerList"
                 ? `
                   <button class="btn btn-primary" type="button" data-provider-list-action="toggle">${detail.badges.includes("暂停接单") ? "切换为正常营业" : "切换为暂停接单"}</button>
                   <button class="btn btn-secondary" type="button" data-provider-list-action="materials">查看详情</button>
@@ -2933,6 +2964,7 @@
                     <button class="btn btn-primary" type="button" data-user-list-action="toggle">${detail.badges.includes("停用") ? "启用账号" : "停用账号"}</button>
                     <button class="btn btn-danger" type="button" data-user-list-action="mute">${detail.badges.includes("禁言") ? "解除禁言" : "禁言用户"}</button>
                     <button class="btn btn-danger" type="button" data-user-list-action="ban">${detail.badges.includes("封号") ? "解除封号" : "封号用户"}</button>
+                    <button class="btn btn-secondary" type="button" data-user-list-action="toggleLinkAuth">${detail.badges.includes("已授权") ? "取消挂链" : "授予挂链"}</button>
                     <button class="btn btn-secondary" type="button" data-user-list-action="materials">查看详情</button>
                   `
               : detail.actions === "userVehicles"
@@ -2944,6 +2976,12 @@
                     <button class="btn btn-secondary" type="button" data-order-action="detail">查看详情</button>
                     <button class="btn btn-primary" type="button" data-order-action="finance">流水/对账</button>
                     <button class="btn btn-secondary" type="button" data-order-action="chat">查看聊天记录</button>
+                  `
+                : detail.actions === "afterSaleList"
+                  ? `
+                    <button class="btn btn-secondary" type="button" data-after-sale-action="detail">查看详情</button>
+                    <button class="btn btn-primary" type="button" data-after-sale-action="order">跳转订单</button>
+                    ${detail.badges.includes("待平台审核") ? `<button class="btn btn-success" type="button" data-after-sale-action="approve">通过申请</button><button class="btn btn-danger" type="button" data-after-sale-action="reject">驳回申请</button>` : `<button class="btn btn-secondary" type="button" disabled>已处理</button>`}
                   `
                 : detail.actions === "chatRecords"
                   ? `
@@ -2976,6 +3014,10 @@
                     <button class="btn btn-secondary" type="button" data-post-action="feature">${detail.badges.includes("加精") ? "取消加精" : "加精"}</button>
                     <button class="btn btn-secondary" type="button" data-post-action="commerce">商品链接</button>
                     <button class="btn btn-secondary" type="button" data-post-action="creator-pin">${detail.badges.includes("主页置顶") ? "取消主页置顶" : "主页置顶作品"}</button>
+                  `
+                : detail.actions === "productList"
+                  ? `
+                    <button class="btn btn-danger" type="button" data-product-action="delete">删除商品</button>
                   `
                 : detail.actions === "vehicleMaterials"
                   ? `
@@ -3114,6 +3156,10 @@
           openUserPunishModal(selected, "ban");
           return;
         }
+        if (button.dataset.userListAction === "toggleLinkAuth") {
+          toggleUserLinkAuth(selected.id);
+          return;
+        }
         toggleUserStatus(selected.id);
       });
     });
@@ -3195,6 +3241,14 @@
           return;
         }
         openCaseDisplayModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-product-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.productAction === "delete") {
+          openProductDeleteModal(selected);
+        }
       });
     });
 
@@ -3421,6 +3475,22 @@
           if (selected) openProductEditorModal("edit", selected);
         });
       });
+      contentEl.querySelectorAll("[data-product-row-action]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const currentRows = filterRows(def.rows, def.filterBy);
+          const rowIndex = Number(button.dataset.rowIndex);
+          const current = currentRows[rowIndex];
+          if (!current) return;
+          if (button.dataset.productRowAction === "delete") {
+            openProductDeleteModal(current);
+            return;
+          }
+          if (button.dataset.productRowAction === "stock") {
+            openProductStockModal(current);
+          }
+        });
+      });
     }
 
     if (state.activePage === "vehicleModelManage") {
@@ -3575,6 +3645,21 @@
           openProviderAuditMaterialsModal(selected);
         });
       });
+      contentEl.querySelectorAll("[data-audit-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.auditAction;
+          if (action === "supplement") {
+            openSupplementModal(selected);
+            return;
+          }
+          if (action === "reject") {
+            openRejectModal(selected);
+            return;
+          }
+          handleAuditDecision(action, selected.id);
+          renderPage();
+        });
+      });
     }
 
     if (state.activePage === "providerList" && selected) {
@@ -3626,6 +3711,10 @@
             openUserMaterialsModal(selected);
             return;
           }
+          if (button.dataset.userListAction === "toggleLinkAuth") {
+            toggleUserLinkAuth(selected.id);
+            return;
+          }
           toggleUserStatus(selected.id);
         });
       });
@@ -3664,6 +3753,46 @@
             return;
           }
           openOrderProcessModal(selected);
+        });
+      });
+    }
+
+    if (state.activePage === "afterSaleList" && selected) {
+      contentEl.querySelectorAll("[data-after-sale-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.afterSaleAction;
+          if (action === "detail") {
+            openGenericDetailModal(def.detail(selected));
+            return;
+          }
+          if (action === "order") {
+            state.activePage = "orderList";
+            state.activeFilter = "全部";
+            const orderRows = filterRows(defs.orderList.rows, defs.orderList.filterBy);
+            const idx = orderRows.findIndex((o) => o.id === selected.id);
+            state.selectedIndex = idx >= 0 ? idx : 0;
+            const parentGroup = menu.find((item) => item.children?.some((c) => c.id === "orderList"));
+            if (parentGroup) state.expandedGroups[parentGroup.id] = true;
+            renderSidebar();
+            renderPage();
+            return;
+          }
+          if (action === "approve") {
+            selected.afterSaleStatus = "已通过";
+            selected.progress = `售后申请已通过：${selected.afterSaleType}，平台已安排处理。`;
+            if (!selected.timeline) selected.timeline = [];
+            selected.timeline.push(`平台通过售后申请：${selected.afterSaleType} — ${getNowStamp()}`);
+            renderPage();
+            return;
+          }
+          if (action === "reject") {
+            selected.afterSaleStatus = "已驳回";
+            selected.progress = `售后申请已驳回：${selected.afterSaleType}，如有疑问请联系平台客服。`;
+            if (!selected.timeline) selected.timeline = [];
+            selected.timeline.push(`平台驳回售后申请：${selected.afterSaleType} — ${getNowStamp()}`);
+            renderPage();
+            return;
+          }
         });
       });
     }
@@ -3846,24 +3975,6 @@
       });
     }
 
-    if (state.activePage === "forumTopics") {
-      contentEl.querySelectorAll("[data-forum-topic-toolbar]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const action = button.dataset.forumTopicToolbar;
-          if (action === "create") {
-            openForumTopicEditorModal("create");
-            return;
-          }
-          if (!selected) return;
-          if (action === "edit") {
-            openForumTopicEditorModal("edit", selected);
-            return;
-          }
-          openForumTopicDeleteModal(selected);
-        });
-      });
-    }
-
     if (state.activePage === "serviceList") {
       contentEl.querySelectorAll("[data-service-toolbar]").forEach((button) => {
         button.addEventListener("click", () => {
@@ -3878,24 +3989,6 @@
             return;
           }
           openServiceDeleteModal(selected);
-        });
-      });
-    }
-
-    if (state.activePage === "consultationConfig") {
-      contentEl.querySelectorAll("[data-template-toolbar]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const action = button.dataset.templateToolbar;
-          if (action === "create") {
-            openTemplateEditorModal("create");
-            return;
-          }
-          if (!selected) return;
-          if (action === "edit") {
-            openTemplateEditorModal("edit", selected);
-            return;
-          }
-          openTemplateDeleteModal(selected);
         });
       });
     }
@@ -4012,24 +4105,48 @@
       });
     }
 
+    function updateModeratorHiddenInput() {
+      const tagList = modalCardEl.querySelector("#moderatorTagList");
+      const hidden = modalCardEl.querySelector('[data-forum-board-field="currentModerators"]');
+      if (!tagList || !hidden) return;
+      const names = Array.from(tagList.querySelectorAll(".pill")).map((span) => span.childNodes[0].textContent.trim()).filter(Boolean);
+      hidden.value = names.join("、");
+    }
+
+    modalCardEl.querySelectorAll("[data-delete-moderator]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const pill = btn.closest(".pill");
+        if (pill) pill.remove();
+        updateModeratorHiddenInput();
+      });
+    });
+
+    const addModeratorBtn = modalCardEl.querySelector("[data-add-moderator]");
+    const newModeratorInput = modalCardEl.querySelector("#newModeratorInput");
+    if (addModeratorBtn && newModeratorInput) {
+      addModeratorBtn.addEventListener("click", () => {
+        const name = newModeratorInput.value.trim();
+        if (!name) return;
+        const tagList = modalCardEl.querySelector("#moderatorTagList");
+        if (!tagList) return;
+        const pill = document.createElement("span");
+        pill.className = "pill";
+        pill.style.cssText = "display:inline-flex; align-items:center; gap:6px;";
+        pill.innerHTML = `${name}<button type="button" class="btn btn-danger btn-sm" data-delete-moderator style="padding:2px 6px; font-size:11px; line-height:1;">×</button>`;
+        pill.querySelector("[data-delete-moderator]").addEventListener("click", () => {
+          pill.remove();
+          updateModeratorHiddenInput();
+        });
+        tagList.appendChild(pill);
+        newModeratorInput.value = "";
+        updateModeratorHiddenInput();
+      });
+    }
+
     const deleteForumBoardBtn = modalCardEl.querySelector("[data-delete-forum-board]");
     if (deleteForumBoardBtn) {
       deleteForumBoardBtn.addEventListener("click", () => {
         deleteForumBoard(deleteForumBoardBtn.dataset.id);
-      });
-    }
-
-    const saveForumTopicBtn = modalCardEl.querySelector("[data-save-forum-topic]");
-    if (saveForumTopicBtn) {
-      saveForumTopicBtn.addEventListener("click", () => {
-        saveForumTopic(saveForumTopicBtn.dataset.mode, saveForumTopicBtn.dataset.id);
-      });
-    }
-
-    const deleteForumTopicBtn = modalCardEl.querySelector("[data-delete-forum-topic]");
-    if (deleteForumTopicBtn) {
-      deleteForumTopicBtn.addEventListener("click", () => {
-        deleteForumTopic(deleteForumTopicBtn.dataset.id);
       });
     }
 
@@ -4057,20 +4174,6 @@
     if (deleteServiceBtn) {
       deleteServiceBtn.addEventListener("click", () => {
         deleteService(deleteServiceBtn.dataset.code);
-      });
-    }
-
-    const saveTemplateBtn = modalCardEl.querySelector("[data-save-template]");
-    if (saveTemplateBtn) {
-      saveTemplateBtn.addEventListener("click", () => {
-        saveTemplate(saveTemplateBtn.dataset.mode, saveTemplateBtn.dataset.title);
-      });
-    }
-
-    const deleteTemplateBtn = modalCardEl.querySelector("[data-delete-template]");
-    if (deleteTemplateBtn) {
-      deleteTemplateBtn.addEventListener("click", () => {
-        deleteTemplate(deleteTemplateBtn.dataset.title);
       });
     }
 
@@ -4298,6 +4401,21 @@
     if (deleteCaseBtn) {
       deleteCaseBtn.addEventListener("click", () => {
         deleteCase(deleteCaseBtn.dataset.caseId);
+      });
+    }
+
+    const deleteProductBtn = modalCardEl.querySelector("[data-delete-product]");
+    if (deleteProductBtn) {
+      deleteProductBtn.addEventListener("click", () => {
+        deleteProduct(deleteProductBtn.dataset.productSku);
+      });
+    }
+
+    const updateStockBtn = modalCardEl.querySelector("[data-update-product-stock]");
+    if (updateStockBtn) {
+      updateStockBtn.addEventListener("click", () => {
+        const input = modalCardEl.querySelector("[data-product-stock-input]");
+        updateProductStock(updateStockBtn.dataset.productSku, input ? input.value.trim() : "");
       });
     }
 
@@ -5022,6 +5140,7 @@
   function openForumBoardEditorModal(mode, row) {
     const isEdit = mode === "edit";
     const source = row || { id: `BOARD-${Date.now().toString().slice(-4)}`, name: "", summary: "", currentModerators: "", status: "启用" };
+    const moderatorList = String(source.currentModerators || "").split(/[、,]/).map((s) => s.trim()).filter(Boolean);
     openModal(`
       <div class="panel-header">
         <div>
@@ -5037,7 +5156,14 @@
         </div>
         <div class="field-group field-group-full">
           <div class="field-label">当前版主</div>
-          <input class="input" data-forum-board-field="currentModerators" placeholder="多个版主使用顿号或逗号分隔" value="${source.currentModerators || ""}" />
+          <div id="moderatorTagList" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+            ${moderatorList.map((m) => `<span class="pill" style="display:inline-flex; align-items:center; gap:6px;">${m}<button type="button" class="btn btn-danger btn-sm" data-delete-moderator style="padding:2px 6px; font-size:11px; line-height:1;">×</button></span>`).join("")}
+          </div>
+          <div style="display:flex; gap:8px;">
+            <input class="input" id="newModeratorInput" placeholder="输入版主名称" />
+            <button class="btn btn-secondary" type="button" data-add-moderator>添加</button>
+          </div>
+          <input type="hidden" data-forum-board-field="currentModerators" value="${source.currentModerators || ""}" />
         </div>
         <div class="field-group field-group-full">
           <div class="field-label">版面说明</div>
@@ -5073,65 +5199,6 @@
     `);
   }
 
-  function openForumTopicEditorModal(mode, row) {
-    const isEdit = mode === "edit";
-    const source = row || { id: `TOPIC-${Date.now().toString().slice(-4)}`, name: "", board: forumBoards[0]?.name || "", sort: forumTopics.length + 1, cover: "", status: "启用" };
-    openModal(`
-      <div class="panel-header">
-        <div>
-          <span class="eyebrow">Forum Topic</span>
-          <h2 class="section-title">${isEdit ? "编辑话题" : "新增话题"}</h2>
-          <p class="section-subtitle">${source.id} / ${isEdit ? source.name : "创建新的论坛话题"}</p>
-        </div>
-      </div>
-      <div class="form-grid">
-        <div class="field-group">
-          <div class="field-label">话题名称</div>
-          <input class="input" data-forum-topic-field="name" value="${source.name}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">所属版面</div>
-          <select class="select" data-forum-topic-field="board">
-            ${forumBoards.map((item) => `<option value="${item.name}" ${item.name === source.board ? "selected" : ""}>${item.name}</option>`).join("")}
-          </select>
-        </div>
-        <div class="field-group">
-          <div class="field-label">排序</div>
-          <input class="input" data-forum-topic-field="sort" value="${source.sort}" />
-        </div>
-        <div class="field-group field-group-full">
-          <div class="field-label">封面说明</div>
-          <input class="input" data-forum-topic-field="cover" value="${source.cover || ""}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">状态</div>
-          <select class="select" data-forum-topic-field="status">
-            ${["启用", "停用"].map((item) => `<option value="${item}" ${item === source.status ? "selected" : ""}>${item}</option>`).join("")}
-          </select>
-        </div>
-      </div>
-      <div style="display:flex; gap:12px; margin-top:18px;">
-        <button class="btn btn-primary" type="button" data-save-forum-topic data-mode="${mode}" data-id="${source.id}">${isEdit ? "保存修改" : "确认新增"}</button>
-        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
-      </div>
-    `);
-  }
-
-  function openForumTopicDeleteModal(row) {
-    openModal(`
-      <div class="panel-header">
-        <div>
-          <span class="eyebrow">Forum Topic</span>
-          <h2 class="section-title">删除话题</h2>
-          <p class="section-subtitle">确认删除话题“${row.name}”吗？</p>
-        </div>
-      </div>
-      <div style="display:flex; gap:12px; margin-top:18px;">
-        <button class="btn btn-danger" type="button" data-delete-forum-topic data-id="${row.id}">确认删除</button>
-        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
-      </div>
-    `);
-  }
 
   function openServiceEditorModal(mode, row) {
     const isEdit = mode === "edit";
@@ -5230,54 +5297,6 @@
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-danger" type="button" data-delete-service data-code="${row.code}">确认删除</button>
-        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
-      </div>
-    `);
-  }
-
-  function openTemplateEditorModal(mode, row) {
-    const isEdit = mode === "edit";
-    openModal(`
-      <div class="panel-header">
-        <div>
-          <span class="eyebrow">Consultation Template</span>
-          <h2 class="section-title">${isEdit ? "编辑咨询方案" : "新增咨询方案"}</h2>
-          <p class="section-subtitle">${isEdit ? `正在编辑 ${row.title}` : "创建新的咨询方案模板"}</p>
-        </div>
-      </div>
-      <div class="form-grid">
-        <div class="field-group">模板名称</div>
-          <input class="input" data-template-field="title" placeholder="请输入模板名称" value="${isEdit ? row.title : ""}" />
-        </div>
-        <div class="field-group field-group-full">
-          <div class="field-label">字段配置</div>
-          <textarea class="textarea" data-template-field="fields" placeholder="请输入模板字段，使用 / 分隔">${isEdit ? row.fields : ""}</textarea>
-        </div>
-        <div class="field-group">状态</div>
-          <select class="select" data-template-field="status">
-            <option value="启用" ${(isEdit ? row.status : "启用") === "启用" ? "selected" : ""}>启用</option>
-            <option value="停用" ${(isEdit ? row.status : "启用") === "停用" ? "selected" : ""}>停用</option>
-          </select>
-        </div>
-      </div>
-      <div style="display:flex; gap:12px; margin-top:18px;">
-        <button class="btn btn-primary" type="button" data-save-template data-mode="${mode}" ${isEdit ? `data-title="${row.title}"` : ""}>${isEdit ? "保存修改" : "确认新增"}</button>
-        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
-      </div>
-    `);
-  }
-
-  function openTemplateDeleteModal(row) {
-    openModal(`
-      <div class="panel-header">
-        <div>
-          <span class="eyebrow">Template Delete</span>
-          <h2 class="section-title">删除咨询方案</h2>
-          <p class="section-subtitle">确认删除咨询方案“${row.title}”吗？此操作仅影响当前 mock 展示数据。</p>
-        </div>
-      </div>
-      <div style="display:flex; gap:12px; margin-top:18px;">
-        <button class="btn btn-danger" type="button" data-delete-template data-title="${row.title}">确认删除</button>
         <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
       </div>
     `);
@@ -6067,10 +6086,6 @@
       </div>
       <div class="form-grid">
         <div class="field-group">
-          <div class="field-label">SKU</div>
-          <input class="input" data-product-field="sku" placeholder="请输入 SKU" value="${isEdit ? row.sku : "PR-9901"}" />
-        </div>
-        <div class="field-group">
           <div class="field-label">商品名称</div>
           <input class="input" data-product-field="name" placeholder="请输入商品名称" value="${isEdit ? row.name : "OZ 锻造轮毂 20寸"}" />
         </div>
@@ -6107,11 +6122,22 @@
         </div>
         <div class="field-group field-group-full">
           <div class="field-label">图片</div>
-          <input class="input" data-product-field="image" placeholder="请输入图片名称或路径" value="${isEdit ? row.image || "" : "product-main-image.jpg"}" />
+          <input type="hidden" data-product-field="image" value="${isEdit ? row.image || "" : ""}" />
+          <div class="product-image-upload">
+            <div class="product-image-preview" data-product-image-preview>
+              ${isEdit && row.image ? `<img src="${row.image}" alt="${escapeHtml(row.name)}" />` : `<div class="product-image-placeholder">${isEdit ? row.name.slice(0, 2) : "商品"}</div>`}
+            </div>
+            <button class="btn btn-secondary btn-sm" type="button" data-product-image-trigger>选择图片</button>
+            <input type="file" accept="image/*" data-product-image-input style="display:none;" />
+          </div>
         </div>
         <div class="field-group field-group-full">
           <div class="field-label">说明</div>
           <textarea class="textarea" data-product-field="description" placeholder="请输入商品说明">${isEdit ? row.description || "" : "主图突出商品核心卖点，补充细节图、安装位说明与实车效果展示。"}</textarea>
+        </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">规格参数</div>
+          <input class="input" data-product-field="spec" placeholder="例如 19×8.5J ET35 / 5×112 / 单只重量约 8.2kg" value="${isEdit ? row.spec || "" : ""}" />
         </div>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
@@ -6124,6 +6150,22 @@
     brandSelect?.addEventListener("change", () => {
       const options = getBrandCategories(brandSelect.value);
       categorySelect.innerHTML = options.map((name) => `<option value="${name}">${name}</option>`).join("");
+    });
+    const imageInput = modalCardEl.querySelector('[data-product-image-input]');
+    const imageTrigger = modalCardEl.querySelector('[data-product-image-trigger]');
+    const imagePreview = modalCardEl.querySelector('[data-product-image-preview]');
+    const imageField = modalCardEl.querySelector('[data-product-field="image"]');
+    imageTrigger?.addEventListener('click', () => imageInput?.click());
+    imageInput?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        if (imageField) imageField.value = dataUrl;
+        if (imagePreview) imagePreview.innerHTML = `<img src="${dataUrl}" alt="商品预览" />`;
+      };
+      reader.readAsDataURL(file);
     });
   }
 
@@ -6465,6 +6507,27 @@
     if (index === -1) return;
     const [removed] = cases.splice(index, 1);
     openFeedbackModal("案例已删除", `${removed.title} 已从案例维护中移除。`);
+  }
+
+  function deleteProduct(sku) {
+    const index = products.findIndex((item) => item.sku === sku);
+    if (index === -1) return;
+    const [removed] = products.splice(index, 1);
+    openFeedbackModal("商品已删除", `${removed.name} 已从商品列表中移除。`);
+    render();
+  }
+
+  function updateProductStock(sku, newStockRaw) {
+    const product = products.find((item) => item.sku === sku);
+    if (!product) return;
+    const newStock = Number(newStockRaw);
+    if (Number.isNaN(newStock) || newStock < 0) {
+      openFeedbackModal("库存输入无效", "请输入大于或等于 0 的整数。");
+      return;
+    }
+    product.stock = newStock;
+    openFeedbackModal("库存已更新", `${product.name} 的库存已修改为 ${newStock}。`);
+    render();
   }
 
   function submitModeratorApply(id, decision) {
@@ -6816,6 +6879,14 @@
     openFeedbackModal("用户状态已更新", `${target.name} 当前状态：${target.status}。`);
   }
 
+  function toggleUserLinkAuth(userId) {
+    const target = users.find((item) => item.id === userId);
+    if (!target) return;
+
+    target.canLinkProduct = target.canLinkProduct === "已授权" ? "未授权" : "已授权";
+    openFeedbackModal("挂链权限已更新", `${target.name} 当前挂链权限：${target.canLinkProduct}。`);
+  }
+
   function toggleUserPunish(userId, type) {
     const target = users.find((item) => item.id === userId);
     if (!target) return;
@@ -6855,7 +6926,6 @@
     const fitment = getProductFitmentSelection(modalCardEl.querySelector("[data-product-fitment-picker]")).join(" / ");
 
     const payload = {
-      sku: getValue("sku"),
       name: getValue("name"),
       brand: getValue("brand"),
       category: getValue("category"),
@@ -6865,6 +6935,7 @@
       image: getValue("image"),
       description: getValue("description"),
       status: getValue("status"),
+      spec: getValue("spec"),
     };
 
     if (!payload.sku || !payload.name || !payload.brand || !payload.category || !payload.fitment) {
@@ -7078,38 +7149,6 @@
     openFeedbackModal("版面已删除", `${removed.name} 已从论坛版面中移除。`);
   }
 
-  function saveForumTopic(mode, sourceId) {
-    const getValue = (field) => modalCardEl.querySelector(`[data-forum-topic-field="${field}"]`)?.value.trim() || "";
-    const payload = {
-      id: sourceId,
-      name: getValue("name"),
-      board: getValue("board"),
-      sort: Number(getValue("sort")) || 0,
-      cover: getValue("cover"),
-      status: getValue("status"),
-    };
-    if (!payload.name || !payload.board || !payload.sort) {
-      openFeedbackModal("信息不完整", "请填写话题名称、所属版面和排序。");
-      return;
-    }
-    if (mode === "edit") {
-      const target = forumTopics.find((item) => item.id === sourceId);
-      if (!target) return;
-      Object.assign(target, payload);
-      openFeedbackModal("话题已更新", `${payload.name} 的话题信息已保存。`);
-      return;
-    }
-    forumTopics.unshift(payload);
-    state.selectedIndex = 0;
-    openFeedbackModal("话题已新增", `${payload.name} 已加入话题维护列表。`);
-  }
-
-  function deleteForumTopic(id) {
-    const index = forumTopics.findIndex((item) => item.id === id);
-    if (index === -1) return;
-    const [removed] = forumTopics.splice(index, 1);
-    openFeedbackModal("话题已删除", `${removed.name} 已从话题维护中移除。`);
-  }
 
   function saveService(mode, sourceCode) {
     const getValue = (field) => {
@@ -7455,7 +7494,7 @@
             </div>
             <div class="field-group">
               <div class="field-label">风格</div>
-              <select class="select" data-case-field="style">${styleOptions}</select>
+              <input class="input" data-case-field="style" placeholder="请输入风格，例如黑武士街道风" value="${source.style}" />
             </div>
             <div class="field-group">
               <div class="field-label">改装类型</div>
@@ -7542,6 +7581,44 @@
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-danger" type="button" data-delete-case data-case-id="${row.id}">确认删除</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
+  function openProductDeleteModal(row) {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Product Delete</span>
+          <h2 class="section-title">删除商品</h2>
+          <p class="section-subtitle">确认删除商品“${row.name}”吗？删除后不可恢复。</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-danger" type="button" data-delete-product data-product-sku="${row.sku}">确认删除</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+  }
+
+  function openProductStockModal(row) {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Product Stock</span>
+          <h2 class="section-title">修改库存</h2>
+          <p class="section-subtitle">${row.name}（SKU：${row.sku}）</p>
+        </div>
+      </div>
+      <div style="margin-top:18px;">
+        <label style="display:grid; gap:8px;">
+          <span style="color:var(--muted); font-size:13px;">当前库存：${row.stock}</span>
+          <input class="input" type="number" min="0" data-product-stock-input value="${row.stock}" placeholder="输入新库存数量" />
+        </label>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-update-product-stock data-product-sku="${row.sku}">保存</button>
         <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
       </div>
     `);
@@ -7964,45 +8041,6 @@
     openFeedbackModal("服务项目已删除", `${removed.name} 已从服务项目列表中移除。`);
   }
 
-  function saveTemplate(mode, sourceTitle) {
-    const getValue = (field) => {
-      const el = modalCardEl.querySelector(`[data-template-field="${field}"]`);
-      return el ? el.value.trim() : "";
-    };
-
-    const payload = {
-      title: getValue("title"),
-      fields: getValue("fields"),
-      uses: Number(getValue("uses")) || 0,
-      status: getValue("status"),
-    };
-
-    if (!payload.title || !payload.fields) {
-      openFeedbackModal("信息不完整", "请填写模板名称和字段配置后再提交。");
-      return;
-    }
-
-    if (mode === "edit") {
-      const target = consultationTemplates.find((item) => item.title === sourceTitle);
-      if (!target) return;
-      Object.assign(target, payload);
-      openFeedbackModal("咨询方案已更新", `${payload.title} 的模板信息已保存。`);
-      return;
-    }
-
-    consultationTemplates.unshift(payload);
-    state.selectedIndex = 0;
-    openFeedbackModal("咨询方案已新增", `${payload.title} 已加入咨询方案配置列表。`);
-  }
-
-  function deleteTemplate(title) {
-    const index = consultationTemplates.findIndex((item) => item.title === title);
-    if (index === -1) return;
-    const [removed] = consultationTemplates.splice(index, 1);
-    state.selectedIndex = Math.max(0, state.selectedIndex - (state.selectedIndex >= consultationTemplates.length ? 1 : 0));
-    openFeedbackModal("咨询方案已删除", `${removed.title} 已从咨询方案配置中移除。`);
-  }
-
   function deleteCategory(name) {
     const target = categories.find((item) => item.name === name);
     if (!target) return;
@@ -8287,6 +8325,13 @@
           result = result.filter((row) => row.audit === state.activeFilter);
         } else if (displayFilters.includes(state.activeFilter)) {
           result = result.filter((row) => row.display === state.activeFilter);
+        }
+      } else if (filterBy === "afterSaleStatus") {
+        result = result.filter((row) => row.afterSaleType);
+        const statusMap = { "待审核": "待平台审核", "已通过": "已通过", "已驳回": "已驳回" };
+        const mapped = statusMap[state.activeFilter];
+        if (mapped) {
+          result = result.filter((row) => row.afterSaleStatus === mapped);
         }
       } else if (filterBy === "forumManage") {
         if (["正常", "已删除"].includes(state.activeFilter)) {

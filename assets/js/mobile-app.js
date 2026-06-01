@@ -3,7 +3,7 @@
   if (!appType) return;
 
   const screenEl = document.getElementById("mobileApp");
-  const { providers, orders, products, settlements, cases, posts, comments, vehicles, services } = window.MockData;
+  const { providers, orders, products, settlements, cases, posts, comments, vehicles, services, forumBoards } = window.MockData;
 
   const appConfigs = {
     admin: { title: "平台管理端", tabs: ["home", "providers", "orders", "operations", "me"], labels: { home: "首页", providers: "服务商", orders: "订单", operations: "运营", me: "我的" } },
@@ -87,6 +87,7 @@
       category: "service",
       serviceStatus: "all",
       goodsStatus: "all",
+      afterSaleStatus: "all",
     },
     adminShipment: {
       orderId: "",
@@ -96,8 +97,7 @@
       products: products[0]?.sku || "",
       cases: cases[0]?.id || "",
       forum: posts[0]?.id || "",
-      messages: "msg-1",
-      settlements: settlements[0]?.id || "",
+      messages: "",
     },
     providerFeedback: "",
     providerCompletion: {
@@ -105,6 +105,7 @@
     },
     providerPurchase: {
       sku: "",
+      formOpen: false,
     },
     providerCaseForm: {
       mode: "",
@@ -115,7 +116,6 @@
     },
     providerMe: {
       profileEditOpen: false,
-      settlementDetailId: settlements[0]?.id || "",
       moderatorApplyOpen: false,
       moderatorStatus: "", // "" | "待审核" | "已通过" | "已驳回"
     },
@@ -147,6 +147,8 @@
       invoiceOrderId: "",
       addressCreateOpen: false,
       creditApplyOpen: false,
+      couponFilter: "available",
+      afterSaleOrderId: "",
     },
     userGarage: {
       selectedVehicle: vehicles[0]?.id || vehicles[0]?.plate || vehicles[0]?.model || "",
@@ -161,6 +163,7 @@
       selectedPost: posts[0]?.id || "",
       createOpen: false,
       replyPostId: "",
+      editingPostId: "",
       filter: "hot",
       category: "all",
     },
@@ -178,6 +181,7 @@
       const targetTab = params.get("tab") || "";
       const mallPage = params.get("mallPage") || "";
       const meTab = params.get("meTab") || "";
+      const forumCategory = params.get("forumCategory") || "";
       const orderId = params.get("orderId") || "";
       const feedback = params.get("feedback") || "";
       if (targetTab && appConfigs.user.tabs.includes(targetTab)) {
@@ -188,6 +192,7 @@
         state.userMallPage = mallPage;
       }
       if (meTab) state.subTab.me = meTab;
+      if (forumCategory) state.userForum.category = forumCategory;
       if (orderId && params.get("openDetail") === "1") state.userMe.selectedOrder = orderId;
       if (feedback) state.userFeedback = feedback;
     }
@@ -225,6 +230,10 @@
     userAddresses: [
       { id: "ADDR-1", name: "周恺", phone: "13800138000", address: "上海市闵行区申长路 1688 号 2 栋 801", tag: "默认地址" },
       { id: "ADDR-2", name: "周恺", phone: "13800138000", address: "杭州市滨江区江南大道 588 号 1 单元 1202", tag: "常用地址" },
+    ],
+    providerAddresses: [
+      { id: "PA-1", name: "御驰 Performance Studio", phone: "021-54321098", address: "上海市闵行区申长路 1688 号改装产业园 A2-301", tag: "门店地址" },
+      { id: "PA-2", name: "御驰 Performance Studio", phone: "021-54321098", address: "上海市浦东新区张江高科路 888 号 3 栋 502", tag: "备用收货点" },
     ],
   };
 
@@ -435,7 +444,7 @@
     const userLoggedIn = appType !== "user" || !!getMockUserAuth();
     const topbarMarkup = appType === "user"
       ? ""
-      : `<header class="android-topbar"><span class="eyebrow">${cfg.title}</span><h2>${cfg.labels[state.tab]}</h2><div class="muted">${appType === "admin" ? "轻审批、轻处理、待办集中办结" : "门店作业、采购与结算"}</div></header>`;
+      : `<header class="android-topbar"><span class="eyebrow">${cfg.title}</span><h2>${cfg.labels[state.tab]}</h2></header>`;
     screenEl.dataset.mobileShell = appType;
     screenEl.innerHTML = `
       <div class="android-status"><span>9:41</span><span>5G 92%</span></div>
@@ -451,6 +460,11 @@
     screenEl.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
       state.tab = b.dataset.tab;
       if (b.dataset.tab === "mall") state.userMallPage = "";
+      if (b.dataset.tab === "forum") {
+        state.userForum.category = "all";
+        state.userForum.selectedPost = "";
+        state.userForum.createOpen = false;
+      }
       render();
     }));
     screenEl.querySelectorAll("[data-sub-tab]").forEach((b) => b.addEventListener("click", () => { state.subTab[state.tab] = b.dataset.subTab; render(); }));
@@ -492,7 +506,7 @@
       if (state.tab === "orders") state.subTab.orders = b.dataset.ordersTarget || "pending";
       if (state.tab === "operations") state.subTab.operations = b.dataset.operationsTarget || "cases";
       if (state.tab === "messages") state.subTab.messages = b.dataset.messagesTarget || "all";
-      if (state.tab === "me") state.subTab.me = b.dataset.meTarget || "settlements";
+      if (state.tab === "me") state.subTab.me = b.dataset.meTarget || "profile";
       render();
     }));
     screenEl.querySelectorAll("[data-provider-action]").forEach((b) => b.addEventListener("click", () => handleProviderAction(b)));
@@ -500,7 +514,6 @@
     screenEl.querySelectorAll("[data-provider-purchase-form]").forEach((form) => form.addEventListener("submit", handleProviderPurchaseSubmit));
     screenEl.querySelectorAll("[data-provider-case-form]").forEach((form) => form.addEventListener("submit", handleProviderCaseSubmit));
     screenEl.querySelectorAll("[data-provider-accept-form]").forEach((form) => form.addEventListener("submit", handleProviderAcceptSubmit));
-    screenEl.querySelectorAll("[data-provider-after-sale-form]").forEach((form) => form.addEventListener("submit", handleProviderAfterSaleSubmit));
     screenEl.querySelectorAll("[data-provider-profile-form]").forEach((form) => form.addEventListener("submit", handleProviderProfileSubmit));
     screenEl.querySelectorAll("[data-provider-pricing-form]").forEach((form) => {
       form.addEventListener("submit", handleProviderPricingSubmit);
@@ -533,10 +546,26 @@
     screenEl.querySelectorAll("[data-user-invoice-form]").forEach((form) => form.addEventListener("submit", handleUserInvoiceSubmit));
     screenEl.querySelectorAll("[data-user-vehicle-form]").forEach((form) => form.addEventListener("submit", handleUserVehicleSubmit));
     screenEl.querySelectorAll("[data-user-forum-form]").forEach((form) => form.addEventListener("submit", handleUserForumSubmit));
+    screenEl.querySelectorAll("[data-rich-cmd]").forEach((btn) => btn.addEventListener("click", () => {
+      const cmd = btn.dataset.richCmd;
+      const val = btn.dataset.richVal || null;
+      if (cmd === "createLink") {
+        const url = prompt("请输入链接地址：", "https://");
+        if (url) document.execCommand(cmd, false, url);
+      } else {
+        document.execCommand(cmd, false, val);
+      }
+      const editor = screenEl.querySelector("#forumRichEditor");
+      if (editor) editor.focus();
+    }));
     screenEl.querySelectorAll("[data-user-forum-reply-form]").forEach((form) => form.addEventListener("submit", handleUserForumReplySubmit));
+    screenEl.querySelectorAll("[data-user-forum-edit-form]").forEach((form) => form.addEventListener("submit", handleUserForumEditSubmit));
     screenEl.querySelectorAll("[data-user-chat-form]").forEach((form) => form.addEventListener("submit", handleUserChatSubmit));
     screenEl.querySelectorAll("[data-user-address-form]").forEach((form) => form.addEventListener("submit", handleUserAddressSubmit));
     screenEl.querySelectorAll("[data-user-credit-form]").forEach((form) => form.addEventListener("submit", handleUserCreditSubmit));
+    screenEl.querySelectorAll("[data-user-profile-form]").forEach((form) => form.addEventListener("submit", handleUserProfileSubmit));
+    screenEl.querySelectorAll("[data-user-avatar-input]").forEach((input) => input.addEventListener("change", handleUserAvatarChange));
+    screenEl.querySelectorAll("[data-user-after-sale-form]").forEach((form) => form.addEventListener("submit", handleUserAfterSaleSubmit));
     screenEl.querySelectorAll("[data-user-dialog-action]").forEach((b) => b.addEventListener("click", () => handleUserDialogAction(b)));
     screenEl.querySelectorAll("[data-user-dialog-rating]").forEach((b) => b.addEventListener("click", () => {
       state.userDialog.rating = Number(b.dataset.userDialogRating || 0);
@@ -644,13 +673,13 @@
       const status = getAdminCurrentOrderStatus();
       const rows = getAdminFilteredOrders();
       const selected = rows.find((i) => i.id === state.adminSelected.orders) || rows[0];
-      const categoryTabs = [{ id: "goods", label: "商品订单" }, { id: "service", label: "服务订单" }];
+      const categoryTabs = [{ id: "goods", label: "商品订单" }, { id: "service", label: "服务订单" }, { id: "after-sale", label: "售后订单" }];
       const statusTabs = getAdminOrderStatusTabs(category);
       const listContent = rows.length ? rows.map((i) => {
         const isGoods = isAdminGoodsOrder(i);
         return `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === i.id ? "active" : ""}" type="button" data-admin-pick data-admin-type="orders" data-admin-id="${i.id}"><div style="display:flex; justify-content:space-between; gap:12px;"><strong>${i.id}</strong>${tag(nOrder(i.status))}</div><div class="muted" style="margin-top:8px;">${safe(i.user, "用户")} / ${safe(i.vehicle, "车型")}</div><div style="margin-top:8px;">${safe(i.service, isGoods ? "商品" : "服务项目")}</div>${isGoods ? "" : `<div class="muted" style="margin-top:8px;">服务商：${safe(i.provider, "待分配")}</div>`}<div class="muted" style="margin-top:8px;">${isGoods ? `支付状态：${safe(i.payment, "-")} / ${safe(i.progress, "待履约")}` : `服务进度：${safe(i.progress, "处理中")}`}</div></button>${selected?.id === i.id ? renderAdminOrderDetail(i, category) : ""}</div>`;
-      }).join("") : `<article class="mobile-item"><strong>${category === "goods" ? "暂无商品订单" : "暂无服务订单"}</strong><div class="muted" style="margin-top:8px;">当前状态为 ${statusTabs.find((item) => item.id === status)?.label || "全部"}，可切换上方标签查看其他订单。</div></article>`;
-      return `<div class="stack"><div class="sub-tabs">${categoryTabs.map((item) => `<button class="sub-tab ${category === item.id ? "active" : ""}" type="button" data-admin-order-category="${item.id}">${item.label}</button>`).join("")}</div><div class="sub-tabs">${statusTabs.map((item) => `<button class="sub-tab ${status === item.id ? "active" : ""}" type="button" data-admin-order-status="${item.id}">${item.label}</button>`).join("")}</div><section class="admin-detail-card"><div class="eyebrow">Order Overview</div><h3>${category === "goods" ? "商品订单" : "服务订单"}</h3><div class="admin-kv-list"><div><span>当前状态</span><strong>${statusTabs.find((item) => item.id === status)?.label || "全部"}</strong></div><div><span>订单数量</span><strong>${rows.length}</strong></div><div><span>业务说明</span><strong>${category === "goods" ? "平台商城商品销售、发货与履约跟进" : "用户改装需求、派单施工与验收闭环"}</strong></div></div></section><div class="mobile-list">${listContent}</div></div>`;
+      }).join("") : `<article class="mobile-item"><strong>${category === "goods" ? "暂无商品订单" : category === "after-sale" ? "暂无售后订单" : "暂无服务订单"}</strong><div class="muted" style="margin-top:8px;">当前状态为 ${statusTabs.find((item) => item.id === status)?.label || "全部"}，可切换上方标签查看其他订单。</div></article>`;
+      return `<div class="stack"><div class="sub-tabs">${categoryTabs.map((item) => `<button class="sub-tab ${category === item.id ? "active" : ""}" type="button" data-admin-order-category="${item.id}">${item.label}</button>`).join("")}</div><div class="sub-tabs">${statusTabs.map((item) => `<button class="sub-tab ${status === item.id ? "active" : ""}" type="button" data-admin-order-status="${item.id}">${item.label}</button>`).join("")}</div><section class="admin-detail-card"><div class="eyebrow">Order Overview</div><h3>${category === "goods" ? "商品订单" : category === "after-sale" ? "售后订单" : "服务订单"}</h3><div class="admin-kv-list"><div><span>当前状态</span><strong>${statusTabs.find((item) => item.id === status)?.label || "全部"}</strong></div><div><span>订单数量</span><strong>${rows.length}</strong></div><div><span>业务说明</span><strong>${category === "goods" ? "平台商城商品销售、发货与履约跟进" : category === "after-sale" ? "用户售后申请、平台审核与退款/换货处理" : "用户改装需求、派单施工与验收闭环"}</strong></div></div></section><div class="mobile-list">${listContent}</div></div>`;
       }
       const active = state.subTab.orders || "list";
       const rows = active === "assign" ? orders.filter((i) => nOrder(i.status) === "待分配") : orders;
@@ -716,21 +745,30 @@
   }
 
   function getAdminCurrentOrderStatus() {
-    const category = state.adminOrders.category === "goods" ? "goods" : "service";
-    const status = state.adminOrders[category === "goods" ? "goodsStatus" : "serviceStatus"] || "all";
-    if (category === "service" && status === "after-sale") return "all";
-    return status;
+    const category = state.adminOrders.category === "goods" ? "goods" : state.adminOrders.category === "after-sale" ? "after-sale" : "service";
+    const statusMap = { goods: "goodsStatus", "after-sale": "afterSaleStatus", service: "serviceStatus" };
+    return state.adminOrders[statusMap[category]] || "all";
   }
 
   function getAdminOrderStatusTabs(category) {
-    return category === "goods"
-      ? [{ id: "all", label: "全部" }, { id: "unpaid", label: "待付款" }, { id: "pending-delivery", label: "待发货" }, { id: "receiving", label: "待收货" }, { id: "completed", label: "已完成" }]
-      : [{ id: "all", label: "全部" }, { id: "pending", label: "待分配" }, { id: "processing", label: "施工中" }, { id: "acceptance", label: "待验收" }, { id: "completed", label: "已完成" }];
+    if (category === "goods") {
+      return [{ id: "all", label: "全部" }, { id: "unpaid", label: "待付款" }, { id: "pending-delivery", label: "待发货" }, { id: "receiving", label: "待收货" }, { id: "completed", label: "已完成" }];
+    }
+    if (category === "after-sale") {
+      return [{ id: "all", label: "全部" }, { id: "pending", label: "待审核" }, { id: "approved", label: "已通过" }, { id: "rejected", label: "已驳回" }];
+    }
+    return [{ id: "all", label: "全部" }, { id: "pending", label: "待分配" }, { id: "processing", label: "施工中" }, { id: "acceptance", label: "待验收" }, { id: "completed", label: "已完成" }];
   }
 
   function matchAdminOrderStatus(item, category, status) {
     const currentStatus = nOrder(item.status);
     if (status === "all") return true;
+    if (category === "after-sale") {
+      if (status === "pending") return item.afterSaleStatus === "待平台审核";
+      if (status === "approved") return item.afterSaleStatus === "已通过";
+      if (status === "rejected") return item.afterSaleStatus === "已驳回";
+      return false;
+    }
     if (category === "goods") {
       if (status === "unpaid") return currentStatus === "待支付";
       if (status === "pending-delivery") return currentStatus === "待发货";
@@ -748,19 +786,27 @@
   function getAdminFilteredOrders() {
     const category = state.adminOrders.category || "service";
     const status = getAdminCurrentOrderStatus();
+    if (category === "after-sale") {
+      return orders.filter((item) => item.afterSaleType && matchAdminOrderStatus(item, category, status));
+    }
     return orders.filter((item) => (category === "goods" ? isAdminGoodsOrder(item) : !isAdminGoodsOrder(item)) && matchAdminOrderStatus(item, category, status));
   }
 
   function renderAdminOrderDetail(item, active) {
     const isGoods = active === "goods";
+    const isAfterSale = active === "after-sale";
+    if (isAfterSale) {
+      return `<section class="admin-detail-card"><div class="eyebrow">After Sale</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>订单类型</span><strong>商品订单</strong></div><div><span>用户</span><strong>${safe(item.user, "-")}</strong></div><div><span>商品</span><strong>${safe(item.service, "-")}</strong></div><div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>售后类型</span><strong>${safe(item.afterSaleType, "-")}</strong></div><div><span>售后原因</span><strong>${safe(item.afterSaleReason, "-")}</strong></div><div><span>售后状态</span><strong>${safe(item.afterSaleStatus, "处理中")}</strong></div><div><span>申请时间</span><strong>${safe(item.afterSaleTime, "-")}</strong></div></div><div class="admin-timeline">${getOrderTimeline(item).map((line) => `<div>${line}</div>`).join("")}</div><div class="admin-action-row">${item.afterSaleStatus === "待平台审核" ? `<button class="btn btn-primary" type="button" data-admin-action="after-sale-approve" data-admin-id="${item.id}">通过申请</button><button class="btn btn-danger" type="button" data-admin-action="after-sale-reject" data-admin-id="${item.id}">驳回申请</button>` : `<button class="btn btn-secondary" type="button" disabled>已处理</button>`}</div></section>`;
+    }
     if (isGoods) {
       const canShip = nOrder(item.status) === "待发货";
       const shippingOpen = state.adminShipment.orderId === item.id;
-      return `<section class="admin-detail-card"><div class="eyebrow">Goods Order</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>订单类型</span><strong>商品订单</strong></div><div><span>用户</span><strong>${safe(item.user, "-")}</strong></div><div><span>收货城市</span><strong>${safe(item.city, "-")}</strong></div><div><span>商品</span><strong>${safe(item.service, "-")}</strong></div><div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>支付状态</span><strong>${safe(item.payment, "-")}</strong></div><div><span>订单状态</span><strong>${nOrder(item.status)}</strong></div><div><span>履约进度</span><strong>${safe(item.progress, "-")}</strong></div><div><span>物流公司</span><strong>${safe(item.shippingCompany, canShip ? "待录入" : "-")}</strong></div><div><span>物流单号</span><strong>${safe(item.shippingNo, canShip ? "待录入" : "-")}</strong></div><div><span>发货备注</span><strong>${safe(item.shippingRemark, canShip ? "待录入" : "-")}</strong></div></div>${shippingOpen ? renderAdminShippingForm(item) : ""}<div class="admin-timeline">${getOrderTimeline(item).map((line) => `<div>${line}</div>`).join("")}</div><div class="admin-action-row">${canShip ? `<button class="btn btn-primary" type="button" data-admin-action="${shippingOpen ? "order-ship-cancel" : "order-ship"}" data-admin-id="${item.id}">${shippingOpen ? "收起发货表单" : "发货"}</button>` : `<button class="btn btn-secondary" type="button" disabled>${nOrder(item.status) === "已完成" ? "已完成履约" : "平台履约跟进中"}</button>`}</div></section>`;
+      const canAfterSale = item.afterSaleStatus === "待平台审核";
+      return `<section class="admin-detail-card"><div class="eyebrow">Goods Order</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>订单类型</span><strong>商品订单</strong></div><div><span>用户</span><strong>${safe(item.user, "-")}</strong></div><div><span>收货城市</span><strong>${safe(item.city, "-")}</strong></div><div><span>商品</span><strong>${safe(item.service, "-")}</strong></div><div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>支付状态</span><strong>${safe(item.payment, "-")}</strong></div><div><span>订单状态</span><strong>${nOrder(item.status)}</strong></div><div><span>履约进度</span><strong>${safe(item.progress, "-")}</strong></div><div><span>物流公司</span><strong>${safe(item.shippingCompany, canShip ? "待录入" : "-")}</strong></div><div><span>物流单号</span><strong>${safe(item.shippingNo, canShip ? "待录入" : "-")}</strong></div><div><span>发货备注</span><strong>${safe(item.shippingRemark, canShip ? "待录入" : "-")}</strong></div>${item.afterSaleType ? `<div><span>售后类型</span><strong>${safe(item.afterSaleType, "-")}</strong></div><div><span>售后状态</span><strong>${safe(item.afterSaleStatus, "处理中")}</strong></div>` : ""}</div>${shippingOpen ? renderAdminShippingForm(item) : ""}<div class="admin-timeline">${getOrderTimeline(item).map((line) => `<div>${line}</div>`).join("")}</div><div class="admin-action-row">${canShip ? `<button class="btn btn-primary" type="button" data-admin-action="${shippingOpen ? "order-ship-cancel" : "order-ship"}" data-admin-id="${item.id}">${shippingOpen ? "收起发货表单" : "发货"}</button>` : canAfterSale ? `<button class="btn btn-primary" type="button" data-admin-action="after-sale-approve" data-admin-id="${item.id}">通过售后</button><button class="btn btn-danger" type="button" data-admin-action="after-sale-reject" data-admin-id="${item.id}">驳回售后</button>` : `<button class="btn btn-secondary" type="button" disabled>${nOrder(item.status) === "已完成" ? "已完成履约" : "平台履约跟进中"}</button>`}</div></section>`;
     }
     const opts = providers.filter((p) => nProvider(p.status) !== "暂停接单" && nAudit(p.auditStatus) === "已通过");
     const canAssign = nOrder(item.status) === "待分配";
-    return `<section class="admin-detail-card"><div class="eyebrow">${canAssign ? "Order Dispatch" : "Service Order"}</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>订单类型</span><strong>服务订单</strong></div><div><span>用户</span><strong>${safe(item.user, "-")}</strong></div><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>改装项目</span><strong>${safe(item.service, "-")}</strong></div><div><span>报价金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>预约时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>客户意向</span><strong>${safe(item.intention, "未指定")}</strong></div><div><span>服务商</span><strong>${safe(item.provider, "待分配")}</strong></div><div><span>当前进度</span><strong>${safe(item.progress, "-")}</strong></div></div>${canAssign ? `<div class="admin-suggest-list">${opts.slice(0, 3).map((p) => `<button class="admin-suggest-item" type="button" data-admin-action="order-assign" data-admin-id="${item.id}" data-provider-id="${p.id}"><strong>${safe(p.name, "服务商")}</strong><span>${p.name === item.intention ? "客户意向门店" : safe(p.city, "城市门店")}</span></button>`).join("")}</div>` : ""}<div class="admin-timeline">${getOrderTimeline(item).map((line) => `<div>${line}</div>`).join("")}</div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-admin-action="order-detail" data-admin-id="${item.id}">查看详情</button>${canAssign ? `<button class="btn btn-primary" type="button" data-admin-action="order-assign-intention" data-admin-id="${item.id}">一键派给意向门店</button>` : ""}</div></section>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">${canAssign ? "Order Dispatch" : "Service Order"}</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>订单类型</span><strong>服务订单</strong></div><div><span>用户</span><strong>${safe(item.user, "-")}</strong></div><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>改装项目</span><strong>${safe(item.service, "-")}</strong></div><div><span>报价金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>预约安装时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>客户意向</span><strong>${safe(item.intention, "未指定")}</strong></div><div><span>服务商</span><strong>${safe(item.provider, "待分配")}</strong></div><div><span>当前进度</span><strong>${safe(item.progress, "-")}</strong></div></div>${canAssign ? `<div class="admin-suggest-list">${opts.slice(0, 3).map((p) => `<button class="admin-suggest-item" type="button" data-admin-action="order-assign" data-admin-id="${item.id}" data-provider-id="${p.id}"><strong>${safe(p.name, "服务商")}</strong><span>${p.name === item.intention ? "客户意向门店" : safe(p.city, "城市门店")}</span></button>`).join("")}</div>` : ""}<div class="admin-timeline">${getOrderTimeline(item).map((line) => `<div>${line}</div>`).join("")}</div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-admin-action="order-detail" data-admin-id="${item.id}">查看详情</button>${canAssign ? `<button class="btn btn-primary" type="button" data-admin-action="order-assign-intention" data-admin-id="${item.id}">一键派给意向门店</button>` : ""}</div></section>`;
   }
   function renderAdminCaseDetail(item) { return `<section class="admin-detail-card"><div class="eyebrow">Case Review</div><h3>${safe(item.title, "案例详情")}</h3><div class="admin-kv-list"><div><span>服务商</span><strong>${safe(item.provider, "-")}</strong></div><div><span>车型</span><strong>${safe(item.model, "-")}</strong></div><div><span>风格</span><strong>${safe(item.style, "-")}</strong></div><div><span>改装类型</span><strong>${safe(item.modType, "-")}</strong></div><div><span>花费区间</span><strong>${safe(item.cost, "-")}</strong></div><div><span>审核状态</span><strong>${nCaseAudit(item.audit)}</strong></div><div><span>展示状态</span><strong>${nCaseDisplay(item.display)}</strong></div></div><div class="admin-doc-list"><div class="admin-doc-item">案例主图</div><div class="admin-doc-item">施工过程图</div><div class="admin-doc-item">完工对比图</div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-admin-action="case-approve" data-admin-id="${item.id}">审核通过</button><button class="btn btn-secondary" type="button" data-admin-action="case-display" data-admin-id="${item.id}">设为正常展示</button><button class="btn btn-danger" type="button" data-admin-action="case-reject" data-admin-id="${item.id}">审核驳回</button></div></section>`; }
   function renderAdminForumDetail(post) { const related = comments.filter((i) => i.post === post.id); return `<section class="admin-detail-card"><div class="eyebrow">Forum Moderation</div><h3>${safe(post.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>作者</span><strong>${safe(post.author, "-")}</strong></div><div><span>发布时间</span><strong>${safe(post.time, "-")}</strong></div><div><span>当前状态</span><strong>${nForum(post.status)}</strong></div><div><span>互动数据</span><strong>回复 ${post.replies || 0} / 点赞 ${post.likes || 0}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-admin-action="forum-post-toggle" data-admin-id="${post.id}">${nForum(post.status) === "已删除" ? "恢复帖子" : "删除帖子"}</button></div><div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${related.length ? related.map((i) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(i.author, "评论用户")}</strong>${tag(nForum(i.status))}</div><p>${safe(i.content, "评论内容")}</p><button class="btn btn-secondary" type="button" data-admin-action="forum-comment-toggle" data-admin-id="${i.id}">${nForum(i.status) === "已删除" ? "恢复评论" : "删除评论"}</button></div>`).join("") : `<div class="muted">当前帖子暂无评论</div>`}</div></div></section>`; }
@@ -847,6 +893,26 @@
       const target = comments.find((item) => item.id === id);
       if (target) target.status = nForum(target.status) === "已删除" ? "正常" : "已删除";
       render();
+      return;
+    }
+    if (action.startsWith("after-sale-")) {
+      const target = orders.find((item) => item.id === id);
+      if (!target) return;
+      if (action === "after-sale-approve") {
+        target.afterSaleStatus = "已通过";
+        target.status = "已完成";
+        target.progress = `售后申请已通过：${target.afterSaleType}，平台已安排处理。`;
+        appendOrderTimeline(target, `平台通过售后申请：${target.afterSaleType}`);
+        state.userFeedback = `${id} 售后申请已通过。`;
+      } else if (action === "after-sale-reject") {
+        target.afterSaleStatus = "已驳回";
+        target.status = "已完成";
+        target.progress = `售后申请已驳回：${target.afterSaleType}，如有疑问请联系平台客服。`;
+        appendOrderTimeline(target, `平台驳回售后申请：${target.afterSaleType}`);
+        state.userFeedback = `${id} 售后申请已驳回。`;
+      }
+      render();
+      return;
     }
   }
 
@@ -881,13 +947,12 @@
 
   function renderProviderHome() {
     const cards = [
-      { title: "待接单", value: getProviderPendingOrders().length, note: "新派单等待门店确认", tab: "orders", ordersTarget: "pending" },
-      { title: "施工中", value: getProviderProcessingOrders().length, note: "跟进施工与完工节点", tab: "orders", ordersTarget: "all" },
-      { title: "待复核统计", value: getProviderSettlementRows().filter((item) => nSettlement(item.status) !== "已归档").length || 1, note: "按服务次数与推荐用户统计", tab: "me", meTarget: "settlements" },
-      { title: "采购与运营", value: getProviderPurchasableProducts().length + getProviderCaseRows().filter((item) => nCaseAudit(item.audit) !== "已通过").length, note: "采购、案例和帖子统一处理", tab: "operations", operationsTarget: "purchase" },
-      { title: "待处理消息", value: fallback.providerMessages.filter((item) => item.status !== "已处理").length, note: "及时查看派单、验收和采购提醒", tab: "messages", messagesTarget: "all" },
+      { title: "待接单", value: getProviderPendingOrders().length, note: "", tab: "orders", ordersTarget: "pending" },
+      { title: "施工中", value: getProviderProcessingOrders().length, note: "", tab: "orders", ordersTarget: "all" },
+      { title: "采购与运营", value: getProviderPurchasableProducts().length + getProviderCaseRows().filter((item) => nCaseAudit(item.audit) !== "已通过").length, note: "", tab: "operations", operationsTarget: "purchase" },
+      { title: "待处理消息", value: fallback.providerMessages.filter((item) => item.status !== "已处理").length, note: "", tab: "messages", messagesTarget: "all" },
     ];
-    return `<div class="stack"><section class="hero-banner"><div class="eyebrow">Store Dashboard</div><h3 style="margin:10px 0 8px; font-size:28px; font-family:var(--font-display);">门店工作台</h3><p class="muted">聚焦接单、施工、采购、内容运营、消息处理和服务统计，适合门店前台快速处理。</p></section><section class="mobile-grid-2">${cards.map((item) => `<button class="m3-card admin-shortcut-card" type="button" data-provider-shortcut="${item.tab}" ${item.ordersTarget ? `data-orders-target="${item.ordersTarget}"` : ""} ${item.operationsTarget ? `data-operations-target="${item.operationsTarget}"` : ""} ${item.messagesTarget ? `data-messages-target="${item.messagesTarget}"` : ""} ${item.meTarget ? `data-me-target="${item.meTarget}"` : ""}><div class="muted">${item.title}</div><span class="mobile-stat">${item.value}</span><div class="muted">${item.note}</div></button>`).join("")}</section><section class="mobile-list"><article class="mobile-item"><strong>今日到店 6 台 / 完工 3 台</strong><div class="muted" style="margin-top:8px;">轮毂升级、隐形车衣与精品内饰是当前主力订单。</div></article><article class="mobile-item"><strong>本周营收 ¥186,000</strong><div class="muted" style="margin-top:8px;">高端改装订单客单价保持在 ¥13,000 以上。</div></article></section></div>`;
+    return `<div class="stack"><section class="hero-banner" style="min-height:auto; padding-bottom:16px;"><div class="eyebrow">Store Dashboard</div><h3 style="margin:10px 0 0; font-size:28px; font-family:var(--font-display);">门店工作台</h3></section><section class="mobile-grid-2">${cards.map((item) => `<button class="m3-card admin-shortcut-card" type="button" data-provider-shortcut="${item.tab}" ${item.ordersTarget ? `data-orders-target="${item.ordersTarget}"` : ""} ${item.operationsTarget ? `data-operations-target="${item.operationsTarget}"` : ""} ${item.messagesTarget ? `data-messages-target="${item.messagesTarget}"` : ""} ${item.meTarget ? `data-me-target="${item.meTarget}"` : ""}><div class="muted">${item.title}</div><span class="mobile-stat">${item.value}</span>${item.note ? `<div class="muted">${item.note}</div>` : ""}</button>`).join("")}</section><section class="mobile-list"><article class="mobile-item"><strong>今日到店 6 台 / 完工 3 台</strong></article><article class="mobile-item"><strong>本周营收 ¥186,000</strong></article></section></div>`;
   }
 
   function renderProviderOrders() {
@@ -914,6 +979,12 @@
     if (active === "pricing") {
       return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${renderProviderServicePricing()}`;
     }
+    if (active === "purchase" && state.providerPurchase.sku) {
+      const product = getProviderPurchasableProducts().find((item) => item.sku === state.providerPurchase.sku);
+      if (product) {
+        return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${renderProviderPurchaseDetail(product)}`;
+      }
+    }
     const rows =
       active === "purchase" ? getProviderPurchasableProducts() :
       active === "record" ? getProviderPurchaseRecords() :
@@ -923,21 +994,24 @@
       active === "purchase" || active === "record"
         ? rows.find((item) => (item.sku || item.id) === state.providerSelected.products) || rows[0]
         : rows.find((item) => item.id === state.providerSelected[active]) || rows[0];
-    return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "cases" ? `<div class="admin-action-row" style="margin-bottom:12px;"><button class="btn btn-primary" type="button" data-provider-action="case-add">新增案例</button></div>${state.providerCaseForm.mode === "create" ? renderProviderCaseForm() : ""}` : active === "forum" ? `<div class="admin-action-row" style="margin-bottom:12px;"><button class="btn btn-primary" type="button" data-provider-action="moderator-apply">${state.providerMe.moderatorStatus === "已通过" ? "版主权限管理" : state.providerMe.moderatorStatus === "待审核" ? "审核中" : "申请版主"}</button>${state.providerMe.moderatorStatus === "已通过" ? `<button class="btn btn-secondary" type="button" data-provider-action="moderator-manage">管理板块</button>` : ""}</div>${state.providerMe.moderatorApplyOpen ? renderProviderModeratorForm() : ""}` : ""}<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${(active === "purchase" || active === "record") ? (selected && (selected.sku || selected.id) === (item.sku || item.id) ? "active" : "") : (selected?.id === item.id ? "active" : "")}" type="button" data-provider-pick data-provider-type="${active === "purchase" || active === "record" ? "products" : active}" data-provider-id="${item.sku || item.id}">${active === "purchase" ? `<div class="provider-product-media"><div class="provider-product-visual" data-product-tone="${(item.brand || "").length % 3}"><span>${safe(item.category, "商品")}</span></div></div><strong>${safe(item.name, "商品")}</strong><div class="muted" style="margin-top:8px;">${safe(item.brand, "品牌")} / 型号 ${providerProductModel(item)}</div><div class="muted" style="margin-top:6px;">${safe(item.category, "类目")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">${safe(item.price, "-")}</span>${tag(nProduct(item.status))}</div>` : active === "record" ? `<strong>${safe(item.id, "采购记录")}</strong><div class="muted" style="margin-top:8px;">${safe(item.name, "商品")} / 型号 ${providerProductModel(item)}</div><div class="muted" style="margin-top:6px;">数量 ${item.quantity || 1} / ${safe(item.amount, "-")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nPurchaseStatus(item.status))}</div>` : active === "cases" ? `<strong>${safe(item.title, "案例")}</strong><div class="muted" style="margin-top:8px;">${safe(item.model, "车型")} / ${safe(item.modType, "改装类型")} / ${safe(item.cost, "-")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nCaseAudit(item.audit))}<span class="pill">${nCaseDisplay(item.display)}</span></div>` : `<strong>${safe(item.title, "帖子")}</strong><div class="muted" style="margin-top:8px;">回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</div><div style="margin-top:10px;">${tag(nForum(item.status))}</div>`}</button>${(active === "purchase" || active === "record") ? (selected && (selected.sku || selected.id) === (item.sku || item.id) ? renderProviderProductDetail(item, active) : "") : (selected?.id === item.id ? (active === "cases" ? renderProviderCaseDetail(item) : renderProviderForumDetail(item)) : "")}</div>`).join("")}</div>`;
+    if (active === "purchase") {
+      return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}<div class="user-mall-v3-grid" style="margin-top:12px;">${rows.map((item, index) => `<article class="user-mall-v3-card"><button class="user-mall-v3-card-art" type="button" data-provider-action="provider-product-pick" data-provider-id="${item.sku}" data-tone="${(index % 4) + 1}"></button><div class="user-mall-v3-card-body"><strong>${safe(item.name, "商品")}</strong><span>${safe(item.brand, "-")} / ${safe(item.category, "-")}</span><p>${safe(item.fitment, "适配当前车型")}</p><div><b>${safe(item.price, "-")}</b></div></div></article>`).join("")}</div>`;
+    }
+    return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "cases" ? `<div class="admin-action-row" style="margin-bottom:12px;"><button class="btn btn-primary" type="button" data-provider-action="case-add">新增案例</button></div>${state.providerCaseForm.mode === "create" ? renderProviderCaseForm() : ""}` : active === "forum" ? `<div class="admin-action-row" style="margin-bottom:12px;"><button class="btn btn-primary" type="button" data-provider-action="moderator-apply">${state.providerMe.moderatorStatus === "已通过" ? "版主权限管理" : state.providerMe.moderatorStatus === "待审核" ? "审核中" : "申请版主"}</button>${state.providerMe.moderatorStatus === "已通过" ? `<button class="btn btn-secondary" type="button" data-provider-action="moderator-manage">管理板块</button>` : ""}</div>${state.providerMe.moderatorApplyOpen ? renderProviderModeratorForm() : ""}` : ""}<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected && (selected.sku || selected.id) === (item.sku || item.id) ? "active" : ""}" type="button" data-provider-pick data-provider-type="products" data-provider-id="${item.sku || item.id}">${active === "record" ? `<strong>${safe(item.id, "采购记录")}</strong><div class="muted" style="margin-top:8px;">${safe(item.name, "商品")} / 型号 ${providerProductModel(item)}</div><div class="muted" style="margin-top:6px;">数量 ${item.quantity || 1} / ${safe(item.amount, "-")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nPurchaseStatus(item.status))}</div>` : active === "cases" ? `<strong>${safe(item.title, "案例")}</strong><div class="muted" style="margin-top:8px;">${safe(item.model, "车型")} / ${safe(item.modType, "改装类型")} / ${safe(item.cost, "-")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nCaseAudit(item.audit))}<span class="pill">${nCaseDisplay(item.display)}</span></div>` : `<strong>${safe(item.title, "帖子")}</strong><div class="muted" style="margin-top:8px;">回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</div><div style="margin-top:10px;">${tag(nForum(item.status))}</div>`}</button>${selected && (selected.sku || selected.id) === (item.sku || item.id) ? renderProviderProductDetail(item, active) : (selected?.id === item.id ? (active === "cases" ? renderProviderCaseDetail(item) : renderProviderForumDetail(item)) : "")}</div>`).join("")}</div>`;
   }
 
   function renderProviderMessages() {
     const rows = fallback.providerMessages;
-    const selected = rows.find((item) => item.id === state.providerSelected.messages) || rows[0];
-    if (!selected) return `<div class="stack">${subTabs([{ id: "all", label: "全部消息" }])}<section class="admin-detail-card"><h3>暂无会话</h3></section></div>`;
-    return `<div class="stack">${subTabs([{ id: "all", label: "全部消息" }])}<section class="provider-chat-shell"><div class="provider-chat-list">${rows.map((item) => `<div class="admin-inline-block"><button class="provider-chat-thread ${selected.id === item.id ? "active" : ""}" type="button" data-provider-pick data-provider-type="messages" data-provider-id="${item.id}"><div class="provider-chat-thread-head"><strong>${item.title}</strong><span>${item.time}</span></div><div class="provider-chat-thread-preview">${safe(item.preview, "暂无新消息")}</div><div class="provider-chat-thread-meta">${tag(item.status)}</div></button>${selected.id === item.id ? `<section class="provider-chat-panel"><header class="provider-chat-header"><div><div class="eyebrow">Realtime Chat</div><h3>${item.title}</h3></div>${tag(item.status)}</header><div class="provider-chat-body">${item.messages.map((message) => `<article class="provider-chat-bubble ${message.from === "provider" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "provider" ? "门店" : message.from === "user" ? "客户" : "平台"}</div><p>${message.text}</p><time>${message.time}</time></article>`).join("")}</div><form class="provider-chat-composer" data-provider-chat-form data-provider-id="${item.id}"><input class="input" name="chatMessage" type="text" placeholder="输入消息并实时发送" autocomplete="off" required><button class="btn btn-primary" type="submit">发送</button></form></section>` : ""}</div>`).join("")}</div></section></div>`;
+    const selected = rows.find((item) => item.id === state.providerSelected.messages);
+    if (!selected) {
+      return `<div class="stack user-message-page">${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}<section class="provider-chat-shell user-message-list-shell"><div class="provider-chat-list user-message-list">${rows.map((item) => `<button class="provider-chat-thread user-message-thread" type="button" data-provider-action="provider-message-pick" data-provider-id="${item.id}"><div class="provider-chat-thread-head"><strong>${safe(item.title, "消息")}</strong><span>${safe(item.time, "刚刚")}</span></div><div class="provider-chat-thread-preview">${safe(item.preview, "暂无消息内容")}</div><div class="provider-chat-thread-meta">${tag(safe(item.status, "正常"))}</div></button>`).join("")}</div></section></div>`;
+    }
+    return `<div class="stack user-message-page">${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}<section class="provider-chat-panel user-message-detail"><header class="provider-chat-header"><button class="user-message-back" type="button" data-provider-action="provider-message-back">返回</button><div><div class="eyebrow">Realtime Chat</div><h3>${safe(selected.title, "即时对话")}</h3></div>${tag(safe(selected.status, "正常"))}</header><div class="provider-chat-body">${selected.messages.map((message) => `<article class="provider-chat-bubble ${message.from === "provider" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "provider" ? "门店" : message.from === "user" ? "客户" : "平台"}</div><p>${message.text}</p><time>${message.time}</time></article>`).join("")}</div><form class="provider-chat-composer user-message-composer" data-provider-chat-form data-provider-id="${selected.id}"><label class="user-message-attach" title="添加附件"><input name="providerChatAttachment" type="file" accept="image/*,video/*,.pdf,.doc,.docx" multiple><span>＋</span></label><input class="input" name="chatMessage" type="text" placeholder="输入消息并实时发送" autocomplete="off"><button class="btn btn-primary" type="submit">发送</button></form></section></div>`;
   }
 
   function renderProviderMe() {
-    const active = state.subTab.me || "settlements";
-    const rows = getProviderSettlementRows();
-    const selected = rows.find((item) => item.id === state.providerSelected.settlements) || rows[0];
-    return `${subTabs([{ id: "settlements", label: "服务统计" }, { id: "business", label: "营业情况" }, { id: "profile", label: "门店资料" }])}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "profile" ? `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Store Profile</div><h3>门店与账号信息</h3><div class="admin-kv-list"><div><span>门店名称</span><strong>${safe(getProviderStore().name, "高端改装门店")}</strong></div><div><span>联系人</span><strong>${safe(getProviderStore().contact, "-")}</strong></div><div><span>门店地址</span><strong>${safe(getProviderStore().address || `${safe(getProviderStore().city, "-")}${safe(getProviderStore().district, "")}改装产业园 A3-201`, "-")}</strong></div><div><span>主营能力</span><strong>${safe(getProviderStore().specialties, "-")}</strong></div><div><span>门店状态</span><strong>${nProvider(getProviderStore().status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">${state.providerMe.profileEditOpen ? "收起资料表单" : "更新门店资料"}</button><button class="btn btn-primary" type="button" data-provider-action="provider-profile-contact">联系平台客服</button></div></section>${state.providerMe.profileEditOpen ? renderProviderProfileForm() : ""}</div>` : active === "business" ? renderProviderBusiness() : `<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === item.id ? "active" : ""}" type="button" data-provider-pick data-provider-type="settlements" data-provider-id="${item.id}"><strong>${item.id}</strong><div class="muted" style="margin-top:8px;">服务 ${item.serviceTimes || item.orders || 0} 次 / 推荐用户 ${item.referredUsers || 0} 人</div><div class="muted" style="margin-top:6px;">订单金额 ${getSettlementGrossAmount(item)}</div><div style="margin-top:10px;">${tag(nSettlement(item.status))}</div></button>${selected?.id === item.id ? renderProviderSettlementDetail(item) : ""}</div>`).join("")}</div>`}`;
+    const active = state.subTab.me || "profile";
+    return `${subTabs([{ id: "business", label: "营业情况" }, { id: "profile", label: "门店资料" }])}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "profile" ? `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Store Profile</div><h3>门店与账号信息</h3><div class="admin-kv-list"><div><span>门店名称</span><strong>${safe(getProviderStore().name, "高端改装门店")}</strong></div><div><span>联系人</span><strong>${safe(getProviderStore().contact, "-")}</strong></div><div><span>门店地址</span><strong>${safe(getProviderStore().address || `${safe(getProviderStore().city, "-")}${safe(getProviderStore().district, "")}改装产业园 A3-201`, "-")}</strong></div><div><span>主营能力</span><strong>${safe(getProviderStore().specialties, "-")}</strong></div><div><span>审核状态</span><strong>${nAudit(getProviderStore().auditStatus)}</strong></div><div><span>门店状态</span><strong>${nProvider(getProviderStore().status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">${state.providerMe.profileEditOpen ? "收起资料表单" : "更新门店资料"}</button><button class="btn btn-primary" type="button" data-provider-action="provider-profile-contact">联系平台客服</button></div></section>${state.providerMe.profileEditOpen ? renderProviderProfileForm() : ""}</div>` : renderProviderBusiness()}`;
   }
 
   function renderProviderDialog() {
@@ -985,6 +1059,22 @@
 
   function getProviderStore() {
     return providers.find((item) => nAudit(item.auditStatus) === "已通过") || providers[0];
+  }
+
+  function getProviderAddresses() {
+    const store = getProviderStore();
+    const defaultAddress = store?.address ? {
+      id: "PA-0",
+      name: store.name || "门店",
+      phone: store.contactPhone || store.phone || "021-54321098",
+      address: store.address,
+      tag: "门店地址",
+    } : null;
+    const rows = fallback.providerAddresses || [];
+    if (defaultAddress && !rows.some((item) => item.address === defaultAddress.address)) {
+      return [defaultAddress, ...rows];
+    }
+    return rows;
   }
 
   function getProviderAllOrders() {
@@ -1045,7 +1135,6 @@
     const meta = getProviderOrderMeta(item);
     const actions = [];
     const completionOpen = state.providerCompletion.orderId === item.id;
-    const afterSaleOpen = state.providerAfterSale.orderId === item.id;
     const afterSaleStatus = safe(meta.afterSaleStatus, status === "售后中" ? "售后处理中" : "未发起");
     if (!item.providerRejectStatus && (status === "待分配" || status === "处理中")) {
       actions.push(`<button class="btn btn-primary" type="button" data-provider-action="order-accept" data-provider-id="${item.id}">接单</button>`);
@@ -1054,20 +1143,14 @@
       actions.push(`<button class="btn btn-primary" type="button" data-provider-action="${completionOpen ? "order-complete-cancel" : "order-complete"}" data-provider-id="${item.id}">${completionOpen ? "收起完工表单" : "提交完工"}</button>`);
     } else if (status === "待验收") {
       actions.push(`<button class="btn btn-secondary" type="button" data-provider-action="order-follow" data-provider-id="${item.id}">查看客户验收说明</button>`);
-    } else if (status === "已完成" || status === "售后中") {
-      actions.push(`<button class="btn btn-primary" type="button" data-provider-action="${afterSaleOpen ? "order-after-sale-cancel" : "order-after-sale"}" data-provider-id="${item.id}">${afterSaleOpen ? "收起售后表单" : meta.afterSaleType ? "更新售后记录" : status === "售后中" ? "继续处理售后" : "发起售后"}</button>`);
     }
-    return `<section class="admin-detail-card"><div class="eyebrow">Order Workbench</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>用户</span><strong>${safe(item.user, "-")}</strong></div><div><span>联系电话</span><strong>${meta.phone}</strong></div><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>服务项目</span><strong>${safe(item.service, "-")}</strong></div><div><span>报价</span><strong>${safe(item.quote, "-")}</strong></div><div><span>预约时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>到店信息</span><strong>${meta.arrival}</strong></div><div><span>预计工时</span><strong>${providerEstimateDuration(item)}</strong></div><div><span>客户意向</span><strong>${safe(item.intention, "未指定")}</strong></div><div><span>当前状态</span><strong>${providerOrderViewStatus(item, "all")}</strong></div>${status === "已完成" || status === "售后中" ? `<div><span>售后状态</span><strong>${afterSaleStatus}</strong></div>` : ""}</div><div class="admin-action-row">${actions.join("")}</div>${completionOpen ? renderProviderCompleteForm(item) : ""}${afterSaleOpen ? renderProviderAfterSaleForm(item) : ""}<div class="admin-timeline">${getOrderTimeline(item).map((line) => `<div>${line}</div>`).join("")}<div>施工备注：${providerOrderRemark(item)}</div>${meta.afterSaleType ? `<div>售后记录：${safe(meta.afterSaleType, "售后处理")} / ${safe(meta.afterSaleNote, "待补充说明")}</div>` : ""}<div>门店视角：${status === "施工中" ? "施工进行中，请按节点提交完工。" : status === "待验收" ? "已提交完工资料，等待客户验收。" : status === "售后中" ? "订单已进入售后处理，请按约定时间跟进复查和回访。" : status === "已完成" ? "订单已完成归档，可按客户反馈继续提供售后支持。" : "请尽快响应订单，提升接单转化。"}</div></div></section>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">Order Workbench</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>用户</span><strong>${safe(item.user, "-")}</strong></div><div><span>联系电话</span><strong>${meta.phone}</strong></div><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>服务项目</span><strong>${safe(item.service, "-")}</strong></div><div><span>报价</span><strong>${safe(item.quote, "-")}</strong></div><div><span>预约安装时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>到店信息</span><strong>${meta.arrival}</strong></div><div><span>预计工时</span><strong>${providerEstimateDuration(item)}</strong></div><div><span>客户意向</span><strong>${safe(item.intention, "未指定")}</strong></div><div><span>当前状态</span><strong>${providerOrderViewStatus(item, "all")}</strong></div>${status === "已完成" || status === "售后中" ? `<div><span>售后状态</span><strong>${afterSaleStatus}</strong></div>` : ""}</div><div class="admin-action-row">${actions.join("")}</div>${completionOpen ? renderProviderCompleteForm(item) : ""}<div class="admin-timeline">${getOrderTimeline(item).map((line) => `<div>${line}</div>`).join("")}<div>施工备注：${providerOrderRemark(item)}</div>${meta.afterSaleType ? `<div>售后记录：${safe(meta.afterSaleType, "售后处理")} / ${safe(meta.afterSaleNote, "待补充说明")}</div>` : ""}<div>门店视角：${status === "施工中" ? "施工进行中，请按节点提交完工。" : status === "待验收" ? "已提交完工资料，等待客户验收。" : status === "售后中" ? "订单已进入售后处理，请按约定时间跟进复查和回访。" : status === "已完成" ? "订单已完成归档，可按客户反馈继续提供售后支持。" : "请尽快响应订单，提升接单转化。"}</div></div></section>`;
   }
 
   function renderProviderCompleteForm(item) {
     return `<form class="provider-complete-form" data-provider-complete-form data-provider-id="${item.id}"><div class="field-group"><label class="field-label" for="complete-note-${item.id}">完工说明</label><textarea class="textarea" id="complete-note-${item.id}" name="completeNote" placeholder="请填写施工完成情况、交付内容和客户注意事项" required>施工已完成，外观与功能已复检，交付前已与客户确认项目清单。</textarea></div><div class="form-grid"><div class="field-group"><label class="field-label" for="complete-images-${item.id}">上传图片</label><label class="upload-panel" for="complete-images-${item.id}"><input id="complete-images-${item.id}" class="upload-input" name="completeImages" type="file" accept="image/*" multiple><span class="upload-illustration"></span><strong>上传完工图片</strong><small>支持施工完成图、交付图、细节图，最多选择 9 张</small></label></div><div class="field-group"><label class="field-label" for="complete-check-${item.id}">提醒客户验收</label><input class="input" id="complete-check-${item.id}" name="acceptanceTips" type="text" value="请客户重点确认外观细节、功能联调与随车物品" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">确认提交完工</button><button class="btn btn-secondary" type="button" data-provider-action="order-complete-cancel" data-provider-id="${item.id}">取消</button></div></form>`;
   }
 
-  function renderProviderAfterSaleForm(item) {
-    const meta = getProviderOrderMeta(item);
-    return `<form class="provider-complete-form" data-provider-after-sale-form data-provider-id="${item.id}"><div class="form-grid"><div class="field-group"><label class="field-label" for="after-sale-type-${item.id}">售后类型</label><select class="input" id="after-sale-type-${item.id}" name="afterSaleType" required><option value="异响复查" ${safe(meta.afterSaleType, "") === "异响复查" ? "selected" : ""}>异响复查</option><option value="安装复紧" ${safe(meta.afterSaleType, "") === "安装复紧" ? "selected" : ""}>安装复紧</option><option value="功能复检" ${safe(meta.afterSaleType, "") === "功能复检" ? "selected" : ""}>功能复检</option><option value="外观返修" ${safe(meta.afterSaleType, "") === "外观返修" ? "selected" : ""}>外观返修</option></select></div><div class="field-group"><label class="field-label" for="after-sale-time-${item.id}">售后预约时间</label><input class="input" id="after-sale-time-${item.id}" name="afterSaleTime" type="datetime-local" value="${toDateTimeLocalValue(meta.afterSaleTime || item.appointment) || "2026-04-10T10:00"}" required></div></div><div class="field-group"><label class="field-label" for="after-sale-note-${item.id}">售后处理说明</label><textarea class="textarea" id="after-sale-note-${item.id}" name="afterSaleNote" placeholder="请填写客户反馈、复查项目和处理安排" required>${safe(meta.afterSaleNote, "客户反馈高速路试后有轻微异响，已安排复查。")}</textarea></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交售后处理</button><button class="btn btn-secondary" type="button" data-provider-action="order-after-sale-cancel" data-provider-id="${item.id}">取消</button></div></form>`;
-  }
 
   function providerEstimateDuration(item) {
     const meta = getProviderOrderMeta(item);
@@ -1108,16 +1191,36 @@
       const purchaseOpen = state.providerPurchase.sku === item.sku;
       return `<section class="admin-detail-card"><div class="eyebrow">Purchase Action</div><div class="provider-product-hero"><div class="provider-product-visual large" data-product-tone="${(item.brand || "").length % 3}"><span>${safe(item.category, "商品")}</span></div><div><h3>${safe(item.name, "商品采购")}</h3><div class="muted" style="margin-top:8px;">${safe(item.description, "商品说明待补充")}</div></div></div><div class="admin-kv-list"><div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>型号</span><strong>${providerProductModel(item)}</strong></div><div><span>类目</span><strong>${safe(item.category, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>库存状态</span><strong>${nProduct(item.status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-provider-action="${purchaseOpen ? "product-purchase-cancel" : "product-purchase"}" data-provider-id="${item.sku}">${purchaseOpen ? "收起采购表单" : "采购"}</button></div>${purchaseOpen ? renderProviderPurchaseForm(item) : ""}</section>`;
     }
-    return `<section class="admin-detail-card"><div class="eyebrow">Purchase Record</div><h3>${safe(item.id, "采购记录")}</h3><div class="admin-kv-list"><div><span>商品</span><strong>${safe(item.name, "-")}</strong></div><div><span>型号</span><strong>${providerProductModel(item)}</strong></div><div><span>数量</span><strong>${item.quantity || 1}</strong></div><div><span>金额</span><strong>${safe(item.amount, "-")}</strong></div><div><span>状态</span><strong>${nPurchaseStatus(item.status)}</strong></div><div><span>进度说明</span><strong>${safe(item.note, "-")}</strong></div></div><div class="admin-action-row">${nPurchaseStatus(item.status) !== "已签收" ? `<button class="btn btn-primary" type="button" data-provider-action="purchase-record-confirm" data-provider-id="${item.id}">确认收货</button>` : `<button class="btn btn-secondary" type="button" disabled>已确认收货</button>`}<button class="btn btn-secondary" type="button" data-provider-action="purchase-record-detail" data-provider-id="${item.id}">查看记录</button></div></section>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">Purchase Record</div><h3>${safe(item.id, "采购记录")}</h3><div class="admin-kv-list"><div><span>商品</span><strong>${safe(item.name, "-")}</strong></div><div><span>型号</span><strong>${providerProductModel(item)}</strong></div><div><span>数量</span><strong>${item.quantity || 1}</strong></div><div><span>金额</span><strong>${safe(item.amount, "-")}</strong></div><div><span>支付方式</span><strong>${safe(item.payment, "-")}</strong></div><div><span>收货地址</span><strong>${safe(item.address, "-")}</strong></div><div><span>状态</span><strong>${nPurchaseStatus(item.status)}</strong></div><div><span>进度说明</span><strong>${safe(item.note, "-")}</strong></div></div><div class="admin-action-row">${nPurchaseStatus(item.status) !== "已签收" ? `<button class="btn btn-primary" type="button" data-provider-action="purchase-record-confirm" data-provider-id="${item.id}">确认收货</button>` : `<button class="btn btn-secondary" type="button" disabled>已确认收货</button>`}<button class="btn btn-secondary" type="button" data-provider-action="purchase-record-detail" data-provider-id="${item.id}">查看记录</button></div></section>`;
+  }
+
+  function renderProviderPurchaseDetail(item) {
+    const formOpen = state.providerPurchase.formOpen;
+    return `<div class="stack provider-purchase-detail-page">${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}<section class="provider-purchase-detail"><header class="provider-purchase-detail-header"><button class="user-message-back" type="button" data-provider-action="provider-product-back">返回</button><div><div class="eyebrow">Product Detail</div><h3>${safe(item.name, "商品详情")}</h3></div>${tag(nProduct(item.status))}</header><div class="provider-purchase-detail-body"><div class="provider-product-visual large" data-product-tone="${(item.brand || "").length % 3}"><span>${safe(item.category, "商品")}</span></div><div class="admin-kv-list" style="margin-top:14px;"><div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>型号</span><strong>${providerProductModel(item)}</strong></div><div><span>类目</span><strong>${safe(item.category, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>库存状态</span><strong>${nProduct(item.status)}</strong></div></div>${formOpen ? renderProviderPurchaseForm(item) : `<div class="admin-action-row" style="margin-top:16px;"><button class="btn btn-primary" type="button" data-provider-action="provider-product-buy" data-provider-id="${item.sku}">立即采购</button></div>`}</div></section></div>`;
   }
 
   function renderProviderPurchaseForm(item) {
-    return `<form class="provider-complete-form" data-provider-purchase-form data-provider-id="${item.sku}"><div class="form-grid"><div class="field-group"><label class="field-label" for="purchase-quantity-${item.sku}">采购数量</label><input class="input" id="purchase-quantity-${item.sku}" name="purchaseQuantity" type="number" min="1" max="99" value="1" required></div><div class="field-group"><label class="field-label" for="purchase-note-${item.sku}">采购备注</label><input class="input" id="purchase-note-${item.sku}" name="purchaseNote" type="text" value="门店补货采购" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">确认采购</button><button class="btn btn-secondary" type="button" data-provider-action="product-purchase-cancel" data-provider-id="${item.sku}">取消</button></div></form>`;
+    const addressRows = getProviderAddresses();
+    const defaultAddress = addressRows.find((a) => a.tag === "门店地址") || addressRows[0];
+    return `<form class="provider-complete-form" data-provider-purchase-form data-provider-id="${item.sku}"><div class="form-grid"><div class="field-group"><label class="field-label" for="purchase-quantity-${item.sku}">采购数量</label><input class="input" id="purchase-quantity-${item.sku}" name="purchaseQuantity" type="number" min="1" max="99" value="1" required></div><div class="field-group"><label class="field-label" for="purchase-payment-${item.sku}">支付方式</label><select class="input" id="purchase-payment-${item.sku}" name="purchasePayment" required><option value="支付宝">支付宝</option><option value="微信支付">微信支付</option></select></div><div class="field-group field-group-full"><label class="field-label" for="purchase-address-${item.sku}">收货地址</label><select class="input" id="purchase-address-${item.sku}" name="purchaseAddressId" required>${addressRows.map((a) => `<option value="${a.id}" ${a.id === defaultAddress?.id ? "selected" : ""}>${a.tag} · ${a.address}</option>`).join("")}</select></div><div class="field-group field-group-full"><label class="field-label" for="purchase-note-${item.sku}">采购备注</label><input class="input" id="purchase-note-${item.sku}" name="purchaseNote" type="text" value="门店补货采购" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">确认采购</button><button class="btn btn-secondary" type="button" data-provider-action="provider-product-buy-cancel" data-provider-id="${item.sku}">取消</button></div></form>`;
   }
 
   function renderProviderCaseForm(item) {
     const editing = !!item;
-    return `<form class="provider-complete-form" data-provider-case-form data-provider-id="${editing ? item.id : ""}"><div class="form-grid"><div class="field-group"><label class="field-label" for="case-title-${editing ? item.id : "new"}">案例标题</label><input class="input" id="case-title-${editing ? item.id : "new"}" name="caseTitle" type="text" value="${editing ? safe(item.title, "") : ""}" required></div><div class="field-group"><label class="field-label" for="case-model-${editing ? item.id : "new"}">车型</label><input class="input" id="case-model-${editing ? item.id : "new"}" name="caseModel" type="text" value="${editing ? safe(item.model, "") : ""}" required></div><div class="field-group"><label class="field-label" for="case-cost-${editing ? item.id : "new"}">费用区间</label><input class="input" id="case-cost-${editing ? item.id : "new"}" name="caseCost" type="text" value="${editing ? safe(item.cost, "") : ""}" required></div><div class="field-group"><label class="field-label" for="case-modType-${editing ? item.id : "new"}">改装类型</label><select class="select" id="case-modType-${editing ? item.id : "new"}" name="caseModType" required><option value="车衣改造" ${editing && item.modType === "车衣改造" ? "selected" : ""}>车衣改造</option><option value="轮毂改造" ${editing && item.modType === "轮毂改造" ? "selected" : ""}>轮毂改造</option></select></div><div class="field-group"><label class="field-label" for="case-images-${editing ? item.id : "new"}">上传图片</label><label class="upload-panel" for="case-images-${editing ? item.id : "new"}"><input id="case-images-${editing ? item.id : "new"}" class="upload-input" name="caseImages" type="file" accept="image/*" multiple><span class="upload-illustration"></span><strong>上传案例图片</strong><small>支持封面图、施工过程图、完工图，最多选择 9 张</small></label></div><div class="field-group"><label class="field-label" for="case-desc-${editing ? item.id : "new"}">案例说明</label><textarea class="textarea" id="case-desc-${editing ? item.id : "new"}" name="caseDesc" required>${editing ? safe(item.description || item.style, "") : "请填写改装项目、施工亮点和交付效果。"}</textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">${editing ? "保存案例" : "新增案例"}</button><button class="btn btn-secondary" type="button" data-provider-action="case-form-cancel" data-provider-id="${editing ? item.id : ""}">取消</button></div></form>`;
+    const linked = editing ? (item.linkedProducts || []) : [];
+    const grouped = {};
+    products.forEach((p) => {
+      if (!grouped[p.category]) grouped[p.category] = [];
+      grouped[p.category].push(p);
+    });
+    const productSelectorHtml = Object.entries(grouped).map(([cat, list]) => {
+      return `<div style="margin-bottom:10px;"><div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">${cat}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${list.map((p) => {
+        const checked = linked.includes(p.sku) ? "checked" : "";
+        return `<label style="display:flex;align-items:center;gap:6px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);cursor:pointer;font-size:12px;"><input type="checkbox" name="caseLinkedProducts" value="${p.sku}" ${checked}><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</span></label>`;
+      }).join("")}</div></div>`;
+    }).join("");
+
+    return `<form class="provider-complete-form" data-provider-case-form data-provider-id="${editing ? item.id : ""}"><div class="form-grid"><div class="field-group"><label class="field-label" for="case-title-${editing ? item.id : "new"}">案例标题</label><input class="input" id="case-title-${editing ? item.id : "new"}" name="caseTitle" type="text" value="${editing ? safe(item.title, "") : ""}" required></div><div class="field-group"><label class="field-label" for="case-model-${editing ? item.id : "new"}">车型</label><input class="input" id="case-model-${editing ? item.id : "new"}" name="caseModel" type="text" value="${editing ? safe(item.model, "") : ""}" required></div><div class="field-group"><label class="field-label" for="case-cost-${editing ? item.id : "new"}">费用区间</label><input class="input" id="case-cost-${editing ? item.id : "new"}" name="caseCost" type="text" value="${editing ? safe(item.cost, "") : ""}" required></div><div class="field-group"><label class="field-label" for="case-modType-${editing ? item.id : "new"}">改装类型</label><select class="select" id="case-modType-${editing ? item.id : "new"}" name="caseModType" required><option value="车衣改造" ${editing && item.modType === "车衣改造" ? "selected" : ""}>车衣改造</option><option value="轮毂改造" ${editing && item.modType === "轮毂改造" ? "selected" : ""}>轮毂改造</option></select></div><div class="field-group"><label class="field-label" for="case-images-${editing ? item.id : "new"}">上传图片</label><label class="upload-panel" for="case-images-${editing ? item.id : "new"}"><input id="case-images-${editing ? item.id : "new"}" class="upload-input" name="caseImages" type="file" accept="image/*" multiple><span class="upload-illustration"></span><strong>上传案例图片</strong><small>支持封面图、施工过程图、完工图，最多选择 9 张</small></label></div><div class="field-group"><label class="field-label" for="case-desc-${editing ? item.id : "new"}">案例说明</label><textarea class="textarea" id="case-desc-${editing ? item.id : "new"}" name="caseDesc" required>${editing ? safe(item.description || item.style, "") : "请填写改装项目、施工亮点和交付效果。"}</textarea></div></div><div class="field-group" style="margin-top:12px;"><label class="field-label">关联商品（可多选）</label><div style="max-height:220px;overflow-y:auto;padding:10px;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);">${productSelectorHtml}</div></div></form>`;
   }
 
   function getProviderCaseRows() {
@@ -1137,7 +1240,9 @@
 
   function renderProviderCaseDetail(item) {
     const editing = state.providerCaseForm.mode === "edit" && state.providerCaseForm.id === item.id;
-    return `<section class="admin-detail-card"><div class="eyebrow">Case Operation</div><h3>${safe(item.title, "案例详情")}</h3><div class="admin-kv-list"><div><span>车型</span><strong>${safe(item.model, "-")}</strong></div><div><span>改装类型</span><strong>${safe(item.modType, "-")}</strong></div><div><span>费用区间</span><strong>${safe(item.cost, "-")}</strong></div><div><span>审核状态</span><strong>${nCaseAudit(item.audit)}</strong></div><div><span>展示状态</span><strong>${nCaseDisplay(item.display)}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-provider-action="case-submit" data-provider-id="${item.id}">提交审核</button><button class="btn btn-secondary" type="button" data-provider-action="${editing ? "case-form-cancel" : "case-edit"}" data-provider-id="${item.id}">${editing ? "取消编辑" : "编辑案例"}</button></div>${editing ? renderProviderCaseForm(item) : ""}</section>`;
+    const linkedProducts = (item.linkedProducts || []).map((sku) => products.find((p) => p.sku === sku)).filter(Boolean);
+    const linkedHtml = linkedProducts.length ? `<div class="admin-comment-block" style="margin-top:10px;"><strong>关联商品</strong><div class="admin-comment-list">${linkedProducts.map((p) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(p.name, "-")}</strong><span class="muted">${safe(p.price, "-")}</span></div><p>${safe(p.brand, "-")} / ${safe(p.category, "-")}</p></div>`).join("")}</div></div>` : "";
+    return `<section class="admin-detail-card"><div class="eyebrow">Case Operation</div><h3>${safe(item.title, "案例详情")}</h3><div class="admin-kv-list"><div><span>车型</span><strong>${safe(item.model, "-")}</strong></div><div><span>改装类型</span><strong>${safe(item.modType, "-")}</strong></div><div><span>费用区间</span><strong>${safe(item.cost, "-")}</strong></div><div><span>审核状态</span><strong>${nCaseAudit(item.audit)}</strong></div><div><span>展示状态</span><strong>${nCaseDisplay(item.display)}</strong></div></div>${linkedHtml}<div class="admin-action-row"><button class="btn btn-primary" type="button" data-provider-action="case-submit" data-provider-id="${item.id}">提交审核</button><button class="btn btn-secondary" type="button" data-provider-action="${editing ? "case-form-cancel" : "case-edit"}" data-provider-id="${item.id}">${editing ? "取消编辑" : "编辑案例"}</button></div>${editing ? renderProviderCaseForm(item) : ""}</section>`;
   }
 
   function renderProviderForumDetail(item) {
@@ -1174,7 +1279,7 @@
     const store = getProviderStore();
     const rows = getProviderServicePricingRows();
     const enabledCount = rows.filter((item) => item.enabled && item.status !== "停用").length;
-    return `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Service Pricing</div><h3>服务定价设置</h3><div class="admin-kv-list"><div><span>当前门店</span><strong>${safe(store.name, "当前门店")}</strong></div><div><span>已启用服务项</span><strong>${enabledCount} 项</strong></div><div><span>平台定价规则</span><strong>报价需在平台区间内</strong></div><div><span>报价用途</span><strong>用于咨询、派单与服务下单展示</strong></div></div><div class="admin-timeline"><div>先勾选门店可承接的服务项，再填写门店对外报价。</div><div>平台会限制每个服务项的报价范围，便于统一对外价格带。</div><div>停用服务项仅作规则展示，不参与当前门店报价。</div></div></section><form class="provider-complete-form" data-provider-pricing-form>${rows.map((item) => `<section class="mobile-item" style="margin-bottom:12px;"><div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;"><div><strong>${safe(item.name, "服务项目")}</strong><div class="muted" style="margin-top:8px;">${safe(item.desc, "服务说明待补充")}</div><div class="muted" style="margin-top:6px;">工时 ${safe(item.duration, "-")} / 服务编码 ${safe(item.code, "-")}</div></div><label style="display:inline-flex; align-items:center; gap:8px; white-space:nowrap; color:${item.status === "停用" ? "var(--text-muted)" : "#fff"};"><input type="checkbox" name="serviceEnabled-${item.key}" data-provider-price-toggle="${item.key}" ${item.enabled ? "checked" : ""} ${item.status === "停用" ? "disabled" : ""}>当前可接</label></div><div class="form-grid" style="margin-top:14px;"><div class="field-group"><label class="field-label" for="service-range-${item.key}">平台价格范围</label><input class="input" id="service-range-${item.key}" type="text" value="${formatCurrency(item.min)} - ${formatCurrency(item.max)}" disabled></div><div class="field-group"><label class="field-label" for="service-price-${item.key}">门店报价</label><input class="input" id="service-price-${item.key}" name="servicePrice-${item.key}" data-provider-price-input="${item.key}" type="number" min="${item.min}" max="${item.max}" step="100" value="${item.quote}" ${item.status === "停用" || !item.enabled ? "disabled" : ""} required></div></div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(item.status === "停用" ? "停用" : "启用")}<span class="pill">建议价 ${formatCurrency(item.suggested)}</span><span class="pill">${item.enabled && item.status !== "停用" ? "已纳入门店报价" : "未纳入门店报价"}</span></div></section>`).join("")}<div class="admin-action-row"><button class="btn btn-primary" type="submit">保存服务定价</button><button class="btn btn-secondary" type="button" data-provider-action="pricing-reset">恢复建议价</button></div></form></div>`;
+    return `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Service Pricing</div><h3>服务定价设置</h3><div class="admin-kv-list"><div><span>当前门店</span><strong>${safe(store.name, "当前门店")}</strong></div><div><span>已启用服务项</span><strong>${enabledCount} 项</strong></div><div><span>平台定价规则</span><strong>报价需在平台区间内</strong></div><div><span>报价用途</span><strong>用于咨询、派单与服务下单展示</strong></div></div></section><form class="provider-complete-form" data-provider-pricing-form>${rows.map((item) => `<section class="mobile-item" style="margin-bottom:12px;"><div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;"><div><strong>${safe(item.name, "服务项目")}</strong><div class="muted" style="margin-top:8px;">${safe(item.desc, "服务说明待补充")}</div><div class="muted" style="margin-top:6px;">工时 ${safe(item.duration, "-")} / 服务编码 ${safe(item.code, "-")}</div></div><label style="display:inline-flex; align-items:center; gap:8px; white-space:nowrap; color:${item.status === "停用" ? "var(--text-muted)" : "#fff"};"><input type="checkbox" name="serviceEnabled-${item.key}" data-provider-price-toggle="${item.key}" ${item.enabled ? "checked" : ""} ${item.status === "停用" ? "disabled" : ""}>当前可接</label></div><div class="form-grid" style="margin-top:14px;"><div class="field-group"><label class="field-label" for="service-range-${item.key}">平台价格范围</label><input class="input" id="service-range-${item.key}" type="text" value="${formatCurrency(item.min)} - ${formatCurrency(item.max)}" disabled></div><div class="field-group"><label class="field-label" for="service-price-${item.key}">门店报价</label><input class="input" id="service-price-${item.key}" name="servicePrice-${item.key}" data-provider-price-input="${item.key}" type="number" min="${item.min}" max="${item.max}" step="100" value="${item.quote}" ${item.status === "停用" || !item.enabled ? "disabled" : ""} required></div></div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(item.status === "停用" ? "停用" : "启用")}<span class="pill">建议价 ${formatCurrency(item.suggested)}</span><span class="pill">${item.enabled && item.status !== "停用" ? "已纳入门店报价" : "未纳入门店报价"}</span></div></section>`).join("")}<div class="admin-action-row"><button class="btn btn-primary" type="submit">保存服务定价</button><button class="btn btn-secondary" type="button" data-provider-action="pricing-reset">恢复建议价</button></div></form></div>`;
   }
 
   function renderProviderBusiness() {
@@ -1216,19 +1321,35 @@
         state.providerDialog = { type: "reject", orderId: id };
       } else if (action === "order-complete") {
         state.providerCompletion.orderId = id;
-        state.providerAfterSale.orderId = "";
       } else if (action === "order-complete-cancel") {
         state.providerCompletion.orderId = "";
       } else if (action === "order-follow") {
         target.progress = "已与客户确认验收时间，等待客户完成验收";
         appendOrderTimeline(target, "门店已跟进客户验收时间");
         state.providerFeedback = `${id} 已更新客户验收跟进说明。`;
-      } else if (action === "order-after-sale") {
-        state.providerAfterSale.orderId = id;
-        state.providerCompletion.orderId = "";
-      } else if (action === "order-after-sale-cancel") {
-        state.providerAfterSale.orderId = "";
       }
+      render();
+      return;
+    }
+    if (action === "provider-product-pick") {
+      state.providerPurchase.sku = id;
+      state.providerPurchase.formOpen = false;
+      render();
+      return;
+    }
+    if (action === "provider-product-back") {
+      state.providerPurchase.sku = "";
+      state.providerPurchase.formOpen = false;
+      render();
+      return;
+    }
+    if (action === "provider-product-buy") {
+      state.providerPurchase.formOpen = true;
+      render();
+      return;
+    }
+    if (action === "provider-product-buy-cancel") {
+      state.providerPurchase.formOpen = false;
       render();
       return;
     }
@@ -1312,18 +1433,13 @@
       render();
       return;
     }
-    if (action.startsWith("settlement-")) {
-      const target = settlements.find((item) => item.id === id);
-      if (!target) {
-        render();
-        return;
-      }
-      state.subTab.me = "settlements";
-      state.providerSelected.settlements = id;
-      if (action === "settlement-detail") {
-        state.providerMe.settlementDetailId = state.providerMe.settlementDetailId === id ? "" : id;
-        state.providerFeedback = state.providerMe.settlementDetailId === id ? `${id} 服务统计明细已收起。` : `${id} 服务统计明细已展开，可查看客户指定与推荐客户订单分布。`;
-      }
+    if (action === "provider-message-pick") {
+      state.providerSelected.messages = id;
+      render();
+      return;
+    }
+    if (action === "provider-message-back") {
+      state.providerSelected.messages = "";
       render();
       return;
     }
@@ -1334,7 +1450,6 @@
         if (!state.providerMe.profileEditOpen) state.providerFeedback = "已收起门店资料表单。";
       } else if (action === "provider-profile-contact") {
         state.tab = "messages";
-        state.providerSelected.messages = fallback.providerMessages.find((item) => item.id === "msg-4")?.id || fallback.providerMessages[0]?.id || "";
       }
       render();
       return;
@@ -1374,6 +1489,9 @@
     if (!product) return;
     const formData = new FormData(form);
     const quantity = Math.max(1, Number(formData.get("purchaseQuantity") || 1));
+    const payment = String(formData.get("purchasePayment") || "支付宝").trim();
+    const addressId = String(formData.get("purchaseAddressId") || "").trim();
+    const addressItem = getProviderAddresses().find((a) => a.id === addressId);
     const note = String(formData.get("purchaseNote") || "").trim() || "门店补货采购";
     const id = `PO-${Date.now().toString().slice(-6)}`;
     providerPurchaseRecords.unshift({
@@ -1385,13 +1503,18 @@
       category: product.category,
       quantity,
       amount: `${product.price} x${quantity}`,
+      payment,
+      address: addressItem?.address || getProviderStore()?.address || "",
+      addressName: addressItem?.name || getProviderStore()?.name || "",
+      addressPhone: addressItem?.phone || "",
       status: "待发货",
       note,
     });
     state.providerPurchase.sku = "";
+    state.providerPurchase.formOpen = false;
     state.subTab.operations = "record";
     state.providerSelected.products = id;
-    state.providerFeedback = `${safe(product.name, "商品")} 已采购 ${quantity} 件，已加入采购记录。`;
+    state.providerFeedback = `${safe(product.name, "商品")} 已采购 ${quantity} 件，支付方式 ${payment}，已加入采购记录。`;
     render();
   }
 
@@ -1407,6 +1530,7 @@
     const desc = String(formData.get("caseDesc") || "").trim();
     const imageCount = form.querySelector('input[name="caseImages"]')?.files?.length || 0;
     const caseDesc = imageCount ? `${desc} / 已上传 ${imageCount} 张案例图片` : desc;
+    const linkedProducts = Array.from(form.querySelectorAll('input[name="caseLinkedProducts"]:checked')).map((cb) => cb.value);
     if (!title || !model || !cost || !modType || !desc) return;
     if (id) {
       const target = cases.find((item) => item.id === id);
@@ -1417,6 +1541,7 @@
       target.modType = modType;
       target.style = caseDesc;
       target.description = caseDesc;
+      target.linkedProducts = linkedProducts;
       state.providerSelected.cases = id;
       state.providerFeedback = `${title} 已更新。`;
     } else {
@@ -1432,6 +1557,7 @@
         provider: getProviderStore().name,
         audit: "待提交",
         display: "未展示",
+        linkedProducts,
       });
       state.providerSelected.cases = newId;
       state.providerFeedback = `${title} 已新增，可继续提交审核。`;
@@ -1507,33 +1633,6 @@
     render();
   }
 
-  function handleProviderAfterSaleSubmit(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const id = form.dataset.providerId || "";
-    const target = getProviderOrderById(id);
-    if (!target) return;
-    const formData = new FormData(form);
-    const afterSaleType = String(formData.get("afterSaleType") || "").trim();
-    const afterSaleTime = String(formData.get("afterSaleTime") || "").trim();
-    const afterSaleNote = String(formData.get("afterSaleNote") || "").trim();
-    if (!afterSaleType || !afterSaleTime || !afterSaleNote) return;
-    const appointment = afterSaleTime.replace("T", " ");
-    target.status = "已完成";
-    target.progress = `售后处理已记录：${afterSaleType}，计划 ${appointment} 进行复查或回访。`;
-    appendOrderTimeline(target, `售后处理记录：${afterSaleType}，计划 ${appointment} 复查或回访`);
-    const extra = providerOrderExtras[id] || (providerOrderExtras[id] = {});
-    extra.afterSaleStatus = "售后已处理";
-    extra.afterSaleType = afterSaleType;
-    extra.afterSaleTime = appointment;
-    extra.afterSaleNote = afterSaleNote;
-    extra.arrival = `已预约 ${appointment} 返店售后`;
-    state.providerAfterSale.orderId = "";
-    state.providerSelected.orders = id;
-    state.subTab.orders = "completed";
-    state.providerFeedback = `${id} 售后处理已提交，订单状态已更新为已完成。`;
-    render();
-  }
 
   function handleProviderProfileSubmit(event) {
     event.preventDefault();
@@ -1547,9 +1646,10 @@
     store.contact = contact;
     store.address = address;
     store.specialties = specialties;
+    store.auditStatus = "待审核";
     state.subTab.me = "profile";
     state.providerMe.profileEditOpen = false;
-    state.providerFeedback = "门店资料已更新，平台展示信息同步完成。";
+    state.providerFeedback = "门店资料已更新，平台将重新审核，审核通过后方可正常接单。";
     render();
   }
 
@@ -1559,13 +1659,15 @@
     const id = form.dataset.providerId || "";
     const target = fallback.providerMessages.find((item) => item.id === id);
     if (!target) return;
-    const formData = new FormData(form);
-    const text = String(formData.get("chatMessage") || "").trim();
-    if (!text) return;
+    const text = String(new FormData(form).get("chatMessage") || "").trim();
+    const files = Array.from(form.querySelector('input[name="providerChatAttachment"]')?.files || []);
+    if (!text && !files.length) return;
     const now = new Date();
     const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    target.messages.push({ from: "provider", text, time });
-    target.preview = text;
+    const attachmentText = files.length ? `附件：${files.map((file) => file.name).slice(0, 3).join("、")}${files.length > 3 ? ` 等 ${files.length} 个文件` : ""}` : "";
+    const messageText = [text, attachmentText].filter(Boolean).join("\n");
+    target.messages.push({ from: "provider", text: messageText, time });
+    target.preview = text || attachmentText;
     target.time = time;
     target.status = "沟通中";
     state.providerSelected.messages = id;
@@ -1656,7 +1758,7 @@
     const primaryCase = featuredCases[0];
     const secondaryCase = featuredCases[1];
     if (!selectedVehicle) {
-      return `<div class="stack user-home-v2">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-home-board user-home-board-empty"><div class="user-home-hero-shell"><div class="user-home-hero-stage"><div class="user-home-car-scene"><div class="user-home-car-shape"></div></div></div><div class="user-home-hero-copy"><div class="user-home-overline">爱车首页</div><h2>先绑定爱车，再开始改装</h2><p>绑定车辆后，首页会围绕你的爱车、订单进度和改装内容做展示。</p><div class="user-home-chip-row"><span class="user-home-chip">订单进度集中查看</span><span class="user-home-chip">案例与商品联动推荐</span></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-tab="garage">立即绑定</button><button class="btn btn-secondary" type="button" data-tab="mall">先逛商城</button></div></div><div class="user-home-stage-card"><div class="user-home-stage-head"><div><div class="user-home-overline">准备开始</div><strong>建立你的爱车档案</strong></div><span class="pill">待绑定</span></div><div class="user-home-stage-summary"><div><span>首页内容</span><strong>车辆、订单、履历与案例推荐</strong></div><div><span>下一步</span><strong>先去爱车页完成车辆绑定</strong></div></div></div></div></section><section class="user-home-quick-grid"><button class="user-home-quick-card" type="button" data-tab="mall"><span class="user-home-quick-mark">商城</span><strong>改装商城</strong><small>直接进入配件与精品列表</small></button><a class="user-home-quick-card" href="user-case-detail.html"><span class="user-home-quick-mark">案例</span><strong>精选案例</strong><small>浏览改装方案和完工效果</small></a><button class="user-home-quick-card" type="button" data-user-action="user-home-orders"><span class="user-home-quick-mark">订单</span><strong>订单中心</strong><small>查看服务进度和历史记录</small></button><button class="user-home-quick-card" type="button" data-tab="garage"><span class="user-home-quick-mark">爱车</span><strong>爱车档案</strong><small>绑定车辆与常用定位信息</small></button></section><section class="user-home-editorial-grid">${primaryCase ? `<a class="user-home-spotlight" href="user-case-detail.html"><div class="user-home-spotlight-media" data-tone="1"></div><div class="user-home-spotlight-body"><div class="user-home-panel-head"><div><div class="user-home-overline">精选案例</div><h3>${safe(primaryCase.title, "精选案例")}</h3></div><span class="pill">${safe(primaryCase.style, "改装风格")}</span></div><p>${safe(primaryCase.model, "适配车型")} / ${safe(primaryCase.provider, "服务商")}</p></div></a>` : ""}<div class="user-home-product-stack">${featuredProducts.map((item, index) => `<article class="user-home-product-card"><div class="user-home-product-visual" data-tone="${index + 1}"></div><div><strong>${safe(item.name, "商品")}</strong><div class="muted" style="margin-top:6px;">${safe(item.price, "-")} / ${safe(item.brand, "品牌")}</div></div><div class="admin-action-row"><a class="btn btn-secondary" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(item.sku === "PR-8801" ? "wheel" : item.sku === "PR-8802" ? "exhaust" : item.sku === "PR-8805" ? "interior" : "exterior")}">商品详情</a><a class="btn btn-primary" href="${buildUserGoodsOrderLink(item)}">立即下单</a></div></article>`).join("")}</div></section></div>`;
+      return `<div class="stack user-home-v2">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-home-board user-home-board-empty"><div class="user-home-hero-shell"><div class="user-home-hero-stage"><div class="user-home-car-scene"><div class="user-home-car-shape"></div></div></div><div class="user-home-hero-copy"><div class="user-home-overline">爱车首页</div><h2>先绑定爱车，再开始改装</h2><p>绑定车辆后，首页会围绕你的爱车、订单进度和改装内容做展示。</p><div class="user-home-chip-row"><span class="user-home-chip">订单进度集中查看</span><span class="user-home-chip">案例与商品联动推荐</span></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-tab="garage">立即绑定</button><button class="btn btn-secondary" type="button" data-tab="mall">先逛商城</button></div></div><div class="user-home-stage-card"><div class="user-home-stage-head"><div><div class="user-home-overline">准备开始</div><strong>建立你的爱车档案</strong></div><span class="pill">待绑定</span></div><div class="user-home-stage-summary"><div><span>首页内容</span><strong>车辆、订单、履历与案例推荐</strong></div><div><span>下一步</span><strong>先去爱车页完成车辆绑定</strong></div></div></div></div></section><section class="user-home-quick-grid"><button class="user-home-quick-card" type="button" data-tab="mall"><span class="user-home-quick-mark">商城</span><strong>改装商城</strong><small>直接进入配件与精品列表</small></button><a class="user-home-quick-card" href="user-app.html?tab=forum&forumCategory=case"><span class="user-home-quick-mark">案例</span><strong>精选案例</strong><small>浏览改装方案和完工效果</small></a><button class="user-home-quick-card" type="button" data-user-action="user-home-orders"><span class="user-home-quick-mark">订单</span><strong>订单中心</strong><small>查看服务进度和历史记录</small></button><button class="user-home-quick-card" type="button" data-tab="garage"><span class="user-home-quick-mark">爱车</span><strong>爱车档案</strong><small>绑定车辆与常用定位信息</small></button></section><section class="user-home-editorial-grid">${primaryCase ? `<a class="user-home-spotlight" href="user-case-detail.html?id=CA-240402-007"><div class="user-home-spotlight-media" data-tone="1"></div><div class="user-home-spotlight-body"><div class="user-home-panel-head"><div><div class="user-home-overline">精选案例</div><h3>${safe(primaryCase.title, "精选案例")}</h3></div><span class="pill">${safe(primaryCase.style, "改装风格")}</span></div><p>${safe(primaryCase.model, "适配车型")} / ${safe(primaryCase.provider, "服务商")}</p></div></a>` : ""}<div class="user-home-product-stack">${featuredProducts.map((item, index) => `<article class="user-home-product-card"><div class="user-home-product-visual" data-tone="${index + 1}"></div><div><strong>${safe(item.name, "商品")}</strong><div class="muted" style="margin-top:6px;">${safe(item.price, "-")} / ${safe(item.brand, "品牌")}</div></div><div class="admin-action-row"><a class="btn btn-secondary" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(item.sku === "PR-8801" ? "wheel" : item.sku === "PR-8802" ? "exhaust" : item.sku === "PR-8805" ? "interior" : "exterior")}">商品详情</a><a class="btn btn-primary" href="${buildUserGoodsOrderLink(item)}">立即下单</a></div></article>`).join("")}</div></section></div>`;
     }
     return `<div class="stack user-home-v2">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-home-board user-home-hero-v2"><div class="user-home-hero-shell"><div class="user-home-location-bar"><div><span class="user-home-location-label">当前定位</span><strong>${getGarageLocationSummary()}</strong></div><button class="btn btn-secondary user-home-location-trigger" type="button" data-user-action="${state.userGarage.locationEditing ? "user-location-cancel" : "user-location-edit"}">${state.userGarage.locationEditing ? "收起" : "切换定位"}</button></div>${state.userGarage.locationEditing ? renderUserHomeLocationPicker() : ""}<div class="user-home-hero-stage"><div class="user-home-car-scene"><div class="user-home-car-shape"></div></div></div><div class="user-home-hero-copy"><h2>${safe(selectedVehicle.model, "当前爱车")}</h2><p>${safe(selectedVehicle.plate, "-")} / ${safe(selectedVehicle.color, "-")} / 车主 ${safe(selectedVehicle.owner, "-")}</p><div class="user-home-status-bar"><article class="user-home-status-item"><span>意向服务商</span><strong>${providersText}</strong></article></div><div class="user-home-metric-row"><article class="user-home-metric"><span>进行中订单</span><strong>${activeOrders.length}</strong></article><article class="user-home-metric"><span>改装履历</span><strong>${historyEntries.length}</strong></article><article class="user-home-metric"><span>常用服务商</span><strong>${providerEntries.length}</strong></article></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-tab="garage">查看爱车页</button><button class="btn btn-primary" type="button" data-user-action="user-home-orders">查看订单</button></div></div><div class="user-home-stage-card">${currentOrder ? `<div class="user-home-stage-head"><div><div class="user-home-overline">当前服务</div><strong>${safe(currentOrder.service, "订单服务")}</strong></div>${tag(nOrder(currentOrder.status))}</div><div class="user-home-stage-summary"><div><span>预约时间</span><strong>${safe(currentOrder.appointment, "-")}</strong></div><div><span>服务商</span><strong>${safe(currentOrder.provider || currentOrder.intention, "-")}</strong></div><div><span>订单金额</span><strong>${safe(currentOrder.quote, "-")}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="user-home-order-detail" data-user-id="${currentOrder.id}">查看详情</button><button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${currentOrder.id}">联系服务商</button></div>` : `<div class="user-home-stage-head"><div><div class="user-home-overline">当前服务</div><strong>当前暂无进行中服务</strong></div><span class="pill">可直接下单</span></div><div class="user-home-stage-summary"><div><span>推荐动作</span><strong>先去商城选商品，或浏览案例再预约</strong></div><div><span>常用服务商</span><strong>${providersText}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-tab="mall">去商城</button><a class="btn btn-secondary" href="user-case-detail.html">看案例</a></div>`}</div></div></section><section class="user-home-quick-grid"><button class="user-home-quick-card" type="button" data-tab="mall"><span class="user-home-quick-mark">商城</span><strong>改装商城</strong><small>轮毂、排气、制动与精品件</small></button><a class="user-home-quick-card" href="user-case-detail.html"><span class="user-home-quick-mark">案例</span><strong>案例灵感</strong><small>看适配当前车型的方案</small></a><button class="user-home-quick-card" type="button" data-tab="forum"><span class="user-home-quick-mark">社区</span><strong>社区动态</strong><small>查看帖子与互动内容</small></button><button class="user-home-quick-card" type="button" data-user-action="user-home-orders"><span class="user-home-quick-mark">订单</span><strong>订单中心</strong><small>集中查看服务进度</small></button></section><section class="user-home-content-grid"><article class="user-home-panel"><div class="user-home-panel-head"><div><div class="user-home-overline">改装履历</div><h3>最近改装记录</h3></div><button class="btn btn-secondary" type="button" data-tab="garage">查看全部</button></div><div class="user-home-history-list">${historyEntries.slice(0, 3).map((entry, index) => `<div class="user-home-history-row"><span class="user-home-history-index">${String(index + 1).padStart(2, "0")}</span><div><strong>${entry}</strong><small>${providersText}</small></div></div>`).join("")}</div></article><article class="user-home-panel"><div class="user-home-panel-head"><div><div class="user-home-overline">服务摘要</div><h3>当前订单信息</h3></div><button class="btn btn-secondary" type="button" data-user-action="user-home-orders">订单中心</button></div><div class="user-home-order-list">${currentOrder ? `<div class="user-home-order-row"><span>服务项目</span><strong>${safe(currentOrder.service, "-")}</strong></div><div class="user-home-order-row"><span>服务商</span><strong>${safe(currentOrder.provider || currentOrder.intention, "-")}</strong></div><div class="user-home-order-row"><span>支付方式</span><strong>${safe(currentOrder.paymentMethod, "线上支付")}</strong></div><div class="user-home-order-row"><span>订单金额</span><strong>${safe(currentOrder.quote, "-")}</strong></div>` : `<div class="user-home-order-row"><span>当前状态</span><strong>暂无订单</strong></div><div class="user-home-order-row"><span>建议动作</span><strong>去商城或案例页发起需求</strong></div>`}</div></article></section><section class="user-home-editorial-grid">${primaryCase ? `<a class="user-home-spotlight" href="user-case-detail.html"><div class="user-home-spotlight-media" data-tone="1"></div><div class="user-home-spotlight-body"><div class="user-home-panel-head"><div><div class="user-home-overline">精选案例</div><h3>${safe(primaryCase.title, "精选案例")}</h3></div><span class="pill">${safe(primaryCase.style, "改装风格")}</span></div><p>${safe(primaryCase.model, "适配车型")} / ${safe(primaryCase.provider, "服务商")}</p></div></a>` : ""}<div class="user-home-product-stack">${secondaryCase ? `<a class="user-home-mini-case" href="user-case-detail.html"><div class="user-home-mini-case-media" data-tone="2"></div><div><div class="user-home-overline">推荐案例</div><strong>${safe(secondaryCase.title, "推荐案例")}</strong><p>${safe(secondaryCase.model, "车型")} / ${safe(secondaryCase.style, "风格")}</p></div></a>` : ""}${featuredProducts.map((item, index) => `<article class="user-home-product-card"><div class="user-home-product-visual" data-tone="${index + 1}"></div><div><strong>${safe(item.name, "商品")}</strong><div class="muted" style="margin-top:6px;">${safe(item.price, "-")} / ${safe(item.brand, "品牌")}</div></div><div class="admin-action-row"><a class="btn btn-secondary" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(item.sku === "PR-8801" ? "wheel" : item.sku === "PR-8802" ? "exhaust" : item.sku === "PR-8805" ? "interior" : "exterior")}">商品详情</a><a class="btn btn-primary" href="${buildUserGoodsOrderLink(item)}">立即下单</a></div></article>`).join("")}</div></section></div>`;
   }
@@ -1671,9 +1773,10 @@
     const rows = getUserMallFilteredProducts(activeBrand, activeModel);
     const resultSummary = `${rows.length} 件商品`;
     const cartCount = getUserCartItems().reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    const collectionCount = getUserCollections().length;
     const { brands: brandList } = window.MockData;
     const bannerText = fallback.userBanners[0];
-    return `<div class="stack user-mall-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-mall-banner"><div class="mall-banner-visual" data-tone="1"><div class="mall-banner-copy"><div class="mall-banner-overline">本周推荐</div><h2>高端姿态方案</h2><p>${bannerText}</p><a class="btn btn-primary mall-banner-cta" href="user-product-detail.html?sku=PR-8801&name=BBS%20锻造轮毂%2019寸&price=%C2%A5%2018,800&brand=BBS&fitment=宝马%203系%20/%20奥迪%20A4L&mallPage=wheel">立即选购</a></div></div></section><section class="user-mall-brands"><div class="mall-brands-head"><strong>签约品牌</strong><span>${brandList.length}+ 全球改装品牌</span></div><div class="mall-brands-scroll">${brandList.map((b) => `<div class="mall-brand-item"><div class="mall-brand-logo" data-brand="${b.id}"></div><span>${b.name}</span></div>`).join("")}</div></section><section class="user-mall-shell"><div class="user-mall-toolbar"><form class="user-mall-search" data-user-mall-search-form><input class="input user-mall-search-input" name="userMallKeyword" type="text" value="${safe(state.userMall.keyword, "")}" placeholder="搜索改装配件、品牌..." aria-label="搜索改装配件、品牌"><button class="user-mall-search-submit" type="submit" aria-label="搜索">搜索</button></form><a class="mall-cart-btn" href="user-app.html?tab=me&meTab=cart"><span class="mall-cart-icon">购物车</span>${cartCount > 0 ? `<span class="mall-cart-badge">${cartCount}</span>` : ""}</a></div><div class="user-mall-filter-row"><select class="input" data-user-mall-filter="brand">${brandOptions.map((item) => `<option value="${item}" ${item === activeBrand ? "selected" : ""}>${item}</option>`).join("")}</select><select class="input" data-user-mall-filter="model">${modelOptions.map((item) => `<option value="${item}" ${item === activeModel ? "selected" : ""}>${item}</option>`).join("")}</select></div><div class="user-mall-layout"><aside class="user-mall-sidebar">${categoryMeta.map((item) => `<button class="user-mall-category ${item.id === "all" ? (!state.userMallPage ? "active" : "") : state.userMallPage === item.id ? "active" : ""}" type="button" data-user-action="user-mall-category" data-user-id="${item.id}">${item.label}</button>`).join("")}</aside><div class="user-mall-results"><div class="user-mall-results-head"><strong>${safe(activeModel !== "全部车型" ? activeModel : selectedVehicle?.model, "当前车型")}</strong><span>${resultSummary}</span></div>${rows.length ? rows.map((item, index) => `<article class="user-mall-card"><a class="user-mall-card-media" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(item.category))}" data-tone="${(index % 4) + 1}"></a><div class="user-mall-card-body"><h4>${safe(item.name, "商品")}</h4><div class="user-mall-card-meta">${safe(item.brand, "-")} · ${safe(item.category, "-")}</div><div class="user-mall-card-fitment">${safe(item.fitment, "适配当前车型")}</div><div class="user-mall-card-actions"><strong class="user-mall-card-price">${safe(item.price, "-")}</strong><button class="btn btn-secondary btn-sm" type="button" data-user-action="user-mall-collect" data-user-id="${item.sku}">收藏</button></div></div></article>`).join("") : `<div class="user-mall-empty">暂无符合条件的商品</div>`}</div></div></section></div>`;
+    return `<div class="stack user-mall-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-mall-banner"><div class="mall-banner-visual" data-tone="1"><div class="mall-banner-copy"><div class="mall-banner-overline">本周推荐</div><h2>高端姿态方案</h2><p>${bannerText}</p><a class="btn btn-primary mall-banner-cta" href="user-product-detail.html?sku=PR-8801&name=BBS%20锻造轮毂%2019寸&price=%C2%A5%2018,800&brand=BBS&fitment=宝马%203系%20/%20奥迪%20A4L&mallPage=wheel">立即选购</a></div></div></section><section class="user-mall-brands"><div class="mall-brands-head"><strong>签约品牌</strong><span>${brandList.length}+ 全球改装品牌</span></div><div class="mall-brands-scroll">${brandList.map((b) => `<div class="mall-brand-item"><div class="mall-brand-logo" data-brand="${b.id}"></div><span>${b.name}</span></div>`).join("")}</div></section><section class="user-mall-shell"><div class="user-mall-toolbar"><form class="user-mall-search" data-user-mall-search-form><input class="input user-mall-search-input" name="userMallKeyword" type="text" value="${safe(state.userMall.keyword, "")}" placeholder="搜索改装配件、品牌..." aria-label="搜索改装配件、品牌"><button class="user-mall-search-submit" type="submit" aria-label="搜索">搜索</button></form><div class="user-mall-toolbar-actions"><a class="mall-cart-btn" href="user-app.html?tab=me&meTab=cart"><span class="mall-cart-icon">购物车</span>${cartCount > 0 ? `<span class="mall-cart-badge">${cartCount}</span>` : ""}</a><a class="mall-cart-btn mall-collection-btn" href="user-app.html?tab=me&meTab=collections"><span class="mall-cart-icon">收藏</span>${collectionCount > 0 ? `<span class="mall-cart-badge">${collectionCount}</span>` : ""}</a></div></div><div class="user-mall-filter-row"><select class="input" data-user-mall-filter="brand">${brandOptions.map((item) => `<option value="${item}" ${item === activeBrand ? "selected" : ""}>${item}</option>`).join("")}</select><select class="input" data-user-mall-filter="model">${modelOptions.map((item) => `<option value="${item}" ${item === activeModel ? "selected" : ""}>${item}</option>`).join("")}</select></div><div class="user-mall-layout"><aside class="user-mall-sidebar">${categoryMeta.map((item) => `<button class="user-mall-category ${item.id === "all" ? (!state.userMallPage ? "active" : "") : state.userMallPage === item.id ? "active" : ""}" type="button" data-user-action="user-mall-category" data-user-id="${item.id}">${item.label}</button>`).join("")}</aside><div class="user-mall-results"><div class="user-mall-results-head"><strong>${safe(activeModel !== "全部车型" ? activeModel : selectedVehicle?.model, "当前车型")}</strong><span>${resultSummary}</span></div>${rows.length ? rows.map((item, index) => `<article class="user-mall-card"><a class="user-mall-card-media" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(item.category))}" data-tone="${(index % 4) + 1}"></a><div class="user-mall-card-body"><h4>${safe(item.name, "商品")}</h4><div class="user-mall-card-meta">${safe(item.brand, "-")} · ${safe(item.category, "-")}</div><div class="user-mall-card-fitment">${safe(item.fitment, "适配当前车型")}</div><div class="user-mall-card-actions"><strong class="user-mall-card-price">${safe(item.price, "-")}</strong><button class="btn btn-secondary btn-sm ${isUserProductCollected(item.sku) ? "active" : ""}" type="button" data-user-action="user-mall-collect" data-user-id="${item.sku}">${isUserProductCollected(item.sku) ? "取消收藏" : "收藏"}</button></div></div></article>`).join("") : `<div class="user-mall-empty">暂无符合条件的商品</div>`}</div></div></section></div>`;
   }
 
   function renderUserMe() {
@@ -1721,6 +1824,10 @@
     window.localStorage.setItem(COLLECTIONS_STORAGE_KEY, JSON.stringify(rows));
   }
 
+  function isUserProductCollected(sku) {
+    return getUserCollections().some((item) => safe(item.sku, "") === safe(sku, ""));
+  }
+
   function readStorageRows(key) {
     if (typeof window === "undefined" || !window.localStorage) return [];
     try {
@@ -1766,7 +1873,7 @@
     return window.MockData.paymentOptions || [
       { id: "alipay", name: "支付宝" },
       { id: "wechat", name: "微信支付" },
-      { id: "bank", name: "银行卡" },
+      { id: "combined", name: "组合支付" },
       { id: "credit", name: "金融授信" },
     ];
   }
@@ -1960,21 +2067,29 @@
     }).join("") || `<article class="mobile-item"><strong>暂无历史订单</strong></article>`}</div>`;
   }
 
+  function renderUserCoupons() {
+    const activeFilter = state.userMe.couponFilter || "available";
+    const coupons = [
+      { id: "C001", name: "新用户专享券", type: "discount", value: "¥200", threshold: "满¥2,000可用", validity: "2026.05.28 - 2026.06.28", status: "available", desc: "限商城轮毂、车衣类目" },
+      { id: "C002", name: "618改装节", type: "percent", value: "9折", threshold: "满¥5,000可用", validity: "2026.06.01 - 2026.06.18", status: "available", desc: "全平台通用" },
+      { id: "C003", name: "服务工时券", type: "discount", value: "¥500", threshold: "满¥3,000可用", validity: "2026.04.01 - 2026.05.01", status: "expired", desc: "限指定服务商门店" },
+      { id: "C004", name: "BBS品牌券", type: "discount", value: "¥1,000", threshold: "满¥10,000可用", validity: "2026.05.01 - 2026.07.01", status: "used", desc: "限BBS锻造轮毂" },
+      { id: "C005", name: "满减券", type: "discount", value: "¥300", threshold: "满¥1,500可用", validity: "2026.05.20 - 2026.06.20", status: "available", desc: "限排气、避震类目" },
+    ];
+    const filtered = coupons.filter((c) => activeFilter === "all" ? true : c.status === activeFilter);
+    const filterTabs = [
+      { id: "available", label: "已领取" },
+      { id: "used", label: "已使用" },
+      { id: "expired", label: "已过期" },
+    ];
+    const listHtml = filtered.length ? `<div class="user-coupon-list">${filtered.map((c) => `<article class="user-coupon-card ${c.status}"><div class="user-coupon-main"><strong>${c.value}</strong><span>${c.name}</span><small>${c.desc}</small></div><div class="user-coupon-meta"><span>${c.threshold}</span><span>${c.validity}</span></div>${c.status === "available" ? `<button class="btn btn-primary btn-sm" type="button" data-tab="mall">去使用</button>` : c.status === "used" ? `<span class="pill">已使用</span>` : `<span class="pill muted">已过期</span>`}</article>`).join("")}</div>` : `<section class="user-me-panel user-me-empty"><strong>暂无优惠券</strong><span>领取优惠券后，会在这里集中查看。</span></section>`;
+    return `<div class="stack user-coupon-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-coupon-head"><div><span>Coupons</span><strong>优惠券管理</strong></div><small>${coupons.filter((c) => c.status === "available").length} 张可用</small></section><section class="user-coupon-filter">${filterTabs.map((t) => `<button class="${activeFilter === t.id ? "active" : ""}" type="button" data-user-action="user-coupon-filter" data-user-id="${t.id}">${t.label}</button>`).join("")}</section>${listHtml}</div>`;
+  }
+
   function renderUserMessages() {
     const rows = fallback.providerMessages.filter((item) => item.messages.some((message) => message.from === "user" || message.from === "provider" || message.from === "platform"));
     const selected = rows.find((item) => item.id === state.userMe.selectedMessage) || rows[0];
     return `<div class="stack">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="provider-chat-shell"><div class="provider-chat-list">${rows.map((item) => `<div class="admin-inline-block"><button class="provider-chat-thread ${selected?.id === item.id ? "active" : ""}" type="button" data-user-action="user-message-pick" data-user-id="${item.id}"><div class="provider-chat-thread-head"><strong>${safe(item.title, "消息")}</strong><span>${safe(item.time, "刚刚")}</span></div><div class="provider-chat-thread-preview">${safe(item.preview, "暂无消息内容")}</div><div class="provider-chat-thread-meta">${tag(safe(item.status, "正常"))}</div></button>${selected?.id === item.id ? `<section class="provider-chat-panel"><header class="provider-chat-header"><div><div class="eyebrow">Realtime Chat</div><h3>${safe(item.title, "即时对话")}</h3></div>${tag(safe(item.status, "正常"))}</header><div class="provider-chat-body">${item.messages.map((message) => `<article class="provider-chat-bubble ${message.from === "user" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "user" ? "我" : message.from === "provider" ? "服务商" : "平台"}</div><p>${message.text}</p><time>${message.time}</time></article>`).join("")}</div><form class="provider-chat-composer" data-user-chat-form data-user-id="${item.id}"><input class="input" name="userChatMessage" type="text" placeholder="输入消息并实时发送" autocomplete="off" required><button class="btn btn-primary" type="submit">发送</button></form></section>` : ""}</div>`).join("")}</div></section></div>`;
-  }
-
-  function renderUserHistoryOrderDetail(item) {
-    const canAccept = nOrder(item.status) === "待验收";
-    const isGoodsOrder = safe(item.type, "") === "商品订单" || ["自提", "快递配送"].includes(safe(item.displayType, ""));
-    const providerMeta = providerOrderExtras[item.id] || {};
-    const completionSummary = item.userVisibleProgress || safe(item.progress, "服务商暂未提交完工说明");
-    const uploadSummary = safe(providerMeta.arrival, "暂未上传完工图片");
-    const acceptanceTips = safe(providerMeta.remark, "请重点核对施工效果、功能联调和随车物品");
-    const visibleTimeline = item.userVisibleProgress ? ["订单已提交", item.userVisibleProgress] : getOrderTimeline(item);
-    return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>${isGoodsOrder ? "商品" : "服务"}</span><strong>${safe(item.service, "-")}</strong></div>${isGoodsOrder ? `<div><span>收货人</span><strong>${safe(item.recipient, getUserDefaultReceiver())}</strong></div><div><span>收货地址</span><strong>${safe(item.address, getUserDefaultAddress())}</strong></div>` : `<div><span>预约时间</span><strong>${safe(item.appointment, "-")}</strong></div>`}<div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>当前进度</span><strong>${completionSummary}</strong></div></div>${canAccept ? `<section class="provider-complete-form"><div class="field-group"><label class="field-label">服务商完工情况</label><div class="admin-timeline"><div>${completionSummary}</div><div>${uploadSummary}</div><div>验收提示：${acceptanceTips}</div></div></div></section>` : ""}<div class="admin-timeline">${visibleTimeline.map((line) => `<div>${line}</div>`).join("")}</div><div class="admin-action-row">${canAccept ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系服务商</button><button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>` : `<button class="btn btn-secondary" type="button" disabled>当前无需验收</button>`}</div></section>`;
   }
 
   function renderUserAddress() {
@@ -2021,63 +2136,30 @@
   }
 
   function renderUserForumCreateForm() {
-    const productOptions = products.map((p) => `<option value="${p.sku}">${p.name} / ${p.brand} / ${p.price}</option>`).join("");
-    return `<form class="topic-create-form" data-user-forum-form style="margin:0 16px 16px;"><div class="field-group"><label class="field-label" for="forum-title">帖子标题</label><input class="input" id="forum-title" name="forumTitle" type="text" placeholder="输入帖子标题" required></div><div class="field-group"><label class="field-label" for="forum-content">帖子内容</label><textarea class="textarea topic-create-textarea" id="forum-content" name="forumContent" rows="5" placeholder="分享你的改装心得..." required></textarea></div><div class="field-group"><label class="field-label" for="forum-product">关联商品（可选）</label><select class="input" id="forum-product" name="forumProduct"><option value="">不关联商品</option>${productOptions}</select></div><div class="field-group"><label class="field-label" for="forum-media">上传图片或视频</label><label class="upload-panel" for="forum-media"><input id="forum-media" class="upload-input" name="forumMedia" type="file" accept="image/*,video/*" multiple><span class="upload-illustration"></span><strong>上传帖子素材</strong><small>支持上传图片或短视频，最多选择 9 个文件</small></label></div><div class="topic-create-actions"><button class="btn btn-secondary" type="button" data-user-action="user-forum-cancel">取消</button><button class="btn btn-primary" type="submit">发布帖子</button></div></form>`;
+    const boardOptions = (forumBoards || []).filter((b) => b.status === "启用").map((b) => `<option value="${b.id}">${b.name}</option>`).join("");
+    return `<form class="topic-create-form" data-user-forum-form style="margin:0 16px 16px;"><div class="field-group"><label class="field-label" for="forum-title">帖子标题</label><input class="input" id="forum-title" name="forumTitle" type="text" placeholder="输入帖子标题" required></div><div class="field-group"><label class="field-label" for="forum-board">发布版面</label><select class="input" id="forum-board" name="forumBoard" required><option value="" disabled selected>请选择发布版面</option>${boardOptions || '<option value="" disabled>暂无可用版面</option>'}</select></div><div class="field-group"><label class="field-label">帖子内容</label><div class="rich-editor-shell"><div class="rich-editor-toolbar"><button type="button" data-rich-cmd="bold" title="加粗"><b>B</b></button><button type="button" data-rich-cmd="italic" title="斜体"><i>I</i></button><button type="button" data-rich-cmd="underline" title="下划线"><u>U</u></button><button type="button" data-rich-cmd="formatBlock" data-rich-val="H2" title="小标题">H2</button><button type="button" data-rich-cmd="formatBlock" data-rich-val="BLOCKQUOTE" title="引用">“</button><button type="button" data-rich-cmd="createLink" title="插入链接">🔗</button><button type="button" data-rich-cmd="insertHorizontalRule" title="分隔线">—</button></div><div class="rich-editor-area" id="forumRichEditor" contenteditable="true" data-placeholder="分享你的改装心得..."></div><input type="hidden" name="forumContent" id="forumContentHidden" /></div></div><div class="field-group"><label class="field-label" for="forum-tags">标签</label><input class="input" id="forum-tags" name="forumTags" type="text" placeholder="#轮毂 #排气 #车衣，多个标签用空格分隔"></div><div class="field-group"><label class="field-label" for="forum-media">上传图片或视频</label><label class="upload-panel" for="forum-media"><input id="forum-media" class="upload-input" name="forumMedia" type="file" accept="image/*,video/*" multiple><span class="upload-illustration"></span><strong>上传帖子素材</strong><small>支持上传图片或短视频，最多选择 9 个文件</small></label></div><div class="topic-create-actions"><button class="btn btn-secondary" type="button" data-user-action="user-forum-cancel">取消</button><button class="btn btn-primary" type="submit">发布帖子</button></div></form>`;
   }
 
-  function renderUserForum() {
-    if (state.userForum.createOpen) {
-      return `<div class="stack forum-home-shell"><section class="forum-home-hero"><div class="forum-section-head"><div><div class="forum-overline">New Post</div><h3>发布新帖</h3></div></div></section>${renderUserForumCreateForm()}</div>`;
-    }
-    const forumCards = [
-      { title: "这套定制宽体终于落地了，碳纤维纹路完美对齐。", author: "Carbon_King", meta: "宽体 / JDM", heat: "1.2k", tone: "cyan", badge: "精选", type: "discussion" },
-      { title: "【818活动】BBS轮毂限时85折，适配G20/001FR", author: "满改官方", meta: "活动 / 轮毂", heat: "3.5k", tone: "brand", badge: "置顶", type: "official", link: "user-product-detail.html?sku=PR-8801" },
-      { title: "内饰大功告成，全 Alcantara 包覆，战斗感拉满。", author: "Craft_Master", meta: "内饰 / 包覆", heat: "412", tone: "graphite", badge: "", type: "discussion" },
-      { title: "全段钛合金排气，这音浪谁受得了？", author: "Turbo_Tom", meta: "排气 / 声浪", heat: "856", tone: "steel", badge: "", type: "discussion" },
-      { title: "【科普】隐形车衣怎么选？XPEL LUX PLUS深度解析", author: "满改官方", meta: "科普 / 车衣", heat: "2.1k", tone: "brand", badge: "置顶", type: "official", link: "user-product-detail.html?sku=PR-8804" },
-      { title: "周末聚会大合照，老伙计们都到齐了。", author: "Retro_Vibe", meta: "聚会 / 赛道日", heat: "1.8k", tone: "amber", badge: "", type: "discussion" },
-      { title: "上海夜晚的街道，才是这台车的归宿。", author: "Night_Owl", meta: "姿态 / 街拍", heat: "2.4k", tone: "violet", badge: "热门", type: "discussion" },
-      { title: "电车改装也有春天，这姿态你给几分？", author: "EV_Addict", meta: "电车 / 姿态", heat: "670", tone: "teal", badge: "", type: "discussion" },
-    ];
-    const activeFilter = state.userForum.filter || "hot";
-    const activeCategory = state.userForum.category || "all";
-    let displayCards = forumCards;
-    if (activeCategory === "official") displayCards = forumCards.filter((c) => c.type === "official");
-    if (activeCategory === "discussion") displayCards = forumCards.filter((c) => c.type === "discussion");
-    const featured = displayCards[0];
-    const secondary = displayCards.slice(1, 3);
-    const feed = displayCards.slice(3);
-    const followed = [
-      { label: "我", name: "我的动态", tone: "self" },
-      { label: "A", name: "RWB_Akira", tone: "brand" },
-      { label: "B", name: "BoostLife", tone: "accent" },
-      { label: "N", name: "NightRunner", tone: "brand" },
-    ];
-    const categoryTabs = [
-      { id: "all", label: "全部" },
-      { id: "official", label: "官方资讯" },
-      { id: "discussion", label: "玩家讨论" },
-    ];
-    const filterTabs = [
-      { id: "hot", label: "热门" },
-      { id: "latest", label: "最新" },
-    ];
-    return `<div class="stack forum-home-shell"><section class="forum-home-hero"><div class="admin-action-row" style="margin-bottom:10px;"><button class="btn btn-primary" type="button" data-user-action="user-forum-create">+ 发布新帖</button></div><div class="forum-home-category-row">${categoryTabs.map((t) => `<button class="pill forum-category-pill ${activeCategory === t.id ? "active" : ""}" type="button" data-user-action="user-forum-category" data-user-id="${t.id}">${t.label}</button>`).join("")}</div><div class="forum-home-filter-row">${filterTabs.map((t) => `<button class="pill forum-filter-pill ${activeFilter === t.id ? "active" : ""}" type="button" data-user-action="user-forum-filter" data-user-id="${t.id}">${t.label}</button>`).join("")}</div>${featured ? `<a class="forum-hero-card" href="${featured.link || "user-topic-detail.html"}"><div class="forum-hero-copy"><div class="forum-overline">${featured.type === "official" ? "官方资讯" : "社区精选"}${featured.badge ? ` · ${featured.badge}` : ""}</div><h3>${featured.title}</h3><p>${featured.meta} / ${featured.author}</p><div class="forum-hero-metrics"><span>${featured.type === "official" && featured.link ? "查看商品" : "热度 " + featured.heat}</span><span>立即查看</span></div></div><div class="forum-hero-art" data-tone="${featured.tone}"></div></a>` : ""}<div class="forum-hero-side">${secondary.map((item) => `<a class="forum-side-card" href="${item.link || "user-topic-detail.html"}"><div class="forum-side-art" data-tone="${item.tone}"></div><div><div class="forum-overline">${item.meta}${item.type === "official" ? " · 官方" : ""}</div><strong>${item.title}</strong><small>${item.author} / ${item.type === "official" && item.link ? "查看商品" : "热度 " + item.heat}</small></div></a>`).join("")}</div></section><section class="forum-follow-section"><div class="forum-section-head"><div><div class="forum-overline">关注更新</div><h3>我关注的</h3></div><a class="forum-section-link" href="user-topic-detail.html">查看全部</a></div><div class="forum-follow-grid">${followed.map((item) => `<a class="forum-follow-item" href="user-topic-detail.html"><div class="forum-follow-avatar" data-tone="${item.tone}">${item.label}</div><div class="forum-follow-name">${item.name}</div></a>`).join("")}</div></section><section class="forum-feed-section"><div class="forum-section-head"><div><div class="forum-overline">灵感流</div><h3>${activeCategory === "official" ? "官方推荐" : activeCategory === "discussion" ? "玩家热帖" : "今日热帖"}</h3></div></div><div class="forum-feed-list">${feed.map((item) => `<a class="forum-feed-card" href="${item.link || "user-topic-detail.html"}"><div class="forum-feed-art" data-tone="${item.tone}">${item.badge ? `<span class="forum-feed-badge">${item.badge}</span>` : ""}${item.type === "official" ? `<span class="forum-feed-badge official">官方</span>` : ""}</div><div class="forum-feed-body"><div class="forum-feed-meta"><strong>${item.author}</strong><span>${item.meta}</span></div><h4>${item.title}</h4><div class="forum-feed-metrics"><span>热度 ${item.heat}</span>${item.type === "official" && item.link ? `<span class="forum-feed-link">查看商品 →</span>` : ""}</div></div></a>`).join("")}</div></section></div>`;
+  function isUserOwnComment(comment) {
+    const profile = getMockUserAuth() || {};
+    const author = safe(comment.author, "");
+    return comment.owner === "current" || author === "当前用户" || author === safe(profile.nickname, "");
   }
 
-
+  function renderUserForumEditForm(item) {
+    return `<form class="provider-complete-form" data-user-forum-edit-form data-user-id="${item.id}"><div class="field-group field-group-full"><label class="field-label" for="forum-edit-title-${item.id}">标题</label><input class="input" id="forum-edit-title-${item.id}" name="forumEditTitle" type="text" value="${safe(item.title, "")}" required></div><div class="field-group field-group-full"><label class="field-label" for="forum-edit-content-${item.id}">正文</label><textarea class="textarea" id="forum-edit-content-${item.id}" name="forumEditContent" rows="6" required>${safe(item.content || item.preview || "", "")}</textarea></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">保存修改</button><button class="btn btn-secondary" type="button" data-user-action="user-forum-edit-cancel" data-user-id="${item.id}">取消</button></div></form>`;
+  }
 
   function renderUserForumDetail(item) {
     const replyOpen = state.userForum.replyPostId === item.id;
+    const editing = state.userForum.editingPostId === item.id;
     const related = comments.filter((comment) => comment.post === item.id && nForum(comment.status) !== "已删除");
     const mine = safe(item.author, "") === "当前用户";
-    const linkedProductRows = (item.linkedProducts || []).map((sku) => {
-      const p = products.find((prod) => prod.sku === sku);
-      if (!p) return "";
-      return `<a class="doc-item" href="user-product-detail.html?sku=${encodeURIComponent(p.sku)}&name=${encodeURIComponent(p.name)}&price=${encodeURIComponent(p.price)}&brand=${encodeURIComponent(p.brand)}&fitment=${encodeURIComponent(p.fitment || "")}" style="display:flex;align-items:center;gap:10px;text-decoration:none;"><span style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,rgba(255,106,0,0.25),rgba(255,140,50,0.15));display:flex;align-items:center;justify-content:center;font-size:12px;">🛒</span><div style="min-width:0;"><strong>${safe(p.name, "商品")}</strong><div class="muted" style="font-size:12px;">${safe(p.brand, "-")} / ${safe(p.price, "-")}</div></div></a>`;
-    }).join("");
-    const linkedSection = linkedProductRows ? `<div class="admin-comment-block" style="margin-top:12px;"><strong>关联商品</strong><div class="doc-list">${linkedProductRows}</div></div>` : "";
-    return `<section class="admin-detail-card"><div class="eyebrow">Forum Detail</div><h3>${safe(item.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>作者</span><strong>${safe(item.author, "-")}</strong></div><div><span>发布时间</span><strong>${safe(item.time, "-")}</strong></div><div><span>互动数据</span><strong>回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</strong></div><div><span>状态</span><strong>${nForum(item.status)}</strong></div></div>${linkedSection}<div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${related.length ? related.map((comment) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(comment.author, "评论用户")}</strong><span class="muted">${safe(comment.time, "刚刚")}</span></div><p>${safe(comment.content, "评论内容")}</p></div>`).join("") : `<div class="muted">当前暂无评论</div>`}</div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="user-forum-like" data-user-id="${item.id}">点赞</button><button class="btn btn-secondary" type="button" data-user-action="${replyOpen ? "user-forum-reply-cancel" : "user-forum-reply"}" data-user-id="${item.id}">${replyOpen ? "取消回复" : "回复"}</button>${mine ? `<button class="btn btn-danger" type="button" data-user-action="user-forum-delete" data-user-id="${item.id}">删除</button>` : ""}</div>${replyOpen ? renderUserForumReplyForm(item) : ""}</section>`;
+    if (editing) {
+      return `<section class="admin-detail-card"><div class="eyebrow">Edit Post</div><h3>编辑帖子</h3>${renderUserForumEditForm(item)}</section>`;
+    }
+    const boardName = (forumBoards || []).find((b) => b.id === item.board)?.name || "-";
+    return `<section class="admin-detail-card"><div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;"><button class="btn btn-secondary btn-sm" type="button" data-user-action="user-forum-back" style="padding:6px 12px;">‹ 返回列表</button><div class="eyebrow">Forum Detail</div></div><h3>${safe(item.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>作者</span><strong>${safe(item.author, "-")}</strong></div><div><span>版面</span><strong>${safe(boardName, "-")}</strong></div><div><span>发布时间</span><strong>${safe(item.time, "-")}</strong></div><div><span>互动数据</span><strong>回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</strong></div><div><span>状态</span><strong>${nForum(item.status)}</strong></div></div>${item.content ? `<div class="rich-editor-area" style="margin:12px 0; padding:12px 14px; border:1px solid rgba(255,255,255,0.06); border-radius:12px; background:rgba(255,255,255,0.02);">${item.content}</div>` : ""}<div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${related.length ? related.map((comment) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(comment.author, "评论用户")}</strong><span class="muted">${safe(comment.time, "刚刚")}</span>${isUserOwnComment(comment) ? `<button class="btn btn-danger btn-sm user-comment-delete-btn" type="button" data-user-action="user-forum-comment-delete" data-user-id="${comment.id}">删除</button>` : ""}</div><p>${safe(comment.content, "评论内容")}</p></div>`).join("") : `<div class="muted">当前暂无评论</div>`}</div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="user-forum-like" data-user-id="${item.id}">点赞</button><button class="btn btn-secondary" type="button" data-user-action="${replyOpen ? "user-forum-reply-cancel" : "user-forum-reply"}" data-user-id="${item.id}">${replyOpen ? "取消回复" : "回复"}</button>${mine ? `<button class="btn btn-secondary" type="button" data-user-action="user-forum-edit" data-user-id="${item.id}">编辑</button><button class="btn btn-danger" type="button" data-user-action="user-forum-delete" data-user-id="${item.id}">删除</button>` : ""}</div>${replyOpen ? renderUserForumReplyForm(item) : ""}</section>`;
   }
 
   function renderUserForumReplyForm(item) {
@@ -2145,7 +2227,7 @@
 
   function renderUserOrderForm(item, active) {
     const itemId = active === "goods" ? item.sku : item.id || item.name;
-    return `<form class="provider-complete-form" data-user-order-form data-user-type="${active}" data-user-id="${itemId}"><div class="form-grid"><div class="field-group"><label class="field-label" for="user-vehicle-${itemId}">车辆信息</label><input class="input" id="user-vehicle-${itemId}" name="userVehicle" type="text" value="${getSelectedUserVehicle()?.model || "宝马 G20 330i"}" required></div><div class="field-group"><label class="field-label" for="user-phone-${itemId}">联系电话</label><input class="input" id="user-phone-${itemId}" name="userPhone" type="text" value="13800138000" required></div>${active === "goods" ? `<div class="field-group field-group-full"><label class="field-label" for="user-address-${itemId}">收货地址</label><textarea class="textarea" id="user-address-${itemId}" name="userAddress" required>${getUserDefaultAddress()}</textarea></div>` : `<div class="field-group"><label class="field-label" for="user-time-${itemId}">预约时间</label><input class="input" id="user-time-${itemId}" name="userTime" type="text" value="2026-04-03 14:30" required></div>`}<div class="field-group"><label class="field-label" for="user-qty-${itemId}">${active === "goods" ? "数量" : "服务数量"}</label><input class="input" id="user-qty-${itemId}" name="userQuantity" type="number" min="1" max="9" value="1" required></div><div class="field-group"><label class="field-label" for="user-note-${itemId}">备注</label><textarea class="textarea" id="user-note-${itemId}" name="userNote" required>${active === "goods" ? "发货后请按物流信息签收快递。" : "请优先安排周末到店。"} </textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交订单</button><button class="btn btn-secondary" type="button" data-user-action="user-order-cancel" data-user-id="${itemId}" data-user-type="${active}">取消</button></div></form>`;
+    return `<form class="provider-complete-form" data-user-order-form data-user-type="${active}" data-user-id="${itemId}"><div class="form-grid"><div class="field-group"><label class="field-label" for="user-vehicle-${itemId}">车辆信息</label><input class="input" id="user-vehicle-${itemId}" name="userVehicle" type="text" value="${getSelectedUserVehicle()?.model || "宝马 G20 330i"}" required></div><div class="field-group"><label class="field-label" for="user-phone-${itemId}">联系电话</label><input class="input" id="user-phone-${itemId}" name="userPhone" type="text" value="13800138000" required></div>${active === "goods" ? `<div class="field-group field-group-full"><label class="field-label" for="user-address-${itemId}">收货地址</label><textarea class="textarea" id="user-address-${itemId}" name="userAddress" required>${getUserDefaultAddress()}</textarea></div>` : `<div class="field-group"><label class="field-label" for="user-time-${itemId}">预约安装时间</label><input class="input" id="user-time-${itemId}" name="userTime" type="text" value="2026-04-03 14:30" required></div>`}<div class="field-group"><label class="field-label" for="user-qty-${itemId}">${active === "goods" ? "数量" : "服务数量"}</label><input class="input" id="user-qty-${itemId}" name="userQuantity" type="number" min="1" max="9" value="1" required></div><div class="field-group"><label class="field-label" for="user-note-${itemId}">备注</label><textarea class="textarea" id="user-note-${itemId}" name="userNote" required>${active === "goods" ? "发货后请按物流信息签收快递。" : "请优先安排周末到店。"} </textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交订单</button><button class="btn btn-secondary" type="button" data-user-action="user-order-cancel" data-user-id="${itemId}" data-user-type="${active}">取消</button></div></form>`;
   }
 
   function handleUserAction(button) {
@@ -2156,6 +2238,13 @@
       if (typeof window !== "undefined" && window.localStorage) window.localStorage.removeItem(AUTH_STORAGE_KEY);
       state.userFeedback = "";
       state.userAuthFeedback = "已退出登录。";
+      render();
+      return;
+    }
+    if (action === "user-profile-detail") {
+      state.tab = "me";
+      state.subTab.me = "profileDetail";
+      state.userFeedback = "";
       render();
       return;
     }
@@ -2276,6 +2365,12 @@
       window.location.href = `user-order-create.html?sku=${encodeURIComponent(safe(target.sku, ""))}&name=${encodeURIComponent(safe(target.name, "商品"))}&price=${encodeURIComponent(safe(target.price, "¥0"))}&brand=${encodeURIComponent(safe(target.brand, "-"))}&fitment=${encodeURIComponent(safe(target.fitment, "适配当前车型"))}&mallPage=${encodeURIComponent(safe(target.mallPage, "exterior"))}&quantity=${encodeURIComponent(String(Number(target.quantity || 1)))}&from=cart`;
       return;
     }
+    if (action === "user-coupon-filter") {
+      state.userMe.couponFilter = id;
+      state.userFeedback = "";
+      render();
+      return;
+    }
     if (action === "user-credit-apply") {
       state.userMe.creditApplyOpen = true;
       render();
@@ -2344,6 +2439,16 @@
       render();
       return;
     }
+    if (action === "user-after-sale-open") {
+      state.userMe.afterSaleOrderId = id;
+      render();
+      return;
+    }
+    if (action === "user-after-sale-cancel") {
+      state.userMe.afterSaleOrderId = "";
+      render();
+      return;
+    }
     if (action === "user-message-pick") {
       state.userMe.selectedMessage = id;
       render();
@@ -2382,6 +2487,11 @@
       render();
       return;
     }
+    if (action === "user-forum-back") {
+      state.userForum.selectedPost = "";
+      render();
+      return;
+    }
     if (action === "user-forum-pick") {
       state.userForum.selectedPost = id;
       render();
@@ -2405,12 +2515,36 @@
       render();
       return;
     }
+    if (action === "user-forum-comment-delete") {
+      const target = comments.find((item) => item.id === id);
+      if (!target || !isUserOwnComment(target)) return;
+      target.status = "已删除";
+      const post = posts.find((item) => item.id === target.post);
+      if (post) post.replies = Math.max(0, Number(post.replies || 0) - 1);
+      state.userFeedback = "评论已删除。";
+      render();
+      return;
+    }
+    if (action === "user-forum-edit") {
+      state.userForum.editingPostId = id;
+      state.userForum.replyPostId = "";
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-edit-cancel") {
+      state.userForum.editingPostId = "";
+      state.userFeedback = "";
+      render();
+      return;
+    }
     if (action === "user-forum-delete") {
       const target = posts.find((item) => item.id === id);
       if (!target) return;
       target.status = "已删除";
       state.userFeedback = `${safe(target.title, "帖子")} 已删除。`;
       state.userForum.replyPostId = "";
+      state.userForum.editingPostId = "";
       render();
       return;
     }
@@ -2430,7 +2564,8 @@
       if (!target) return;
       const exists = collections.find((c) => c.sku === id);
       if (exists) {
-        state.userFeedback = `\${safe(target.name, "商品")} 已在收藏夹中。`;
+        setUserCollections(collections.filter((item) => safe(item.sku, "") !== id));
+        state.userFeedback = `${safe(target.name, "商品")} 已取消收藏。`;
       } else {
         collections.push({
           sku: target.sku,
@@ -2438,10 +2573,12 @@
           price: target.price,
           brand: target.brand,
           fitment: target.fitment,
+          mallPage: resolveUserMallPageByCategory(target.category),
+          status: target.status || "上架",
           collectedAt: new Date().toISOString(),
         });
         setUserCollections(collections);
-        state.userFeedback = `\${safe(target.name, "商品")} 已加入收藏夹，降价时将通知您。`;
+        state.userFeedback = `${safe(target.name, "商品")} 已加入收藏。`;
       }
       render();
       return;
@@ -2474,9 +2611,9 @@
   function updateGarageChoice(type, index) {
     const scrollTarget = screenEl.querySelector(".screen-content") || screenEl;
     const scrollTop = scrollTarget.scrollTop;
-    if (type === "color") state.garageColor = index;
-    if (type === "wheel") state.garageWheel = index;
-    if (type === "film") state.garageFilm = index;
+    if (type === "color") state.garageColor = state.garageColor === index ? -1 : index;
+    if (type === "wheel") state.garageWheel = state.garageWheel === index ? -1 : index;
+    if (type === "film") state.garageFilm = state.garageFilm === index ? -1 : index;
     render();
     requestAnimationFrame(() => {
       const nextScrollTarget = screenEl.querySelector(".screen-content") || screenEl;
@@ -2503,15 +2640,22 @@
   function handleUserForumSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
+    const editor = form.querySelector("#forumRichEditor");
+    const hidden = form.querySelector("#forumContentHidden");
+    if (editor && hidden) hidden.value = editor.innerHTML;
     const formData = new FormData(form);
     const title = String(formData.get("forumTitle") || "").trim();
     const content = String(formData.get("forumContent") || "").trim();
-    const productSku = String(formData.get("forumProduct") || "").trim();
+    const rawTags = String(formData.get("forumTags") || "").trim();
+    const postTags = rawTags ? rawTags.split(/\s+/).filter((t) => t.startsWith("#")).map((t) => t.slice(1)).filter(Boolean) : [];
     const mediaCount = form.querySelector('input[name="forumMedia"]')?.files?.length || 0;
-    if (!title || !content) return;
+    const boardId = String(formData.get("forumBoard") || "").trim();
+    const board = (forumBoards || []).find((b) => b.id === boardId);
+    if (!title || !content || !board) return;
     const id = `POST-${Date.now().toString().slice(-6)}`;
-    const linkedProducts = productSku ? [productSku] : [];
-    const product = products.find((p) => p.sku === productSku);
+    const linkedProducts = productUrl ? [productUrl] : [];
+    const metaParts = [board.name];
+    if (postTags.length) metaParts.push(postTags.join(" / "));
     posts.unshift({
       id,
       title,
@@ -2520,9 +2664,11 @@
       replies: 0,
       likes: 0,
       status: "正常",
+      type: "discussion",
+      board: board.id,
+      tags: postTags,
+      meta: metaParts.join(" / "),
       content: mediaCount ? `${content} / 已上传 ${mediaCount} 个图片或视频文件` : content,
-      linkedProducts,
-      linkAuthStatus: product ? "已授权" : "未授权",
     });
     state.userForum.selectedPost = id;
     state.userForum.createOpen = false;
@@ -2542,6 +2688,7 @@
       id: `COMMENT-${Date.now().toString().slice(-6)}`,
       post: id,
       author: "当前用户",
+      owner: "current",
       time: "刚刚",
       content: text,
       status: "正常",
@@ -2549,6 +2696,23 @@
     target.replies = (target.replies || 0) + 1;
     state.userForum.replyPostId = "";
     state.userFeedback = `${safe(target.title, "帖子")} 已回复。`;
+    render();
+  }
+
+  function handleUserForumEditSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const id = form.dataset.userId || "";
+    const target = posts.find((item) => item.id === id);
+    if (!target) return;
+    const title = String(new FormData(form).get("forumEditTitle") || "").trim();
+    const content = String(new FormData(form).get("forumEditContent") || "").trim();
+    if (!title || !content) return;
+    target.title = title;
+    target.content = content;
+    target.preview = content.slice(0, 80);
+    state.userForum.editingPostId = "";
+    state.userFeedback = "帖子已更新。";
     render();
   }
 
@@ -2601,6 +2765,52 @@
     if (!isValid) return;
     state.userMe.creditApplyOpen = false;
     state.userFeedback = `授信申请已提交，预计 2 小时内完成初审，申请城市为 ${String(formData.get("creditCity") || "").trim()}。`;
+    render();
+  }
+
+  function readUserAvatarFile(file) {
+    return new Promise((resolve) => {
+      if (!file) {
+        resolve("");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function handleUserAvatarChange(event) {
+    const input = event.target;
+    const fileName = input.files?.[0]?.name || "未选择任何文件";
+    const nameEl = input.closest(".user-avatar-file-wrap")?.querySelector(".user-avatar-file-name");
+    if (nameEl) nameEl.textContent = fileName;
+  }
+
+  async function handleUserProfileSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const current = getMockUserAuth() || {};
+    const nickname = String(formData.get("profileNickname") || "").trim();
+    const phone = String(formData.get("profilePhone") || "").trim();
+    if (!nickname || !phone) return;
+    const avatarFile = form.querySelector('input[name="profileAvatar"]')?.files?.[0] || null;
+    const uploadedAvatar = await readUserAvatarFile(avatarFile);
+    const avatarUrl = formData.get("profileAvatarReset") === "on" ? "" : (uploadedAvatar || current.avatarUrl || "");
+    setMockUserAuth({
+      ...current,
+      id: getUserDisplayId(current),
+      nickname,
+      phone,
+      avatarUrl,
+      inviteProviderName: String(formData.get("profileInviteProviderName") || "").trim() || "自然流量",
+      bio: String(formData.get("profileBio") || "").trim(),
+      updatedAt: getNowStamp(),
+    });
+    state.subTab.me = "profile";
+    state.userFeedback = "个人信息已保存。";
     render();
   }
 
@@ -2760,7 +2970,7 @@
 
   function renderUserOrderForm(item, active) {
     const itemId = active === "goods" ? item.sku : item.id || item.name;
-    return `<form class="provider-complete-form" data-user-order-form data-user-type="${active}" data-user-id="${itemId}"><div class="form-grid"><div class="field-group"><label class="field-label" for="user-vehicle-${itemId}">车辆信息</label><input class="input" id="user-vehicle-${itemId}" name="userVehicle" type="text" value="${getSelectedUserVehicle()?.model || "宝马 G20 330i"}" required></div><div class="field-group"><label class="field-label" for="user-phone-${itemId}">联系电话</label><input class="input" id="user-phone-${itemId}" name="userPhone" type="text" value="${safe(getMockUserAuth()?.phone, "13800138000")}" required></div>${active === "goods" ? `<div class="field-group field-group-full"><label class="field-label" for="user-address-${itemId}">收货地址</label><textarea class="textarea" id="user-address-${itemId}" name="userAddress" required>${getUserDefaultAddress()}</textarea></div>` : `<div class="field-group"><label class="field-label" for="user-time-${itemId}">预约时间</label><input class="input" id="user-time-${itemId}" name="userTime" type="text" value="2026-04-03 14:30" required></div>`}<div class="field-group"><label class="field-label" for="user-pay-${itemId}">支付方式</label><select class="input" id="user-pay-${itemId}" name="userPaymentMethod">${getPaymentOptions().map((option) => `<option value="${option.id}">${option.name}</option>`).join("")}</select></div><div class="field-group"><label class="field-label" for="user-qty-${itemId}">${active === "goods" ? "数量" : "服务数量"}</label><input class="input" id="user-qty-${itemId}" name="userQuantity" type="number" min="1" max="9" value="1" required></div><div class="field-group field-group-full"><label class="field-label" for="user-note-${itemId}">备注</label><textarea class="textarea" id="user-note-${itemId}" name="userNote" required>${active === "goods" ? "发货后请按物流信息签收快递。" : "请优先安排周末到店。"}</textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交订单</button><button class="btn btn-secondary" type="button" data-user-action="user-order-cancel" data-user-id="${itemId}" data-user-type="${active}">取消</button></div></form>`;
+    return `<form class="provider-complete-form" data-user-order-form data-user-type="${active}" data-user-id="${itemId}"><div class="form-grid"><div class="field-group"><label class="field-label" for="user-vehicle-${itemId}">车辆信息</label><input class="input" id="user-vehicle-${itemId}" name="userVehicle" type="text" value="${getSelectedUserVehicle()?.model || "宝马 G20 330i"}" required></div><div class="field-group"><label class="field-label" for="user-phone-${itemId}">联系电话</label><input class="input" id="user-phone-${itemId}" name="userPhone" type="text" value="${safe(getMockUserAuth()?.phone, "13800138000")}" required></div>${active === "goods" ? `<div class="field-group field-group-full"><label class="field-label" for="user-address-${itemId}">收货地址</label><textarea class="textarea" id="user-address-${itemId}" name="userAddress" required>${getUserDefaultAddress()}</textarea></div>` : `<div class="field-group"><label class="field-label" for="user-time-${itemId}">预约安装时间</label><input class="input" id="user-time-${itemId}" name="userTime" type="text" value="2026-04-03 14:30" required></div>`}<div class="field-group"><label class="field-label" for="user-pay-${itemId}">支付方式</label><select class="input" id="user-pay-${itemId}" name="userPaymentMethod">${getPaymentOptions().map((option) => `<option value="${option.id}">${option.name}</option>`).join("")}</select></div><div class="field-group"><label class="field-label" for="user-qty-${itemId}">${active === "goods" ? "数量" : "服务数量"}</label><input class="input" id="user-qty-${itemId}" name="userQuantity" type="number" min="1" max="9" value="1" required></div><div class="field-group field-group-full"><label class="field-label" for="user-note-${itemId}">备注</label><textarea class="textarea" id="user-note-${itemId}" name="userNote" required>${active === "goods" ? "发货后请按物流信息签收快递。" : "请优先安排周末到店。"}</textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交订单</button><button class="btn btn-secondary" type="button" data-user-action="user-order-cancel" data-user-id="${itemId}" data-user-type="${active}">取消</button></div></form>`;
   }
 
   function renderUserCollections() {
@@ -2782,7 +2992,35 @@
     const isGoodsOrder = safe(item.type, "").includes("商品") || ["自提", "快递配送", "平台自提"].some((label) => safe(item.displayType, "").includes(label));
     const visibleProgress = item.userVisibleProgress || safe(item.progress, "-");
     const visibleTimeline = item.userVisibleProgress ? ["订单已提交", item.userVisibleProgress] : getOrderTimeline(item);
-    return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>${isGoodsOrder ? "商品" : "服务"}</span><strong>${safe(item.service, "-")}</strong></div>${isGoodsOrder ? `<div><span>收货人</span><strong>${safe(item.recipient, getUserDefaultReceiver())}</strong></div><div><span>收货地址</span><strong>${safe(item.address, getUserDefaultAddress())}</strong></div>` : `<div><span>预约时间</span><strong>${safe(item.appointment, "-")}</strong></div>`}<div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>支付方式</span><strong>${safe(item.paymentMethod, "线上支付")}</strong></div><div><span>支付状态</span><strong>${safe(item.payment, "mock 已记录")}</strong></div><div><span>当前进度</span><strong>${visibleProgress}</strong></div></div><div class="admin-timeline">${visibleTimeline.map((line) => `<div>${line}</div>`).join("")}</div><div class="admin-action-row">${canAccept ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系服务商</button><button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>` : `<button class="btn btn-secondary" type="button" disabled>当前无需验收</button>`}</div></section>`;
+    const canAfterSale = isGoodsOrder && (nOrder(item.status) === "已完成" || item.status === "售后中");
+    const afterSaleOpen = state.userMe.afterSaleOrderId === item.id;
+    return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>${isGoodsOrder ? "商品" : "服务"}</span><strong>${safe(item.service, "-")}</strong></div>${isGoodsOrder ? `<div><span>收货人</span><strong>${safe(item.recipient, getUserDefaultReceiver())}</strong></div><div><span>收货地址</span><strong>${safe(item.address, getUserDefaultAddress())}</strong></div>` : `<div><span>预约安装时间</span><strong>${safe(item.appointment, "-")}</strong></div>`}<div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>支付方式</span><strong>${safe(item.paymentMethod, "线上支付")}</strong></div><div><span>支付状态</span><strong>${safe(item.payment, "mock 已记录")}</strong></div><div><span>当前进度</span><strong>${visibleProgress}</strong></div>${item.afterSaleType ? `<div><span>售后类型</span><strong>${safe(item.afterSaleType, "-")}</strong></div><div><span>售后状态</span><strong>${safe(item.afterSaleStatus, "处理中")}</strong></div>` : ""}</div><div class="admin-timeline">${visibleTimeline.map((line) => `<div>${line}</div>`).join("")}</div>${afterSaleOpen ? renderUserAfterSaleForm(item) : ""}<div class="admin-action-row">${canAccept ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系服务商</button><button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>` : canAfterSale ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系客服</button><button class="btn btn-danger" type="button" data-user-action="${afterSaleOpen ? "user-after-sale-cancel" : "user-after-sale-open"}" data-user-id="${item.id}">${afterSaleOpen ? "收起售后申请" : item.afterSaleType ? "查看售后进度" : "申请售后"}</button>` : `<button class="btn btn-secondary" type="button" disabled>当前无需验收</button>`}</div></section>`;
+  }
+
+  function renderUserAfterSaleForm(item) {
+    const types = ["退款", "退货", "换货", "补发配件"];
+    return `<form class="provider-complete-form" data-user-after-sale-form data-order-id="${item.id}"><div class="form-grid"><div class="field-group"><label class="field-label">售后类型</label><select class="input" name="afterSaleType" required>${types.map((t) => `<option value="${t}">${t}</option>`).join("")}</select></div><div class="field-group"><label class="field-label">问题描述</label><textarea class="textarea" name="afterSaleReason" placeholder="请简述售后原因" required>商品与描述不符，申请退款。</textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交申请</button><button class="btn btn-secondary" type="button" data-user-action="user-after-sale-cancel" data-user-id="${item.id}">取消</button></div></form>`;
+  }
+
+  function handleUserAfterSaleSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const orderId = form.dataset.orderId || "";
+    const target = getUserOrderById(orderId);
+    if (!target) return;
+    const formData = new FormData(form);
+    const afterSaleType = String(formData.get("afterSaleType") || "").trim();
+    const afterSaleReason = String(formData.get("afterSaleReason") || "").trim();
+    if (!afterSaleType || !afterSaleReason) return;
+    target.status = "售后中";
+    target.afterSaleType = afterSaleType;
+    target.afterSaleReason = afterSaleReason;
+    target.afterSaleStatus = "待平台审核";
+    target.afterSaleTime = getNowStamp();
+    appendOrderTimeline(target, `用户提交售后申请：${afterSaleType}`);
+    state.userMe.afterSaleOrderId = "";
+    state.userFeedback = `${orderId} 售后申请已提交，平台将在 1-2 个工作日内处理。`;
+    render();
   }
 
   function handleUserAuthSubmit(event) {
@@ -2801,13 +3039,17 @@
         render();
         return;
       }
-      setMockUserAuth({ phone, nickname: String(formData.get("nickname") || "新用户").trim(), inviteCode, inviteProviderName: invite ? invite.providerName : "自然流量", createdAt: getNowStamp() });
+      setMockUserAuth({ id: `U-${Date.now().toString().slice(-5)}`, phone, nickname: String(formData.get("nickname") || "新用户").trim(), inviteCode, inviteProviderName: invite ? invite.providerName : "自然流量", createdAt: getNowStamp() });
     } else {
       const account = (window.MockData.userAccounts || []).find((item) => item.phone === phone);
-      setMockUserAuth({ phone, nickname: account?.nickname || "顾铭", inviteCode: account?.inviteCode || "", inviteProviderName: account?.inviteProviderName || "自然流量", loginAt: getNowStamp() });
+      setMockUserAuth({ id: account?.id || window.MockData.creditInfo?.userId || "U-20311", phone, nickname: account?.nickname || "顾铭", inviteCode: account?.inviteCode || "", inviteProviderName: account?.inviteProviderName || "自然流量", loginAt: getNowStamp() });
     }
     state.userAuthFeedback = "";
     state.userFeedback = "已进入用户 App。";
+    state.tab = "forum";
+    state.userForum.category = "all";
+    state.userForum.selectedPost = "";
+    state.userForum.createOpen = false;
     render();
   }
 
@@ -2906,26 +3148,44 @@
       cart: "购物车",
       collections: "我的收藏",
       invoices: "电子凭证",
-      messages: "消息中心",
+      coupons: "优惠券管理",
       address: "收货地址",
       credit: "金融授信",
+      profileDetail: "个人信息",
+      following: "我的关注",
+      postCollections: "帖子收藏",
+      followers: "我的粉丝",
     };
-    const content = active === "profile" ? renderUserProfile() : active === "orders" ? renderUserHistoryOrders() : active === "cart" ? renderUserCart() : active === "collections" ? renderUserCollections() : active === "invoices" ? renderUserInvoices() : active === "messages" ? renderUserMessages() : active === "address" ? renderUserAddress() : renderUserCredit();
+    const content = active === "profile" ? renderUserProfile() : active === "profileDetail" ? renderUserProfileDetail() : active === "orders" ? renderUserHistoryOrders() : active === "cart" ? renderUserCart() : active === "collections" ? renderUserCollections() : active === "invoices" ? renderUserInvoices() : active === "coupons" ? renderUserCoupons() : active === "address" ? renderUserAddress() : active === "following" ? renderUserFollowing() : active === "postCollections" ? renderUserPostCollections() : active === "followers" ? renderUserFollowers() : renderUserCredit();
     return `<div class="user-me-page user-me-page-light"><header class="user-me-top"><strong>${titleMap[active] || "个人中心"}</strong>${active !== "profile" ? `<button type="button" data-sub-tab="profile">返回</button>` : ""}</header>${state.userFeedback ? `<div class="provider-feedback user-me-feedback">${state.userFeedback}</div>` : ""}${content}</div>`;
   }
 
+  function renderUserPortrait(profile = getMockUserAuth() || {}, className = "") {
+    const avatarUrl = safe(profile.avatarUrl, "");
+    const fallbackText = safe(profile.nickname, "顾").slice(0, 1);
+    return `<div class="user-me-portrait ${className}">${avatarUrl ? `<img src="${avatarUrl}" alt="avatar">` : fallbackText}</div>`;
+  }
+
   function renderUserMeProfileHero(profile = getMockUserAuth() || {}) {
-    return `<section class="user-me-red-hero compact"><div class="user-me-portrait">${safe(profile.nickname, "顾").slice(0, 1)}</div><div class="user-me-red-copy"><strong>${safe(profile.nickname, "未设置昵称")}</strong></div></section>`;
+    const availableLimit = safe(window.MockData.creditInfo?.availableLimit, "¥ 80,000");
+    const userId = getUserDisplayId(profile);
+    return `<a class="user-me-red-hero compact user-me-profile-entry" href="user-app.html?tab=me&meTab=profileDetail" aria-label="编辑个人信息">${renderUserPortrait(profile)}<div class="user-me-red-copy"><div class="user-me-name-stack"><strong>${safe(profile.nickname, "未设置昵称")}</strong><small>用户ID ${userId}</small></div><span class="user-me-credit-limit">可用额度 ${availableLimit}</span></div><b>›</b></a>`;
+  }
+
+  function getUserDisplayId(profile = getMockUserAuth() || {}) {
+    const account = (window.MockData.userAccounts || []).find((item) => item.phone === profile.phone);
+    return safe(profile.id || account?.id || window.MockData.creditInfo?.userId, "U-20311");
   }
 
   function renderUserProfile() {
     const profile = getMockUserAuth() || {};
+    const socialStats = { following: 3, postCollections: 6, followers: 128 };
     const orderRows = [
       { label: "待付款", value: "0", tone: "pay" },
       { label: "待发货", value: String(getUserOrders().filter((item) => nOrder(item.status).includes("待发货")).length), tone: "box" },
       { label: "待收货", value: "0", tone: "truck" },
       { label: "待评价", value: String(getUserOrders().filter((item) => nOrder(item.status).includes("待验收")).length), tone: "card" },
-      { label: "退款/售后", value: "0", tone: "refund" },
+      { label: "售后", value: "0", tone: "refund" },
     ];
     const menuRows = [
       { label: "我的收藏", sub: "collections", icon: "☆" },
@@ -2933,10 +3193,50 @@
       { label: "我的购物车", sub: "cart", icon: "□" },
       { label: "金融授信", sub: "credit", icon: "¥" },
       { label: "收货地址", sub: "address", icon: "⌖" },
-      { label: "消息中心", sub: "messages", icon: "☎" },
+      { label: "优惠券管理", sub: "coupons", icon: "🎫" },
       { label: "退出登录", action: "user-logout", icon: "↧" },
     ];
-    return `<div class="user-me-light-home">${renderUserMeProfileHero(profile)}<section class="user-me-red-metrics"><article><strong>${getUserOrders().length}</strong><span>订单</span></article><article><strong>${getUserCollections().length}</strong><span>收藏</span></article><article><strong>${getUserInvoices().length}</strong><span>发票</span></article></section><section class="user-me-white-block"><div class="user-me-block-head"><strong>我的订单</strong><button type="button" data-sub-tab="orders">全部订单</button></div><div class="user-me-order-icons">${orderRows.map((item) => `<button type="button" data-sub-tab="orders"><i data-tone="${item.tone}">${item.value}</i><span>${item.label}</span></button>`).join("")}</div></section><section class="user-me-menu-list">${menuRows.map((item) => item.action ? `<button class="user-me-menu-row" type="button" data-user-action="${item.action}"><i>${item.icon}</i><span>${item.label}</span><b>›</b></button>` : `<button class="user-me-menu-row" type="button" data-sub-tab="${item.sub}"><i>${item.icon}</i><span>${item.label}</span><b>›</b></button>`).join("")}</section></div>`;
+    return `<div class="user-me-light-home">${renderUserMeProfileHero(profile)}<section class="user-me-red-metrics"><button type="button" data-sub-tab="following"><strong>${socialStats.following}</strong><span>关注</span></button><button type="button" data-sub-tab="postCollections"><strong>${socialStats.postCollections}</strong><span>收藏</span></button><button type="button" data-sub-tab="followers"><strong>${socialStats.followers}</strong><span>粉丝</span></button></section><section class="user-me-white-block"><div class="user-me-block-head"><strong>我的订单</strong><button type="button" data-sub-tab="orders">全部订单</button></div><div class="user-me-order-icons">${orderRows.map((item) => `<button type="button" data-sub-tab="orders"><i data-tone="${item.tone}">${item.value}</i><span>${item.label}</span></button>`).join("")}</div></section><section class="user-me-menu-grid">${menuRows.map((item) => item.action ? `<button class="user-me-menu-tile" type="button" data-user-action="${item.action}"><i>${item.icon}</i><span>${item.label}</span></button>` : `<button class="user-me-menu-tile" type="button" data-sub-tab="${item.sub}"><i>${item.icon}</i><span>${item.label}</span></button>`).join("")}</section></div>`;
+  }
+
+  function renderUserProfileDetail() {
+    const profile = getMockUserAuth() || {};
+    const userId = getUserDisplayId(profile);
+    const avatarHelp = profile.avatarUrl ? "已上传头像，保存时不选择新图片会继续保留。" : "未上传头像时，个人中心自动显示用户名第一个字。";
+    return `<div class="user-me-light-subpage"><section class="user-me-white-block user-profile-edit-card"><div class="user-profile-edit-head">${renderUserPortrait(profile, "large")}<div><strong>${safe(profile.nickname, "顾铭")}</strong><span>用户ID ${userId}</span></div></div><form class="user-me-form light" data-user-profile-form><label><span>用户名</span><input class="input" name="profileNickname" type="text" value="${safe(profile.nickname, "顾铭")}" required></label><label class="user-avatar-upload"><span>头像图片</span><div class="user-avatar-file-wrap"><input class="input" name="profileAvatar" type="file" accept="image/*" data-user-avatar-input><div class="user-avatar-file-trigger"><span>⬆</span><span>点击选择图片</span></div><span class="user-avatar-file-name">未选择任何文件</span></div><small>${avatarHelp}</small></label>${profile.avatarUrl ? `<label class="user-avatar-reset"><input name="profileAvatarReset" type="checkbox"> <span>清除头像，改用用户名首字</span></label>` : ""}<label><span>手机号</span><input class="input" name="profilePhone" type="tel" value="${safe(profile.phone, "13800138000")}" required></label><label><span>绑定来源</span><input class="input" name="profileInviteProviderName" type="text" value="${safe(profile.inviteProviderName, "自然流量")}"></label><label><span>个人简介</span><textarea class="textarea" name="profileBio" placeholder="写一句展示在个人主页上的简介">${safe(profile.bio, "热爱姿态与性能改装。")}</textarea></label><button class="btn btn-primary user-me-full-btn" type="submit">保存个人信息</button></form></section></div>`;
+  }
+
+  function renderUserSocialList(title, rows, total = rows.length) {
+    return `<div class="user-me-light-subpage"><section class="user-me-white-block"><div class="user-me-block-head"><strong>${title}</strong><span>${total} 条</span></div><div class="user-me-record-list light">${rows.map((item) => `<article><div><strong>${safe(item.name, "-")}</strong>${item.userId ? `<small class="user-me-list-id">用户ID ${safe(item.userId, "-")}</small>` : ""}<span>${safe(item.desc, "-")}</span></div><span>${safe(item.meta, "")}</span></article>`).join("")}</div></section></div>`;
+  }
+
+  function renderUserFollowing() {
+    return renderUserSocialList("我关注的发帖用户", [
+      { userId: "U-20872", name: "RWB_Akira", desc: "宽体 / JDM / 近期发布 3 篇", meta: "已关注" },
+      { userId: "U-19645", name: "BoostLife", desc: "动力 / 排气 / 近期发布 5 篇", meta: "已关注" },
+      { userId: "U-20312", name: "NightRunner", desc: "姿态 / 街拍 / 近期发布 2 篇", meta: "已关注" },
+    ]);
+  }
+
+  function renderUserPostCollections() {
+    return renderUserSocialList("我收藏的帖子", [
+      { name: "宝马 G20 升级 19 寸轮毂后需要重新做四轮定位吗？", desc: "顾铭收藏 / 轮毂 / 定位", meta: "今天" },
+      { name: "这套定制宽体终于落地了，碳纤维纹路完美对齐。", desc: "Carbon_King / 宽体 / JDM", meta: "昨天" },
+      { name: "全段钛合金排气，这个声浪谁受得了？", desc: "Turbo_Tom / 排气 / 声浪", meta: "3 天前" },
+      { name: "隐形车衣怎么选？XPEL LUX PLUS 深度解析", desc: "满改官方 / 科普 / 车衣", meta: "本周" },
+      { name: "上海夜晚的街道，才是这台车的归宿。", desc: "Night_Owl / 姿态 / 街拍", meta: "本周" },
+      { name: "内饰全 Alcantara 包覆，战斗感直接拉满。", desc: "Craft_Master / 内饰 / 包覆", meta: "本月" },
+    ]);
+  }
+
+  function renderUserFollowers() {
+    return renderUserSocialList("关注我的用户", [
+      { userId: "U-18856", name: "Turbo_Tom", desc: "已关注你", meta: "2 小时前" },
+      { userId: "U-22501", name: "Night_Owl", desc: "已关注你", meta: "今天" },
+      { userId: "U-21740", name: "Craft_Master", desc: "已关注你", meta: "昨天" },
+      { userId: "U-23008", name: "EV_Addict", desc: "已关注你", meta: "本周" },
+      { userId: "U-21437", name: "Carbon_King", desc: "已关注你", meta: "本周" },
+    ], 128);
   }
 
   function renderUserCollections() {
@@ -2955,33 +3255,56 @@
 
   function renderUserForum() {
     if (state.userForum.createOpen) {
-      return `<div class="forum-home-feed"><section class="forum-home-topbar"><div class="forum-home-user">顾</div><div class="forum-home-search"><span>⌕</span><span>发布新帖</span></div></section><section class="forum-home-nav"><button class="active" type="button">新建内容</button></section>${renderUserForumCreateForm()}</div>`;
+      return `<div class="forum-home-feed"><section class="forum-home-nav"><button class="active" type="button">新建内容</button></section>${renderUserForumCreateForm()}</div><button class="forum-fab" type="button" data-user-action="user-forum-create" aria-label="发帖">＋</button>`;
     }
+    const selectedPost = posts.find((p) => p.id === state.userForum.selectedPost);
+    if (selectedPost) return renderUserForumDetail(selectedPost);
     const activeFilter = state.userForum.filter || "hot";
     const activeCategory = state.userForum.category || "all";
     const cards = [
       { title: "这套定制宽体终于落地了，碳纤维纹路完美对齐。", author: "Carbon_King", meta: "宽体 / JDM", heat: "1.2k", tone: "cyan", badge: "精选", type: "discussion" },
       { title: "【818活动】BBS轮毂限时85折，适配G20/001FR", author: "满改官方", meta: "活动 / 轮毂", heat: "3.5k", tone: "brand", badge: "官方", type: "official", link: "user-topic-detail.html?topic=818-bbs&product=PR-8801" },
+      { title: "G20 330i 升级全段排气 + 锻造轮毂，声浪与姿态兼得", author: "御驰 Performance Studio", meta: "排气 / 轮毂 / 案例", heat: "3.2k", tone: "brand", badge: "热门", type: "case", link: "user-case-detail.html?id=CA-240402-007" },
+      { title: "718 Cayman 赛道化改造，从街车到圈速机器", author: "Racing One Atelier", meta: "赛道 / 性能 / 案例", heat: "2.8k", tone: "cyan", badge: "精选", type: "case", link: "user-case-detail.html?id=CA-240401-011" },
       { title: "全段钛合金排气，这个声浪谁受得了？", author: "Turbo_Tom", meta: "排气 / 声浪", heat: "856", tone: "steel", badge: "", type: "discussion" },
       { title: "隐形车衣怎么选？XPEL LUX PLUS深度解析", author: "满改官方", meta: "科普 / 车衣", heat: "2.1k", tone: "brand", badge: "官方", type: "official", link: "user-topic-detail.html?topic=xpel-guide&product=PR-8804" },
+      { title: "Model 3P 制动升级 + 底盘调校，赛道日稳了", author: "凌速 High Spec Garage", meta: "制动 / 底盘 / 案例", heat: "1.9k", tone: "steel", badge: "", type: "case", link: "user-case-detail.html?id=CA-240401-011" },
       { title: "上海夜晚的街道，才是这台车的归宿。", author: "Night_Owl", meta: "姿态 / 街拍", heat: "2.4k", tone: "violet", badge: "热门", type: "discussion" },
       { title: "内饰全 Alcantara 包覆，战斗感直接拉满。", author: "Craft_Master", meta: "内饰 / 包覆", heat: "412", tone: "graphite", badge: "", type: "discussion" },
       { title: "电车改装也有春天，这姿态你给几分？", author: "EV_Addict", meta: "电车 / 姿态", heat: "670", tone: "teal", badge: "", type: "discussion" },
     ];
-    let rows = cards;
-    if (activeCategory === "official") rows = cards.filter((item) => item.type === "official");
-    if (activeCategory === "discussion") rows = cards.filter((item) => item.type === "discussion");
+    const postCards = posts.map((p) => {
+      const board = (forumBoards || []).find((b) => b.id === p.board);
+      return {
+        id: p.id,
+        title: p.title,
+        author: p.author,
+        meta: p.meta || "",
+        heat: `${(p.replies || 0) + (p.likes || 0)}`,
+        tone: "brand",
+        badge: board ? board.name : "",
+        type: p.type || "discussion",
+        isPost: true,
+      };
+    });
+    let rows = [...postCards, ...cards];
+    if (activeCategory === "official") rows = rows.filter((item) => item.type === "official");
+    if (activeCategory === "discussion") rows = rows.filter((item) => item.type === "discussion");
+    if (activeCategory === "case") rows = rows.filter((item) => item.type === "case");
+    if (activeCategory === "mine") rows = rows.filter((item) => item.author === "当前用户");
     const featured = rows[0] || cards[0];
     const navTabs = [
       { id: "all", label: "推荐" },
       { id: "official", label: "官方资讯" },
       { id: "discussion", label: "玩家讨论" },
+      { id: "case", label: "精选案例" },
+      { id: "mine", label: "我的" },
     ];
     const sortTabs = [
       { id: "hot", label: "热门" },
       { id: "latest", label: "最新" },
     ];
-    return `<div class="forum-home-feed"><section class="forum-home-topbar"><div class="forum-home-user">顾</div><form class="forum-home-search" data-user-mall-search-form><span>⌕</span><input name="userMallKeyword" value="${safe(state.userMall.keyword, "")}" placeholder="搜索改装案例、品牌、车型" aria-label="搜索改装案例、品牌、车型"></form><button class="forum-post-btn" type="button" data-user-action="user-forum-create" aria-label="发帖">＋</button></section><section class="forum-home-nav">${navTabs.map((item) => `<button class="${activeCategory === item.id ? "active" : ""}" type="button" data-user-action="user-forum-category" data-user-id="${item.id}">${item.label}</button>`).join("")}</section><section class="forum-sort-row">${sortTabs.map((item) => `<button class="${activeFilter === item.id ? "active" : ""}" type="button" data-user-action="user-forum-filter" data-user-id="${item.id}">${item.label}</button>`).join("")}</section>${featured ? `<a class="forum-home-banner" href="${featured.link || "user-topic-detail.html"}"><div class="forum-home-banner-art" data-tone="${featured.tone}"></div><div class="forum-home-banner-copy"><span>${featured.type === "official" ? "官方推荐" : "社区精选"}${featured.badge ? ` / ${featured.badge}` : ""}</span><strong>${featured.title}</strong><small>${featured.meta} / ${featured.author}</small></div><div class="forum-home-dots"><i></i><i></i><i></i></div></a>` : ""}<section class="forum-waterfall">${rows.slice(1).map((item, index) => `<a class="forum-waterfall-card ${index % 3 === 1 ? "tall" : ""}" href="${item.link || "user-topic-detail.html"}"><div class="forum-waterfall-art" data-tone="${item.tone}">${item.badge ? `<span>${item.badge}</span>` : ""}${item.linkedProducts?.length ? `<span style="position:absolute;bottom:6px;right:6px;background:rgba(255,106,0,0.9);color:#fff;font-size:11px;padding:2px 8px;border-radius:999px;">已挂商品</span>` : ""}</div><div class="forum-waterfall-body"><strong>${item.title}</strong><p>${item.author} / ${item.meta}</p><div><span>热度 ${item.heat}</span>${item.type === "official" ? `<em>查看帖子</em>` : ""}</div></div></a>`).join("")}</section></div>`;
+    return `<div class="forum-home-feed"><section class="forum-home-nav">${navTabs.map((item) => `<button class="${activeCategory === item.id ? "active" : ""}" type="button" data-user-action="user-forum-category" data-user-id="${item.id}">${item.label}</button>`).join("")}</section><section class="forum-home-topbar"><form class="forum-home-search" data-user-mall-search-form><span>⌕</span><input name="userMallKeyword" value="${safe(state.userMall.keyword, "")}" placeholder="搜索改装案例、品牌、车型" aria-label="搜索改装案例、品牌、车型"></form></section>${activeCategory !== "mine" ? `<section class="forum-sort-row">${sortTabs.map((item) => `<button class="${activeFilter === item.id ? "active" : ""}" type="button" data-user-action="user-forum-filter" data-user-id="${item.id}">${item.label}</button>`).join("")}</section>` : ""}${featured && activeCategory !== "mine" ? `<a class="forum-home-banner" href="${featured.link || "user-topic-detail.html"}"><div class="forum-home-banner-art" data-tone="${featured.tone}"></div><div class="forum-home-banner-copy"><span>${featured.type === "official" ? "官方推荐" : featured.type === "case" ? "精选案例" : "社区精选"}${featured.badge ? ` / ${featured.badge}` : ""}</span><strong>${featured.title}</strong><small>${featured.meta} / ${featured.author}</small></div><div class="forum-home-dots"><i></i><i></i><i></i></div></a>` : ""}<section class="forum-waterfall">${(activeCategory === "mine" ? rows : rows.slice(1)).map((item, index) => item.isPost ? `<button class="forum-waterfall-card ${index % 3 === 1 ? "tall" : ""}" type="button" data-user-action="user-forum-pick" data-user-id="${item.id}"><div class="forum-waterfall-art" data-tone="${item.tone}">${item.badge ? `<span>${item.badge}</span>` : ""}</div><div class="forum-waterfall-body"><strong>${item.title}</strong><p>${item.author}${item.meta ? ` / ${item.meta}` : ""}</p><div><span>热度 ${item.heat}</span></div></div></button>` : `<a class="forum-waterfall-card ${index % 3 === 1 ? "tall" : ""}" href="${item.link || "user-topic-detail.html"}"><div class="forum-waterfall-art" data-tone="${item.tone}">${item.badge ? `<span>${item.badge}</span>` : ""}${item.linkedProducts?.length ? `<span style="position:absolute;bottom:6px;right:6px;background:rgba(255,106,0,0.9);color:#fff;font-size:11px;padding:2px 8px;border-radius:999px;">已挂商品</span>` : ""}</div><div class="forum-waterfall-body"><strong>${item.title}</strong><p>${item.author}${item.meta ? ` / ${item.meta}` : ""}</p><div><span>热度 ${item.heat}</span>${item.type === "official" ? `<em>查看帖子</em>` : ""}</div></div></a>`).join("")}</section></div><button class="forum-fab" type="button" data-user-action="user-forum-create" aria-label="发帖">＋</button>`;
   }
 
   function renderUserMessages() {
@@ -3045,6 +3368,7 @@
     const activeModel = state.userMall.model || getSelectedUserVehicle()?.model || getUserMallModelOptions(activeBrand)[0];
     const rows = getUserMallFilteredProducts(activeBrand, activeModel);
     const cartCount = getUserCartItems().reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    const collectionCount = getUserCollections().length;
     const brandList = [
       ...(window.MockData.brands || []),
       { id: "kw", name: "KW" },
@@ -3059,7 +3383,7 @@
     const promoLabel = recommendation?.label || "本周推荐";
     const promoTitle = recommendation?.title || promoProduct?.name || "精选商品";
     const promoDescription = recommendation?.description || promoProduct?.description || "平台精选商品，适合当前车型与改装偏好。";
-    return `<div class="user-mall-v3">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-mall-v3-top"><div><span>商城</span><strong>改装严选</strong></div><form class="user-mall-v3-search" data-user-mall-search-form><span>⌕</span><input name="userMallKeyword" type="text" value="${safe(state.userMall.keyword, "")}" placeholder="搜索配件、品牌、车型" aria-label="搜索配件、品牌、车型"></form><a class="user-mall-v3-cart" href="user-app.html?tab=me&meTab=cart" aria-label="购物车">购物车${cartCount > 0 ? `<i>${cartCount}</i>` : ""}</a></section><section class="user-mall-v3-brands" aria-label="品牌方"><div class="mall-brands-scroll">${duplicatedBrands.map((b) => `<div class="mall-brand-item"><div class="mall-brand-logo" data-brand="${b.id}"></div><span>${b.name}</span></div>`).join("")}</div></section><section class="user-mall-v3-tabs"><button class="${activeCategory === "all" ? "active" : ""}" type="button" data-user-action="user-mall-category" data-user-id="all">推荐</button>${categoryRows.map((item) => `<button class="${activeCategory === item.id ? "active" : ""}" type="button" data-user-action="user-mall-category" data-user-id="${item.id}">${item.label}</button>`).join("")}</section><section class="user-mall-v3-hero"><a class="user-mall-v3-hero-art" href="user-product-detail.html?sku=${encodeURIComponent(promoProduct?.sku || "")}&name=${encodeURIComponent(safe(promoProduct?.name, "精选商品"))}&price=${encodeURIComponent(safe(promoProduct?.price, "¥0"))}&brand=${encodeURIComponent(safe(promoProduct?.brand, "-"))}&fitment=${encodeURIComponent(safe(promoProduct?.fitment || promoProduct?.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(promoProduct?.category))}"><div><span>${safe(promoLabel, "本周推荐")}</span><strong>${safe(promoTitle, "精选商品")}</strong><small>${safe(promoDescription, "平台精选商品，适合当前车型与改装偏好。")}</small></div></a><div class="user-mall-v3-dots"><i></i><i></i><i></i></div></section><section class="user-mall-v3-products"><div class="user-mall-v3-section-head"><strong>${safe(activeModel !== "全部车型" ? activeModel : getSelectedUserVehicle()?.model, "当前车型")}</strong><span>${rows.length} 件商品</span></div><div class="user-mall-v3-grid">${rows.length ? rows.map((item, index) => `<article class="user-mall-v3-card"><a class="user-mall-v3-card-art" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(item.category))}" data-tone="${(index % 4) + 1}"></a><div class="user-mall-v3-card-body"><strong>${safe(item.name, "商品")}</strong><span>${safe(item.brand, "-")} / ${safe(item.category, "-")}</span><p>${safe(item.fitment, "适配当前车型")}</p><div><b>${safe(item.price, "-")}</b><button type="button" data-user-action="user-mall-collect" data-user-id="${item.sku}">收藏</button></div></div></article>`).join("") : `<div class="user-mall-empty">暂无符合条件的商品</div>`}</div></section></div>`;
+    return `<div class="user-mall-v3">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-mall-v3-top"><div><span>商城</span><strong>改装严选</strong></div><form class="user-mall-v3-search" data-user-mall-search-form><span>⌕</span><input name="userMallKeyword" type="text" value="${safe(state.userMall.keyword, "")}" placeholder="搜索配件、品牌、车型" aria-label="搜索配件、品牌、车型"></form><div class="user-mall-v3-actions"><a class="user-mall-v3-cart" href="user-app.html?tab=me&meTab=cart" aria-label="购物车">购物车${cartCount > 0 ? `<i>${cartCount}</i>` : ""}</a><a class="user-mall-v3-cart user-mall-v3-collections" href="user-app.html?tab=me&meTab=collections" aria-label="收藏列表">收藏${collectionCount > 0 ? `<i>${collectionCount}</i>` : ""}</a></div></section><section class="user-mall-v3-brands" aria-label="品牌方"><div class="mall-brands-scroll">${duplicatedBrands.map((b) => `<div class="mall-brand-item"><div class="mall-brand-logo" data-brand="${b.id}"></div><span>${b.name}</span></div>`).join("")}</div></section><section class="user-mall-v3-tabs"><button class="${activeCategory === "all" ? "active" : ""}" type="button" data-user-action="user-mall-category" data-user-id="all">推荐</button>${categoryRows.map((item) => `<button class="${activeCategory === item.id ? "active" : ""}" type="button" data-user-action="user-mall-category" data-user-id="${item.id}">${item.label}</button>`).join("")}</section><section class="user-mall-v3-hero"><a class="user-mall-v3-hero-art" href="user-product-detail.html?sku=${encodeURIComponent(promoProduct?.sku || "")}&name=${encodeURIComponent(safe(promoProduct?.name, "精选商品"))}&price=${encodeURIComponent(safe(promoProduct?.price, "¥0"))}&brand=${encodeURIComponent(safe(promoProduct?.brand, "-"))}&fitment=${encodeURIComponent(safe(promoProduct?.fitment || promoProduct?.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(promoProduct?.category))}"><div><span>${safe(promoLabel, "本周推荐")}</span><strong>${safe(promoTitle, "精选商品")}</strong><small>${safe(promoDescription, "平台精选商品，适合当前车型与改装偏好。")}</small></div></a><div class="user-mall-v3-dots"><i></i><i></i><i></i></div></section><section class="user-mall-v3-products"><div class="user-mall-v3-section-head"><strong>${safe(activeModel !== "全部车型" ? activeModel : getSelectedUserVehicle()?.model, "当前车型")}</strong><span>${rows.length} 件商品</span></div><div class="user-mall-v3-grid">${rows.length ? rows.map((item, index) => `<article class="user-mall-v3-card"><a class="user-mall-v3-card-art" href="user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(item.category))}" data-tone="${(index % 4) + 1}"></a><div class="user-mall-v3-card-body"><strong>${safe(item.name, "商品")}</strong><span>${safe(item.brand, "-")} / ${safe(item.category, "-")}</span><p>${safe(item.fitment, "适配当前车型")}</p><div><b>${safe(item.price, "-")}</b><button class="${isUserProductCollected(item.sku) ? "active" : ""}" type="button" data-user-action="user-mall-collect" data-user-id="${item.sku}">${isUserProductCollected(item.sku) ? "取消收藏" : "收藏"}</button></div></div></article>`).join("") : `<div class="user-mall-empty">暂无符合条件的商品</div>`}</div></section></div>`;
   }
 
   function renderInvoiceOrderApplyForm(order) {
@@ -3104,7 +3428,7 @@
     ];
     const activeColor = matchedColors[state.garageColor] || matchedColors[0] || fallback.colors[0];
     const activeWheel = matchedWheels[state.garageWheel] || matchedWheels[0] || fallback.wheels[0];
-    const activeFilm = filmRows[state.garageFilm] || filmRows[0];
+    const activeFilm = state.garageFilm >= 0 ? (filmRows[state.garageFilm] || filmRows[0]) : null;
     const wheelProduct = products.find((item) => item.sku === "PR-8801") || products[0] || {};
     const filmProduct = products.find((item) => item.sku === "PR-8804") || {};
     const colorValue = activeColor?.colorValue || activeColor?.value || "#0d0f12";
@@ -3117,14 +3441,18 @@
       price: safe(activeWheel?.price || wheelProduct.price, "¥ 18,800"),
     };
     const filmItem = {
-      name: safe(activeFilm.name || filmProduct.name, "车衣方案"),
-      brand: safe(activeFilm.brand || filmProduct.brand, "XPEL"),
-      price: safe(activeFilm.price || filmProduct.price, "¥ 12,800"),
+      name: safe(activeFilm?.name || filmProduct.name, "车衣方案"),
+      brand: safe(activeFilm?.brand || filmProduct.brand, "XPEL"),
+      price: safe(activeFilm?.price || filmProduct.price, "¥ 12,800"),
     };
-    const comboItems = [wheelItem, filmItem, colorItem];
+    const comboItems = [
+      state.garageWheel >= 0 ? wheelItem : null,
+      state.garageFilm >= 0 ? filmItem : null,
+      state.garageColor >= 0 ? colorItem : null,
+    ].filter(Boolean);
     const comboTotal = comboItems.reduce((sum, item) => sum + priceToNumber(item.price), 0);
-    const comboLink = buildGarageComboOrderLink(selectedVehicle, comboItems);
-    return `<section class="garage-preview garage-config-preview"><div class="eyebrow">Render Lab</div><strong style="display:block; margin-top:10px; font-size:22px;">${safe(selectedVehicle?.model, "宝马 G20 330i")} 外观预览</strong><div class="muted" style="margin-top:6px;">选择轮毂、车衣和颜色后，下方组合商品、品牌与价格实时联动。</div><div class="garage-3d-stage"><div class="garage-3d-car" id="garage3dCar"><div class="garage-3d-wheel left" style="background:radial-gradient(circle, #a3a9b3 0 10%, ${shade(wheelColor, -30)} 12% 44%, #0a0d11 46% 100%);"></div><div class="garage-3d-wheel right" style="background:radial-gradient(circle, #a3a9b3 0 10%, ${shade(wheelColor, -30)} 12% 44%, #0a0d11 46% 100%);"></div><div class="garage-3d-body" style="background:linear-gradient(145deg, ${shade(colorValue, -18)}, ${colorValue}); box-shadow: inset 0 0 0 999px ${activeFilm.tone ? "rgba(255,255,255,0.04)" : "transparent"};"></div></div></div><div class="garage-config-group"><div class="garage-config-head"><strong>车身颜色</strong><span>${colorName}</span></div><div class="swatch-row">${matchedColors.map((item, index) => `<button class="swatch ${index === state.garageColor ? "active" : ""}" style="background:${item.colorValue || item.value};" type="button" title="${safe(item.colorName || item.name, "车身颜色")}" data-color-index="${index}"></button>`).join("")}</div></div></section><section class="garage-config-section"><div class="garage-config-head"><strong>轮毂</strong><span>${wheelItem.brand} / ${wheelItem.price}</span></div><div class="garage-choice-list">${matchedWheels.map((item, index) => `<button class="wheel-option ${index === state.garageWheel ? "active" : ""}" type="button" data-wheel-index="${index}"><span><strong>${safe(item.name, "轮毂样式")}</strong><div class="muted" style="margin-top:6px;">${safe(item.size || item.spokes, "-")} / ${safe(item.brand, "高端改装")} / ${safe(item.price, "")}</div></span><span class="wheel-badge" style="background:${item.color || "#c78a47"};"></span></button>`).join("")}</div></section><section class="garage-config-section"><div class="garage-config-head"><strong>车衣</strong><span>${filmItem.brand} / ${filmItem.price}</span></div><div class="garage-choice-list">${filmRows.map((item, index) => `<button class="wheel-option garage-film-option ${index === state.garageFilm ? "active" : ""}" type="button" data-film-index="${index}"><span><strong>${safe(item.name, "车衣方案")}</strong><div class="muted" style="margin-top:6px;">${safe(item.brand, "-")} / ${safe(item.price, "-")}</div></span><span class="wheel-badge" style="background:${item.tone};"></span></button>`).join("")}</div></section><section class="garage-combo-panel"><div class="garage-config-head"><strong>组合方案</strong><span>${formatCurrency(comboTotal)}</span></div><div class="garage-combo-list">${comboItems.map((item) => `<article><span>${item.name}</span><strong>${item.brand}</strong><b>${item.price}</b></article>`).join("")}</div><a class="btn btn-primary user-me-full-btn" href="${comboLink}">组合方案下单</a></section>`;
+    const comboLink = comboItems.length ? buildGarageComboOrderLink(selectedVehicle, comboItems) : "";
+    return `<section class="garage-preview garage-config-preview"><div class="eyebrow">Render Lab</div><strong style="display:block; margin-top:10px; font-size:22px;">${safe(selectedVehicle?.model, "宝马 G20 330i")} 外观预览</strong><div class="muted" style="margin-top:6px;">点击选择轮毂、车衣和颜色，点击已选项可取消选择。</div><div class="garage-3d-stage"><div class="garage-3d-car" id="garage3dCar"><div class="garage-3d-wheel left" style="background:radial-gradient(circle, #a3a9b3 0 10%, ${shade(wheelColor, -30)} 12% 44%, #0a0d11 46% 100%);"></div><div class="garage-3d-wheel right" style="background:radial-gradient(circle, #a3a9b3 0 10%, ${shade(wheelColor, -30)} 12% 44%, #0a0d11 46% 100%);"></div><div class="garage-3d-body" style="background:linear-gradient(145deg, ${shade(colorValue, -18)}, ${colorValue}); box-shadow: inset 0 0 0 999px ${activeFilm?.tone ? "rgba(255,255,255,0.04)" : "transparent"};"></div></div></div><div class="garage-config-group"><div class="garage-config-head"><strong>车身颜色</strong><span>${state.garageColor >= 0 ? colorName : "未选择"}</span></div><div class="swatch-row">${matchedColors.map((item, index) => `<button class="swatch ${index === state.garageColor ? "active" : ""}" style="background:${item.colorValue || item.value};" type="button" title="${safe(item.colorName || item.name, "车身颜色")}" data-color-index="${index}"></button>`).join("")}</div></div></section><section class="garage-config-section"><div class="garage-config-head"><strong>轮毂</strong><span>${state.garageWheel >= 0 ? `${wheelItem.brand} / ${wheelItem.price}` : "未选择"}</span></div><div class="garage-choice-list">${matchedWheels.map((item, index) => `<button class="wheel-option ${index === state.garageWheel ? "active" : ""}" type="button" data-wheel-index="${index}"><span><strong>${safe(item.name, "轮毂样式")}</strong><div class="muted" style="margin-top:6px;">${safe(item.size || item.spokes, "-")} / ${safe(item.brand, "高端改装")} / ${safe(item.price, "")}</div></span><span class="wheel-badge" style="background:${item.color || "#c78a47"};"></span></button>`).join("")}</div></section><section class="garage-config-section"><div class="garage-config-head"><strong>车衣</strong><span>${state.garageFilm >= 0 ? `${filmItem.brand} / ${filmItem.price}` : "未选择"}</span></div><div class="garage-choice-list">${filmRows.map((item, index) => `<button class="wheel-option garage-film-option ${index === state.garageFilm ? "active" : ""}" type="button" data-film-index="${index}"><span><strong>${safe(item.name, "车衣方案")}</strong><div class="muted" style="margin-top:6px;">${safe(item.brand, "-")} / ${safe(item.price, "-")}</div></span><span class="wheel-badge" style="background:${item.tone};"></span></button>`).join("")}</div></section><section class="garage-combo-panel"><div class="garage-config-head"><strong>组合方案</strong><span>${formatCurrency(comboTotal)}</span></div><div class="garage-combo-list">${comboItems.length ? comboItems.map((item) => `<article><span>${item.name}</span><strong>${item.brand}</strong><b>${item.price}</b></article>`).join("") : `<article class="muted" style="text-align:center; padding:12px 0;">请在上方选择至少一项</article>`}</div>${comboItems.length ? `<a class="btn btn-primary user-me-full-btn" href="${comboLink}">组合方案下单</a>` : `<button class="btn btn-primary user-me-full-btn" type="button" disabled style="opacity:0.45;">组合方案下单</button>`}</section>`;
   }
 
   render();
