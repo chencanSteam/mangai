@@ -104,6 +104,7 @@
                 <!-- 返回按钮 -->
                 <div class="pd-header">
                   <button type="button" id="pdBackBtn">‹</button>
+                  <button type="button" id="pdShareBtn" title="分享" style="margin-left:auto; width:32px; height:32px; border-radius:50%; background:rgba(0,0,0,0.4); border:none; color:#fff; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(8px);">⇧</button>
                 </div>
 
                 <div class="pd-body">
@@ -278,6 +279,82 @@
         const total = cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
         showFeedback(`已加入购物车，购物车共 ${total} 件`);
       });
+
+      // 分享功能
+      (function initShare() {
+        const shareBtn = document.getElementById("pdShareBtn");
+        if (!shareBtn) return;
+
+        // 创建分享面板
+        const shareSheet = document.createElement("div");
+        shareSheet.className = "share-sheet";
+        shareSheet.id = "pdShareSheet";
+        const users = (window.MockData?.users || []).slice(0, 8);
+        shareSheet.innerHTML = `
+          <div class="share-sheet-panel">
+            <div class="share-sheet-title">分享到</div>
+            <div class="share-external-row">
+              <button class="share-external-item" data-share="wechat" type="button">
+                <div class="share-external-icon">💬</div>
+                <span>微信</span>
+              </button>
+              <button class="share-external-item" data-share="moment" type="button">
+                <div class="share-external-icon">👥</div>
+                <span>朋友圈</span>
+              </button>
+              <button class="share-external-item" data-share="douyin" type="button">
+                <div class="share-external-icon">🎵</div>
+                <span>抖音</span>
+              </button>
+              <button class="share-external-item" data-share="copy" type="button">
+                <div class="share-external-icon">🔗</div>
+                <span>复制链接</span>
+              </button>
+            </div>
+            <div class="share-user-section">
+              <div class="share-user-section-title">分享给平台用户</div>
+              <div class="share-user-list">
+                ${users.map((u) => `<button class="share-user-item" data-share-user="${u.name}" type="button"><div class="share-user-avatar">${(u.name || "用").charAt(0)}</div><span class="share-user-name">${u.name || "用户"}</span></button>`).join("")}
+              </div>
+            </div>
+            <button class="share-sheet-close" type="button" data-share-close>取消</button>
+          </div>
+        `;
+        document.body.appendChild(shareSheet);
+
+        function openShare() { shareSheet.classList.add("visible"); }
+        function closeShare() { shareSheet.classList.remove("visible"); }
+        function showShareFeedback(text) { showFeedback(text); }
+
+        shareBtn.addEventListener("click", openShare);
+        shareSheet.addEventListener("click", (e) => { if (e.target === shareSheet) closeShare(); });
+        shareSheet.querySelector("[data-share-close]").addEventListener("click", closeShare);
+
+        shareSheet.querySelectorAll("[data-share]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const type = btn.dataset.share;
+            if (type === "copy") {
+              const url = window.location.href;
+              if (navigator.clipboard) { navigator.clipboard.writeText(url); }
+              showShareFeedback("链接已复制");
+            } else {
+              if (navigator.share) {
+                navigator.share({ title: document.title, url: window.location.href });
+              } else {
+                showShareFeedback("请使用浏览器分享功能");
+              }
+            }
+            closeShare();
+          });
+        });
+
+        shareSheet.querySelectorAll("[data-share-user]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            showShareFeedback(`已分享给 ${btn.dataset.shareUser}`);
+            closeShare();
+          });
+        });
+      })();
 
       syncCollect();
 

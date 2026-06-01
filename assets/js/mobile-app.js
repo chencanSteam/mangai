@@ -1873,7 +1873,6 @@
     return window.MockData.paymentOptions || [
       { id: "alipay", name: "支付宝" },
       { id: "wechat", name: "微信支付" },
-      { id: "combined", name: "组合支付" },
       { id: "credit", name: "金融授信" },
     ];
   }

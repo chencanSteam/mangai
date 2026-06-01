@@ -1,6 +1,8 @@
 .tmp-*.log
 /scripts/.state/
 node_modules/
+dist/
+.wrangler/
 docx_extract/
 outputs/
 *~

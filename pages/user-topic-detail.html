@@ -40,6 +40,11 @@
                         <span id="topicCollectLabel">收藏</span>
                         <strong>总收藏 <b id="topicCollectCount">26</b></strong>
                       </button>
+                      <button class="topic-engage-btn" type="button" id="topicShareBtn">
+                        <i>享</i>
+                        <span>分享</span>
+                        <strong>分享帖子</strong>
+                      </button>
                     </div>
                   </div>
                   <div class="topic-hero-visual" data-tone="night"></div>
@@ -260,6 +265,88 @@
             syncEngageState();
           });
         }
+
+        // 分享功能
+        (function initShare() {
+          const shareBtn = document.getElementById("topicShareBtn");
+          if (!shareBtn) return;
+
+          const shareSheet = document.createElement("div");
+          shareSheet.className = "share-sheet";
+          shareSheet.id = "topicShareSheet";
+          const users = (window.MockData?.users || []).slice(0, 8);
+          shareSheet.innerHTML = `
+            <div class="share-sheet-panel">
+              <div class="share-sheet-title">分享到</div>
+              <div class="share-external-row">
+                <button class="share-external-item" data-share="wechat" type="button">
+                  <div class="share-external-icon">💬</div>
+                  <span>微信</span>
+                </button>
+                <button class="share-external-item" data-share="moment" type="button">
+                  <div class="share-external-icon">👥</div>
+                  <span>朋友圈</span>
+                </button>
+                <button class="share-external-item" data-share="douyin" type="button">
+                  <div class="share-external-icon">🎵</div>
+                  <span>抖音</span>
+                </button>
+                <button class="share-external-item" data-share="copy" type="button">
+                  <div class="share-external-icon">🔗</div>
+                  <span>复制链接</span>
+                </button>
+              </div>
+              <div class="share-user-section">
+                <div class="share-user-section-title">分享给平台用户</div>
+                <div class="share-user-list">
+                  ${users.map((u) => `<button class="share-user-item" data-share-user="${u.name}" type="button"><div class="share-user-avatar">${(u.name || "用").charAt(0)}</div><span class="share-user-name">${u.name || "用户"}</span></button>`).join("")}
+                </div>
+              </div>
+              <button class="share-sheet-close" type="button" data-share-close>取消</button>
+            </div>
+          `;
+          document.body.appendChild(shareSheet);
+
+          function showToast(text) {
+            const toast = document.createElement("div");
+            toast.style.cssText = "position:fixed; bottom:120px; left:50%; transform:translateX(-50%); z-index:60; padding:10px 18px; border-radius:12px; background:rgba(20,24,31,0.95); border:1px solid rgba(255,255,255,0.08); font-size:13px; color:#fff; text-align:center; white-space:nowrap;";
+            toast.textContent = text;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+          }
+
+          function openShare() { shareSheet.classList.add("visible"); }
+          function closeShare() { shareSheet.classList.remove("visible"); }
+
+          shareBtn.addEventListener("click", openShare);
+          shareSheet.addEventListener("click", (e) => { if (e.target === shareSheet) closeShare(); });
+          shareSheet.querySelector("[data-share-close]").addEventListener("click", closeShare);
+
+          shareSheet.querySelectorAll("[data-share]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const type = btn.dataset.share;
+              if (type === "copy") {
+                const url = window.location.href;
+                if (navigator.clipboard) { navigator.clipboard.writeText(url); }
+                showToast("链接已复制");
+              } else {
+                if (navigator.share) {
+                  navigator.share({ title: document.title, url: window.location.href });
+                } else {
+                  showToast("请使用浏览器分享功能");
+                }
+              }
+              closeShare();
+            });
+          });
+
+          shareSheet.querySelectorAll("[data-share-user]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              showToast(`已分享给 ${btn.dataset.shareUser}`);
+              closeShare();
+            });
+          });
+        })();
 
         if (!input || !cancelBtn || !submitBtn || !feedback) return;
 

@@ -115,36 +115,9 @@
                         <span class="order-pay-title">微信支付</span>
                       </label>
                       <label class="order-pay-option">
-                        <input type="radio" name="paymentMethod" value="combined" />
-                        <span class="order-pay-title">组合支付</span>
-                      </label>
-                      <label class="order-pay-option">
                         <input type="radio" name="paymentMethod" value="credit" />
                         <span class="order-pay-title">金融授信</span>
                       </label>
-                    </div>
-                  </div>
-                  <div class="field-group field-group-full" id="combinedPayGroup" style="display:none;">
-                    <label class="field-label">组合支付详情</label>
-                    <div class="order-combined-options">
-                      <label class="order-combined-option active">
-                        <input type="radio" name="combinedSubMethod" value="alipay_credit" checked />
-                        <span>支付宝 + 金融授信</span>
-                      </label>
-                      <label class="order-combined-option">
-                        <input type="radio" name="combinedSubMethod" value="wechat_credit" />
-                        <span>微信支付 + 金融授信</span>
-                      </label>
-                    </div>
-                    <div class="order-combined-amounts">
-                      <label>
-                        <span id="combinedPayLabel">支付宝支付金额</span>
-                        <input class="input" id="combinedPayAmount" name="combinedPayAmount" type="number" min="0" placeholder="输入金额" />
-                      </label>
-                      <div class="order-combined-credit">
-                        <span>授信支付金额</span>
-                        <strong id="combinedCreditAmount">¥0</strong>
-                      </div>
                     </div>
                   </div>
                   <div class="field-group">
@@ -377,39 +350,12 @@
       });
 
       // Payment method toggle
-      const combinedPayGroup = document.getElementById("combinedPayGroup");
-      const combinedPayLabel = document.getElementById("combinedPayLabel");
-      const combinedPayAmountInput = document.getElementById("combinedPayAmount");
-      const combinedCreditAmountEl = document.getElementById("combinedCreditAmount");
-
-      function updateCombinedCredit() {
-        const quantity = Math.max(1, Number(orderQuantityInput.value || 1));
-        const goodsTotal = priceToNumber(price) * quantity;
-        const discount = calcDiscount(goodsTotal);
-        const finalTotal = Math.max(0, goodsTotal - discount);
-        const thirdPay = Math.max(0, Number(combinedPayAmountInput.value || 0));
-        const creditPay = Math.max(0, finalTotal - thirdPay);
-        combinedCreditAmountEl.textContent = formatCurrency(creditPay);
-      }
-
       document.querySelectorAll('input[name="paymentMethod"]').forEach((radio) => {
         radio.addEventListener("change", () => {
           document.querySelectorAll(".order-pay-option").forEach((label) => label.classList.remove("active"));
           radio.closest(".order-pay-option").classList.add("active");
-          combinedPayGroup.style.display = radio.value === "combined" ? "block" : "none";
-          if (radio.value === "combined") updateCombinedCredit();
         });
       });
-
-      document.querySelectorAll('input[name="combinedSubMethod"]').forEach((radio) => {
-        radio.addEventListener("change", () => {
-          document.querySelectorAll(".order-combined-option").forEach((label) => label.classList.remove("active"));
-          radio.closest(".order-combined-option").classList.add("active");
-          combinedPayLabel.textContent = radio.value === "wechat_credit" ? "微信支付金额" : "支付宝支付金额";
-        });
-      });
-
-      combinedPayAmountInput.addEventListener("input", updateCombinedCredit);
 
       orderCreateForm.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -432,17 +378,7 @@
         const finalTotal = Math.max(0, goodsTotal - discount);
         const totalPrice = formatCurrency(finalTotal);
         const displayType = deliveryType === "provider" ? (provider ? `指定服务商：${provider}` : "待分配服务商") : "平台自提";
-        let payMethodText = ({ alipay: "\u652f\u4ed8\u5b9d", wechat: "\u5fae\u4fe1\u652f\u4ed8", combined: "\u7ec4\u5408\u652f\u4ed8", credit: "\u91d1\u878d\u6388\u4fe1" })[paymentMethod] || "\u652f\u4ed8\u5b9d";
-        let combinedSub = "";
-        let thirdPayAmount = 0;
-        let creditPayAmount = 0;
-        if (paymentMethod === "combined") {
-          const sub = String(formData.get("combinedSubMethod") || "alipay_credit");
-          thirdPayAmount = Math.max(0, Number(formData.get("combinedPayAmount") || 0));
-          creditPayAmount = Math.max(0, finalTotal - thirdPayAmount);
-          combinedSub = sub === "wechat_credit" ? "微信+授信" : "支付宝+授信";
-          payMethodText = `组合支付（${combinedSub}）`;
-        }
+        let payMethodText = ({ alipay: "\u652f\u4ed8\u5b9d", wechat: "\u5fae\u4fe1\u652f\u4ed8", credit: "\u91d1\u878d\u6388\u4fe1" })[paymentMethod] || "\u652f\u4ed8\u5b9d";
         const nextOrders = [
           {
             id: orderId,
@@ -460,9 +396,6 @@
             serviceFee: "待门店确认",
             payment: "已支付",
             paymentMethod: payMethodText,
-            combinedSub: combinedSub,
-            thirdPayAmount: thirdPayAmount,
-            creditPayAmount: creditPayAmount,
             status: "待发货",
             progress: `商品已付款，${deliveryType === "provider" ? "将配送至指定服务商门店" : "等待平台发货，快递将配送至"} ${address}，备注：${note}`,
             appointment: deliveryType === "provider" ? (appointmentTime ? appointmentTime.replace("T", " ") : "待确认") : "等待发货",
