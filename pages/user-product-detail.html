@@ -14,10 +14,12 @@
       .pd-media-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); }
       .pd-media-dots i.active { background: #ff6a00; }
       .pd-body { padding: 0 16px; }
-      .pd-price-row { display: flex; align-items: baseline; gap: 10px; margin: 14px 0 10px; }
+      .pd-price-row { display: flex; align-items: baseline; gap: 10px; margin: 14px 0 10px; flex-wrap: wrap; }
       .pd-price-main { font-size: 32px; font-weight: 700; color: #ff6a00; font-family: var(--font-display); }
       .pd-price-main small { font-size: 14px; font-weight: 400; }
       .pd-price-origin { font-size: 13px; color: var(--text-muted); text-decoration: line-through; }
+      .pd-promo-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; background: rgba(255,106,0,0.12); border: 1px solid rgba(255,106,0,0.25); color: #ff6a00; font-size: 11px; }
+      .pd-promo-desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
       .pd-title-row { margin-bottom: 12px; }
       .pd-title-row h1 { font-size: 18px; font-weight: 600; line-height: 1.5; margin: 0 0 8px; }
       .pd-fitment-tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; background: rgba(74,168,255,0.1); border: 1px solid rgba(74,168,255,0.25); color: #4aa8ff; font-size: 12px; }
@@ -86,6 +88,8 @@
       .pd-review-like { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; transition: color 0.2s; }
       .pd-review-like:hover { color: #ff6a00; }
       .pd-review-empty { text-align: center; padding: 24px 0; color: var(--text-muted); font-size: 13px; }
+      .pd-review-media { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+      .pd-review-media img, .pd-review-media video { width: 120px; height: 120px; object-fit: cover; border-radius: 10px; background: #0d0f12; }
     </style>
   </head>
   <body data-page="user-product-detail">
@@ -112,6 +116,10 @@
                   <div class="pd-price-row">
                     <div class="pd-price-main" id="pdPrice">¥0</div>
                     <div class="pd-price-origin" id="pdPriceOrigin" style="display:none;"></div>
+                  </div>
+                  <div id="pdPromoWrap" style="display:none; margin-bottom:10px;">
+                    <span class="pd-promo-tag" id="pdPromoTag"></span>
+                    <div class="pd-promo-desc" id="pdPromoDesc"></div>
                   </div>
 
                   <!-- 标题 + 适配 -->
@@ -199,6 +207,16 @@
       document.getElementById("pdName").textContent = p.name || name;
       document.getElementById("pdFitment").textContent = p.fitment || fitment;
       document.getElementById("pdPrice").textContent = p.price || price;
+      const originEl = document.getElementById("pdPriceOrigin");
+      if (p.originalPrice) { originEl.textContent = p.originalPrice; originEl.style.display = "block"; } else { originEl.style.display = "none"; }
+      const promoWrap = document.getElementById("pdPromoWrap");
+      if (p.promotion) {
+        promoWrap.style.display = "block";
+        document.getElementById("pdPromoTag").textContent = `${p.promotion.label || ""} · ${p.promotion.discount || ""}`;
+        document.getElementById("pdPromoDesc").textContent = p.promotion.desc || "";
+      } else {
+        promoWrap.style.display = "none";
+      }
       document.getElementById("pdParamBrand").textContent = p.brand || brand;
       document.getElementById("pdParamStock").textContent = p.stock !== undefined ? `${p.stock} 件` : "有货";
       document.getElementById("pdParamStatus").textContent = p.status || "在售";
@@ -320,7 +338,8 @@
             <button class="share-sheet-close" type="button" data-share-close>取消</button>
           </div>
         `;
-        document.body.appendChild(shareSheet);
+        const phoneScreen = document.querySelector(".phone-screen");
+        (phoneScreen || document.body).appendChild(shareSheet);
 
         function openShare() { shareSheet.classList.add("visible"); }
         function closeShare() { shareSheet.classList.remove("visible"); }
@@ -360,7 +379,7 @@
 
       // 商品评价
       (function renderReviews() {
-        const reviews = (window.MockData?.productReviews || []).filter((r) => r.sku === (p.sku || sku));
+        const reviews = (window.MockData?.productReviews || []).filter((r) => r.sku === (p.sku || sku) && r.auditStatus === "已通过");
         const summaryEl = document.getElementById("pdReviewSummary");
         const tagsEl = document.getElementById("pdReviewTags");
         const listEl = document.getElementById("pdReviewList");
@@ -373,11 +392,6 @@
         }
 
         const avgRating = (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1);
-        const recommendRate = Math.round((reviews.filter((r) => r.isRecommended).length / reviews.length) * 100);
-        const allTags = reviews.flatMap((r) => r.tags || []);
-        const tagCounts = {};
-        allTags.forEach((t) => { tagCounts[t] = (tagCounts[t] || 0) + 1; });
-        const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
 
         summaryEl.innerHTML = `
           <div>
@@ -385,56 +399,38 @@
             <div class="pd-review-stars">${"★".repeat(Math.round(avgRating))}${"☆".repeat(5 - Math.round(avgRating))}</div>
             <div class="pd-review-count">${reviews.length} 条评价</div>
           </div>
-          <div class="pd-review-rate">
-            <div>${recommendRate}%</div>
-            <span>推荐率</span>
-          </div>
         `;
 
-        tagsEl.innerHTML = [
-          { tag: "全部", count: reviews.length },
-          ...topTags.map(([tag, count]) => ({ tag, count })),
-        ].map((item, idx) => `
-          <button class="pd-review-tag ${idx === 0 ? "active" : ""}" data-tag="${item.tag}" type="button">${item.tag} (${item.count})</button>
-        `).join("");
+        tagsEl.style.display = "none";
 
-        let currentTag = "全部";
-        function filterAndRender() {
-          const filtered = currentTag === "全部" ? reviews : reviews.filter((r) => (r.tags || []).includes(currentTag));
-          if (filtered.length === 0) {
-            listEl.innerHTML = '<div class="pd-review-empty">暂无该标签的评价</div>';
-            return;
-          }
-          listEl.innerHTML = filtered.map((r) => `
-            <div class="pd-review-item">
-              <div class="pd-review-user">
-                <div class="pd-review-avatar">${(r.user || "用").charAt(0)}</div>
-                <div class="pd-review-meta">
-                  <strong>${r.user || "匿名用户"}</strong>
-                  <span>${r.vehicle || ""}</span>
-                </div>
-              </div>
-              <div class="pd-review-stars-row">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</div>
-              <div class="pd-review-content">${r.content || ""}</div>
-              ${(r.tags || []).length ? `<div class="pd-review-item-tags">${r.tags.map((t) => `<span class="pd-review-item-tag">${t}</span>`).join("")}</div>` : ""}
-              <div class="pd-review-foot">
-                <span>${r.time || ""}</span>
-                <span class="pd-review-like">♡ ${r.likes || 0}</span>
-              </div>
-            </div>
-          `).join("");
+        function renderMedia(images) {
+          if (!images || !images.length) return "";
+          return `<div class="pd-review-media">${images.map((url) => {
+            const isVideo = String(url).match(/\.(mp4|webm|mov)($|\?)/i) || String(url).startsWith("blob:");
+            return isVideo
+              ? `<video src="${url}" controls playsinline muted style="width:120px; height:120px; object-fit:cover; border-radius:10px; background:#0d0f12;"></video>`
+              : `<img src="${url}" style="width:120px; height:120px; object-fit:cover; border-radius:10px; background:#0d0f12;" alt="">`;
+          }).join("")}</div>`;
         }
 
-        tagsEl.querySelectorAll(".pd-review-tag").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            tagsEl.querySelectorAll(".pd-review-tag").forEach((b) => b.classList.remove("active"));
-            btn.classList.add("active");
-            currentTag = btn.dataset.tag;
-            filterAndRender();
-          });
-        });
-
-        filterAndRender();
+        listEl.innerHTML = reviews.map((r) => `
+          <div class="pd-review-item">
+            <div class="pd-review-user">
+              <div class="pd-review-avatar">${(r.user || "用").charAt(0)}</div>
+              <div class="pd-review-meta">
+                <strong>${r.user || "匿名用户"}</strong>
+                <span>${r.vehicle || ""}</span>
+              </div>
+            </div>
+            <div class="pd-review-stars-row">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</div>
+            <div class="pd-review-content">${r.content || ""}</div>
+            ${renderMedia(r.images)}
+            <div class="pd-review-foot">
+              <span>${r.time || ""}</span>
+              <span class="pd-review-like">♡ ${r.likes || 0}</span>
+            </div>
+          </div>
+        `).join("");
       })();
     </script>
   </body>

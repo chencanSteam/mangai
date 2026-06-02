@@ -141,6 +141,7 @@
     userFeedback: "",
     userAuthMode: "login",
     userAuthFeedback: "",
+    wechatBindInfo: null,
     userMe: {
       selectedOrder: "",
       selectedMessage: "",
@@ -149,6 +150,7 @@
       creditApplyOpen: false,
       couponFilter: "available",
       afterSaleOrderId: "",
+      reviewOrderId: "",
     },
     userGarage: {
       selectedVehicle: vehicles[0]?.id || vehicles[0]?.plate || vehicles[0]?.model || "",
@@ -160,7 +162,7 @@
       locationEditing: false,
     },
     userForum: {
-      selectedPost: posts[0]?.id || "",
+      selectedPost: "",
       createOpen: false,
       replyPostId: "",
       editingPostId: "",
@@ -172,6 +174,11 @@
       orderId: "",
       sourceName: "",
       rating: 0,
+    },
+    userShareSheet: {
+      open: false,
+      id: "",
+      type: "",
     },
   };
 
@@ -223,9 +230,9 @@
     ],
     providerMessages: window.MockData.orderChats || [],
     userHistoryOrders: [
-      { id: "UO-240401", user: "当前用户", vehicle: "宝马 G20 330i", service: "BBS 轮毂套装 x1", quote: "¥ 18,800", status: "待验收", progress: "商品已安装完成，等待用户确认验收。", appointment: "2026-04-01 14:00", provider: "御驰 Performance Studio" },
-      { id: "UO-240328", user: "当前用户", vehicle: "AMG C43", service: "Akrapovic 排气升级", quote: "¥ 31,500", status: "已完成", progress: "已完成验收并归档。", appointment: "2026-03-28 10:30", provider: "擎速 Motorsport Lab" },
-      { id: "UO-240320", user: "当前用户", vehicle: "保时捷 718 Cayman", service: "XPEL 车衣施工", quote: "¥ 12,600", status: "施工中", progress: "门店已接单，正在施工中。", appointment: "2026-03-20 09:00", provider: "凌速 High Spec Garage" },
+      { id: "UO-240401", type: "商品订单", displayType: "自提", user: "当前用户", vehicle: "宝马 G20 330i", service: "BBS 轮毂套装 x1", quote: "¥ 18,800", sku: "PR-8801", status: "待验收", progress: "商品已安装完成，等待用户确认验收。", appointment: "2026-04-01 14:00", provider: "御驰 Performance Studio" },
+      { id: "UO-240328", type: "商品订单", displayType: "自提", user: "当前用户", vehicle: "AMG C43", service: "Akrapovic 排气升级", quote: "¥ 31,500", sku: "PR-8802", status: "已完成", progress: "已完成验收并归档。", appointment: "2026-03-28 10:30", provider: "擎速 Motorsport Lab" },
+      { id: "UO-240320", type: "服务订单", displayType: "改装服务", user: "当前用户", vehicle: "保时捷 718 Cayman", service: "XPEL 车衣施工", quote: "¥ 12,600", status: "施工中", progress: "门店已接单，正在施工中。", appointment: "2026-03-20 09:00", provider: "凌速 High Spec Garage" },
     ],
     userAddresses: [
       { id: "ADDR-1", name: "周恺", phone: "13800138000", address: "上海市闵行区申长路 1688 号 2 栋 801", tag: "默认地址" },
@@ -451,8 +458,20 @@
       ${topbarMarkup}
       <section class="screen-content">${!userLoggedIn ? renderUserAuth() : appType === "admin" ? renderAdmin() : appType === "provider" ? renderProvider() : renderUser()}</section>
       ${userLoggedIn ? `<nav class="bottom-nav">${cfg.tabs.map((id) => `<button class="${state.tab === id ? "active" : ""}" type="button" data-tab="${id}"><span>${cfg.labels[id]}</span></button>`).join("")}</nav>` : ""}
-      ${userLoggedIn ? (appType === "provider" ? renderProviderDialog() : appType === "user" ? renderUserDialog() : "") : ""}
+      ${userLoggedIn ? (appType === "provider" ? renderProviderDialog() : appType === "user" ? renderUserDialog() + renderUserShareSheet() : "") : ""}
     `;
+    const phoneFrame = screenEl.closest(".phone-frame");
+    if (phoneFrame) {
+      phoneFrame.style.position = "relative";
+      const oldSheet = phoneFrame.querySelector(".share-sheet");
+      const shareSheetEl = screenEl.querySelector(".share-sheet");
+      if (shareSheetEl) {
+        if (oldSheet && oldSheet !== shareSheetEl) oldSheet.remove();
+        phoneFrame.appendChild(shareSheetEl);
+      } else if (oldSheet) {
+        oldSheet.remove();
+      }
+    }
     bindEvents();
   }
 
@@ -566,6 +585,8 @@
     screenEl.querySelectorAll("[data-user-profile-form]").forEach((form) => form.addEventListener("submit", handleUserProfileSubmit));
     screenEl.querySelectorAll("[data-user-avatar-input]").forEach((input) => input.addEventListener("change", handleUserAvatarChange));
     screenEl.querySelectorAll("[data-user-after-sale-form]").forEach((form) => form.addEventListener("submit", handleUserAfterSaleSubmit));
+    screenEl.querySelectorAll("[data-user-review-form]").forEach((form) => form.addEventListener("submit", handleUserReviewSubmit));
+    screenEl.querySelectorAll("[data-user-review-media]").forEach((input) => input.addEventListener("change", handleUserReviewMediaChange));
     screenEl.querySelectorAll("[data-user-dialog-action]").forEach((b) => b.addEventListener("click", () => handleUserDialogAction(b)));
     screenEl.querySelectorAll("[data-user-dialog-rating]").forEach((b) => b.addEventListener("click", () => {
       state.userDialog.rating = Number(b.dataset.userDialogRating || 0);
@@ -575,6 +596,7 @@
     screenEl.querySelectorAll("[data-color-index]").forEach((b) => b.addEventListener("click", () => { updateGarageChoice("color", Number(b.dataset.colorIndex)); }));
     screenEl.querySelectorAll("[data-wheel-index]").forEach((b) => b.addEventListener("click", () => { updateGarageChoice("wheel", Number(b.dataset.wheelIndex)); }));
     screenEl.querySelectorAll("[data-film-index]").forEach((b) => b.addEventListener("click", () => { updateGarageChoice("film", Number(b.dataset.filmIndex)); }));
+    screenEl.querySelectorAll("[data-stop-propagation]").forEach((el) => el.addEventListener("click", (e) => e.stopPropagation()));
     bindScrollableSubTabs();
   }
 
@@ -690,7 +712,7 @@
       const active = state.subTab.operations || "cases";
       const rows = active === "cases" ? cases : posts;
       const selected = rows.find((i) => i.id === state.adminSelected[active]) || rows[0];
-      return `${subTabs([{ id: "cases", label: "案例审核" }, { id: "forum", label: "论坛处理" }])}<div class="mobile-list">${rows.map((i) => active === "cases" ? `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === i.id ? "active" : ""}" type="button" data-admin-pick data-admin-type="cases" data-admin-id="${i.id}"><strong>${safe(i.title, "案例标题")}</strong><div class="muted" style="margin-top:8px;">${safe(i.model, "车型")} / ${safe(i.modType, "改装类型")} / ${safe(i.provider, "服务商")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nCaseAudit(i.audit))}<span class="pill">${nCaseDisplay(i.display)}</span></div></button>${selected?.id === i.id ? renderAdminCaseDetail(i) : ""}</div>` : `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === i.id ? "active" : ""}" type="button" data-admin-pick data-admin-type="forum" data-admin-id="${i.id}"><strong>${safe(i.title, "帖子标题")}</strong><div class="muted" style="margin-top:8px;">${safe(i.author, "作者")} / ${safe(i.time, "今天")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">回复 ${i.replies || 0}</span><span class="pill">点赞 ${i.likes || 0}</span>${tag(nForum(i.status))}</div></button>${selected?.id === i.id ? renderAdminForumDetail(i) : ""}</div>`).join("")}</div>`;
+      return `${subTabs([{ id: "cases", label: "案例审核" }, { id: "forum", label: "论坛处理" }])}<div class="mobile-list">${rows.map((i) => active === "cases" ? `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === i.id ? "active" : ""}" type="button" data-admin-pick data-admin-type="cases" data-admin-id="${i.id}"><strong>${safe(i.title, "案例标题")}</strong><div class="muted" style="margin-top:8px;">${safe(i.model, "车型")} / ${safe(i.modType, "改装类型")} / ${safe(i.provider, "服务商")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nCaseAudit(i.audit))}<span class="pill">${nCaseDisplay(i.display)}</span></div></button>${selected?.id === i.id ? renderAdminCaseDetail(i) : ""}</div>` : `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === i.id ? "active" : ""}" type="button" data-admin-pick data-admin-type="forum" data-admin-id="${i.id}"><strong>${safe(i.title, "帖子标题")}</strong><div class="muted" style="margin-top:8px;">${safe(i.author, "作者")} / ${safe(i.time, "今天")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">回复 ${i.replies || 0}</span><span class="pill">点赞 ${i.likes || 0}</span><span class="pill">浏览 ${(i.views || 0).toLocaleString("zh-CN")}</span>${tag(nForum(i.status))}</div></button>${selected?.id === i.id ? renderAdminForumDetail(i) : ""}</div>`).join("")}</div>`;
     }
     return renderAdminMe();
   }
@@ -809,7 +831,7 @@
     return `<section class="admin-detail-card"><div class="eyebrow">${canAssign ? "Order Dispatch" : "Service Order"}</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>订单类型</span><strong>服务订单</strong></div><div><span>用户</span><strong>${safe(item.user, "-")}</strong></div><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>改装项目</span><strong>${safe(item.service, "-")}</strong></div><div><span>报价金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>预约安装时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>客户意向</span><strong>${safe(item.intention, "未指定")}</strong></div><div><span>服务商</span><strong>${safe(item.provider, "待分配")}</strong></div><div><span>当前进度</span><strong>${safe(item.progress, "-")}</strong></div></div>${canAssign ? `<div class="admin-suggest-list">${opts.slice(0, 3).map((p) => `<button class="admin-suggest-item" type="button" data-admin-action="order-assign" data-admin-id="${item.id}" data-provider-id="${p.id}"><strong>${safe(p.name, "服务商")}</strong><span>${p.name === item.intention ? "客户意向门店" : safe(p.city, "城市门店")}</span></button>`).join("")}</div>` : ""}<div class="admin-timeline">${getOrderTimeline(item).map((line) => `<div>${line}</div>`).join("")}</div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-admin-action="order-detail" data-admin-id="${item.id}">查看详情</button>${canAssign ? `<button class="btn btn-primary" type="button" data-admin-action="order-assign-intention" data-admin-id="${item.id}">一键派给意向门店</button>` : ""}</div></section>`;
   }
   function renderAdminCaseDetail(item) { return `<section class="admin-detail-card"><div class="eyebrow">Case Review</div><h3>${safe(item.title, "案例详情")}</h3><div class="admin-kv-list"><div><span>服务商</span><strong>${safe(item.provider, "-")}</strong></div><div><span>车型</span><strong>${safe(item.model, "-")}</strong></div><div><span>风格</span><strong>${safe(item.style, "-")}</strong></div><div><span>改装类型</span><strong>${safe(item.modType, "-")}</strong></div><div><span>花费区间</span><strong>${safe(item.cost, "-")}</strong></div><div><span>审核状态</span><strong>${nCaseAudit(item.audit)}</strong></div><div><span>展示状态</span><strong>${nCaseDisplay(item.display)}</strong></div></div><div class="admin-doc-list"><div class="admin-doc-item">案例主图</div><div class="admin-doc-item">施工过程图</div><div class="admin-doc-item">完工对比图</div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-admin-action="case-approve" data-admin-id="${item.id}">审核通过</button><button class="btn btn-secondary" type="button" data-admin-action="case-display" data-admin-id="${item.id}">设为正常展示</button><button class="btn btn-danger" type="button" data-admin-action="case-reject" data-admin-id="${item.id}">审核驳回</button></div></section>`; }
-  function renderAdminForumDetail(post) { const related = comments.filter((i) => i.post === post.id); return `<section class="admin-detail-card"><div class="eyebrow">Forum Moderation</div><h3>${safe(post.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>作者</span><strong>${safe(post.author, "-")}</strong></div><div><span>发布时间</span><strong>${safe(post.time, "-")}</strong></div><div><span>当前状态</span><strong>${nForum(post.status)}</strong></div><div><span>互动数据</span><strong>回复 ${post.replies || 0} / 点赞 ${post.likes || 0}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-admin-action="forum-post-toggle" data-admin-id="${post.id}">${nForum(post.status) === "已删除" ? "恢复帖子" : "删除帖子"}</button></div><div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${related.length ? related.map((i) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(i.author, "评论用户")}</strong>${tag(nForum(i.status))}</div><p>${safe(i.content, "评论内容")}</p><button class="btn btn-secondary" type="button" data-admin-action="forum-comment-toggle" data-admin-id="${i.id}">${nForum(i.status) === "已删除" ? "恢复评论" : "删除评论"}</button></div>`).join("") : `<div class="muted">当前帖子暂无评论</div>`}</div></div></section>`; }
+  function renderAdminForumDetail(post) { const related = comments.filter((i) => i.post === post.id); return `<section class="admin-detail-card"><div class="eyebrow">Forum Moderation</div><h3>${safe(post.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>作者</span><strong>${safe(post.author, "-")}</strong></div><div><span>发布时间</span><strong>${safe(post.time, "-")}</strong></div><div><span>当前状态</span><strong>${nForum(post.status)}</strong></div><div><span>互动数据</span><strong>回复 ${post.replies || 0} / 点赞 ${post.likes || 0} / 浏览 ${(post.views || 0).toLocaleString("zh-CN")}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-admin-action="forum-post-toggle" data-admin-id="${post.id}">${nForum(post.status) === "已删除" ? "恢复帖子" : "删除帖子"}</button></div><div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${related.length ? related.map((i) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(i.author, "评论用户")}</strong>${tag(nForum(i.status))}</div><p>${safe(i.content, "评论内容")}</p><button class="btn btn-secondary" type="button" data-admin-action="forum-comment-toggle" data-admin-id="${i.id}">${nForum(i.status) === "已删除" ? "恢复评论" : "删除评论"}</button></div>`).join("") : `<div class="muted">当前帖子暂无评论</div>`}</div></div></section>`; }
   function renderAdminShippingForm(item) {
     return `<form class="provider-complete-form" data-admin-shipping-form data-admin-id="${item.id}"><div class="form-grid"><div class="field-group"><label class="field-label" for="admin-shipping-company-${item.id}">物流公司</label><input class="input" id="admin-shipping-company-${item.id}" name="shippingCompany" type="text" value="${safe(item.shippingCompany, "顺丰速运")}" required></div><div class="field-group"><label class="field-label" for="admin-shipping-no-${item.id}">物流单号</label><input class="input" id="admin-shipping-no-${item.id}" name="shippingNo" type="text" value="${safe(item.shippingNo, "")}" placeholder="请输入物流单号" required></div></div><div class="field-group"><label class="field-label" for="admin-shipping-remark-${item.id}">备注</label><textarea class="textarea" id="admin-shipping-remark-${item.id}" name="shippingRemark" placeholder="请填写包装说明、拆分发货或签收提醒" required>${safe(item.shippingRemark, "木箱加固包装，签收前请先检查外箱。")}</textarea></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">确认发货</button><button class="btn btn-secondary" type="button" data-admin-action="order-ship-cancel" data-admin-id="${item.id}">取消</button></div></form>`;
   }
@@ -1006,7 +1028,7 @@
     if (!selected) {
       return `<div class="stack user-message-page">${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}<section class="provider-chat-shell user-message-list-shell"><div class="provider-chat-list user-message-list">${rows.map((item) => `<button class="provider-chat-thread user-message-thread" type="button" data-provider-action="provider-message-pick" data-provider-id="${item.id}"><div class="provider-chat-thread-head"><strong>${safe(item.title, "消息")}</strong><span>${safe(item.time, "刚刚")}</span></div><div class="provider-chat-thread-preview">${safe(item.preview, "暂无消息内容")}</div><div class="provider-chat-thread-meta">${tag(safe(item.status, "正常"))}</div></button>`).join("")}</div></section></div>`;
     }
-    return `<div class="stack user-message-page">${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}<section class="provider-chat-panel user-message-detail"><header class="provider-chat-header"><button class="user-message-back" type="button" data-provider-action="provider-message-back">返回</button><div><div class="eyebrow">Realtime Chat</div><h3>${safe(selected.title, "即时对话")}</h3></div>${tag(safe(selected.status, "正常"))}</header><div class="provider-chat-body">${selected.messages.map((message) => `<article class="provider-chat-bubble ${message.from === "provider" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "provider" ? "门店" : message.from === "user" ? "客户" : "平台"}</div><p>${message.text}</p><time>${message.time}</time></article>`).join("")}</div><form class="provider-chat-composer user-message-composer" data-provider-chat-form data-provider-id="${selected.id}"><label class="user-message-attach" title="添加附件"><input name="providerChatAttachment" type="file" accept="image/*,video/*,.pdf,.doc,.docx" multiple><span>＋</span></label><input class="input" name="chatMessage" type="text" placeholder="输入消息并实时发送" autocomplete="off"><button class="btn btn-primary" type="submit">发送</button></form></section></div>`;
+    return `<div class="stack user-message-page">${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}<section class="provider-chat-panel user-message-detail"><header class="provider-chat-header"><button class="user-message-back" type="button" data-provider-action="provider-message-back">返回</button><div><div class="eyebrow">Realtime Chat</div><h3>${safe(selected.title, "即时对话")}</h3></div>${tag(safe(selected.status, "正常"))}</header><div class="provider-chat-body">${selected.messages.map((message) => `<article class="provider-chat-bubble ${message.from === "provider" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "provider" ? "门店" : "客户"}</div><p>${message.text}</p><time>${message.time}</time></article>`).join("")}</div><form class="provider-chat-composer user-message-composer" data-provider-chat-form data-provider-id="${selected.id}"><label class="user-message-attach" title="添加附件"><input name="providerChatAttachment" type="file" accept="image/*,video/*,.pdf,.doc,.docx" multiple><span>＋</span></label><input class="input" name="chatMessage" type="text" placeholder="输入消息并实时发送" autocomplete="off"><button class="btn btn-primary" type="submit">发送</button></form></section></div>`;
   }
 
   function renderProviderMe() {
@@ -1055,6 +1077,11 @@
       return `<div class="modal visible"><div class="panel modal-card provider-dialog-card"><div class="eyebrow">Order Acceptance</div><h3>确认验收</h3><p class="muted">请确认施工项目、完工图片和功能联调结果无误后，再完成本次验收。</p><div class="provider-dialog-summary"><strong>${order.id}</strong><span>${safe(order.vehicle, "车辆")} / ${safe(order.service, "服务")}</span></div><div class="admin-timeline"><div>完工情况：${safe(order.progress, "服务商已提交完工资料")}</div><div>图片与交付：${safe(providerMeta.arrival, "已上传完工图片，等待用户确认")}</div><div>验收提示：${safe(providerMeta.remark, "请重点核对施工效果、功能联调和随车物品")}</div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-user-dialog-action="acceptance-contact">联系服务商</button><button class="btn btn-primary" type="button" data-user-dialog-action="confirm-acceptance">确认验收</button><button class="btn btn-secondary" type="button" data-user-dialog-action="close">暂不验收</button></div></div></div>`;
     }
     return "";
+  }
+
+  function renderUserShareSheet() {
+    if (!state.userShareSheet.open) return "";
+    return `<div class="share-sheet visible" style="position:absolute;"><div class="share-sheet-overlay" data-user-action="user-share-sheet-close"></div><div class="share-sheet-panel" data-stop-propagation><div class="share-sheet-title">分享到</div><div class="share-external-row"><button class="share-external-item" type="button" data-user-action="user-share-wechat"><div class="share-external-icon">💬</div><span>微信</span></button><button class="share-external-item" type="button" data-user-action="user-share-moments"><div class="share-external-icon">👥</div><span>朋友圈</span></button><button class="share-external-item" type="button" data-user-action="user-share-douyin"><div class="share-external-icon">🎵</div><span>抖音</span></button><button class="share-external-item" type="button" data-user-action="user-share-copy"><div class="share-external-icon">🔗</div><span>复制链接</span></button></div><div class="share-user-section"><div class="share-user-section-title">分享给平台用户</div><div class="share-user-list"><button class="share-user-item" type="button" data-user-action="user-share-platform"><div class="share-user-avatar">平</div><div class="share-user-name">平台推荐</div></button></div></div><button class="share-sheet-close" type="button" data-user-action="user-share-sheet-close">取消</button></div></div>`;
   }
 
   function getProviderStore() {
@@ -1293,14 +1320,14 @@
     const revenue = getProviderSettlementRows()
       .map((item) => priceToNumber(getSettlementGrossAmount(item)))
       .reduce((sum, value) => sum + value, 0);
-    return `<div class="stack"><section class="hero-banner"><div class="eyebrow">Business Overview</div><h3 style="margin:10px 0 8px; font-size:28px; font-family:var(--font-display);">门店营业情况</h3><p class="muted">${safe(store.name, "当前门店")} 的接单、施工、验收、推荐用户和订单金额都汇总在这里。</p></section><section class="mobile-grid-2"><article class="m3-card"><div class="muted">累计完成订单</div><span class="mobile-stat">${completedOrders}</span><div class="muted">本阶段已完工并交付客户</div></article><article class="m3-card"><div class="muted">施工中订单</div><span class="mobile-stat">${processingOrders}</span><div class="muted">当前正在施工的订单数量</div></article><article class="m3-card"><div class="muted">待客户验收</div><span class="mobile-stat">${acceptanceOrders}</span><div class="muted">已提交完工，等待客户确认</div></article><article class="m3-card"><div class="muted">采购跟进中</div><span class="mobile-stat">${pendingPurchase}</span><div class="muted">待发货或运输中的采购记录</div></article></section><section class="admin-detail-card"><div class="eyebrow">Store Status</div><h3>今日营业概览</h3><div class="admin-kv-list"><div><span>门店营业状态</span><strong>${nProvider(store.status)}</strong></div><div><span>案例展示数量</span><strong>${caseCount} 个</strong></div><div><span>累计订单金额</span><strong>¥${revenue.toLocaleString("zh-CN")}</strong></div><div><span>推荐用户</span><strong>${getProviderSettlementRows().reduce((sum, item) => sum + Number(item.referredUsers || item.referralUsers || 0), 0)} 人</strong></div></div><div class="admin-timeline"><div>服务统计只记录服务次数、推荐用户和订单金额。</div><div>推荐用户来自邀请码、平台推荐和历史服务转化。</div><div>采购记录已并入运营页，可在发货后同步安排施工计划。</div></div></section></div>`;
+    return `<div class="stack"><section class="hero-banner"><div class="eyebrow">Business Overview</div><h3 style="margin:10px 0 8px; font-size:28px; font-family:var(--font-display);">门店营业情况</h3><p class="muted">${safe(store.name, "当前门店")} 的接单、施工、验收、推荐用户和订单金额都汇总在这里。</p></section><section class="mobile-grid-2"><article class="m3-card"><div class="muted">累计完成订单</div><span class="mobile-stat">${completedOrders}</span><div class="muted">本阶段已完工并交付客户</div></article><article class="m3-card"><div class="muted">施工中订单</div><span class="mobile-stat">${processingOrders}</span><div class="muted">当前正在施工的订单数量</div></article><article class="m3-card"><div class="muted">待客户验收</div><span class="mobile-stat">${acceptanceOrders}</span><div class="muted">已提交完工，等待客户确认</div></article><article class="m3-card"><div class="muted">采购跟进中</div><span class="mobile-stat">${pendingPurchase}</span><div class="muted">待发货或运输中的采购记录</div></article></section><section class="admin-detail-card"><div class="eyebrow">Store Status</div><h3>今日营业概览</h3><div class="admin-kv-list"><div><span>门店营业状态</span><strong>${nProvider(store.status)}</strong></div><div><span>案例展示数量</span><strong>${caseCount} 个</strong></div><div><span>累计订单金额</span><strong>¥${revenue.toLocaleString("zh-CN")}</strong></div><div><span>推荐用户</span><strong>${getProviderSettlementRows().reduce((sum, item) => sum + Number(item.referredUsers || item.referralUsers || 0), 0)} 人</strong></div></div><div class="admin-timeline"><div>服务统计只记录服务次数、推荐用户和订单金额。</div><div>推荐用户来自推荐码、平台推荐和历史服务转化。</div><div>采购记录已并入运营页，可在发货后同步安排施工计划。</div></div></section></div>`;
   }
 
   function renderProviderSettlementDetail(item) {
     const opened = state.providerMe.settlementDetailId === item.id;
     const serviceTimes = item.serviceTimes || item.orders || 0;
     const referredUsers = item.referredUsers || item.referralUsers || 0;
-    return `<section class="admin-detail-card"><div class="eyebrow">Service Stats</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>门店</span><strong>${safe(item.provider, "-")}</strong></div><div><span>服务次数</span><strong>${serviceTimes} 次</strong></div><div><span>推荐用户</span><strong>${referredUsers} 人</strong></div><div><span>订单金额</span><strong>${getSettlementGrossAmount(item)}</strong></div><div><span>统计状态</span><strong>${nSettlement(item.status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="settlement-detail" data-provider-id="${item.id}">${opened ? "收起详情" : "查看详情"}</button></div>${opened ? `<div class="admin-timeline"><div>统计周期：近 ${serviceTimes} 次已完工并验收服务</div><div>推荐用户：${referredUsers} 人（邀请码、平台推荐或历史服务转化）</div><div>订单金额合计：${getSettlementGrossAmount(item)}</div><div>记录更新时间：${safe(item.paidAt || item.applyTime, "待更新")}</div></div>` : ""}</section>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">Service Stats</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>门店</span><strong>${safe(item.provider, "-")}</strong></div><div><span>服务次数</span><strong>${serviceTimes} 次</strong></div><div><span>推荐用户</span><strong>${referredUsers} 人</strong></div><div><span>订单金额</span><strong>${getSettlementGrossAmount(item)}</strong></div><div><span>统计状态</span><strong>${nSettlement(item.status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="settlement-detail" data-provider-id="${item.id}">${opened ? "收起详情" : "查看详情"}</button></div>${opened ? `<div class="admin-timeline"><div>统计周期：近 ${serviceTimes} 次已完工并验收服务</div><div>推荐用户：${referredUsers} 人（推荐码、平台推荐或历史服务转化）</div><div>订单金额合计：${getSettlementGrossAmount(item)}</div><div>记录更新时间：${safe(item.paidAt || item.applyTime, "待更新")}</div></div>` : ""}</section>`;
   }
 
   function renderProviderProfileForm() {
@@ -1910,8 +1937,27 @@
   }
 
   function renderUserAuth() {
-    const isRegister = state.userAuthMode === "register";
-    return `<div class="user-auth-screen"><section class="user-auth-card"><div class="user-auth-kicker">MAN GAI Mock</div><h2>${isRegister ? "注册用户账号" : "用户登录"}</h2><p>${isRegister ? "服务商邀请码可选，注册后会一次性绑定来源。" : "使用 mock 账号进入用户 App，数据仅保存在当前浏览器。"}</p>${state.userAuthFeedback ? `<div class="provider-feedback">${state.userAuthFeedback}</div>` : ""}<div class="user-auth-switch"><button class="${!isRegister ? "active" : ""}" type="button" data-user-auth-mode="login">登录</button><button class="${isRegister ? "active" : ""}" type="button" data-user-auth-mode="register">注册</button></div><form class="provider-complete-form user-auth-form" data-user-auth-form data-auth-mode="${isRegister ? "register" : "login"}"><div class="form-grid"><div class="field-group"><label class="field-label" for="auth-phone">手机号</label><input class="input" id="auth-phone" name="phone" type="tel" value="13800138000" required></div>${isRegister ? `<div class="field-group"><label class="field-label" for="auth-code">验证码</label><input class="input" id="auth-code" name="code" type="text" value="888888" required></div><div class="field-group"><label class="field-label" for="auth-nickname">昵称</label><input class="input" id="auth-nickname" name="nickname" type="text" value="顾铭" required></div><div class="field-group"><label class="field-label" for="auth-invite">服务商邀请码</label><input class="input" id="auth-invite" name="inviteCode" type="text" placeholder="可不填，如 YC2026"></div>` : ""}<div class="field-group"><label class="field-label" for="auth-password">密码</label><input class="input" id="auth-password" name="password" type="password" value="mock1234" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">${isRegister ? "注册并进入" : "登录"}</button></div></form></section></div>`;
+    const mode = state.userAuthMode;
+    const isLogin = mode === "login";
+    const isChoice = mode === "registerChoice";
+    const isPhone = mode === "registerPhone";
+    const isWechat = mode === "registerWechat";
+    const wx = state.wechatBindInfo;
+
+    if (isChoice) {
+      return `<div class="user-auth-screen"><section class="user-auth-card"><div class="user-auth-kicker">MAN GAI Mock</div><h2>选择注册方式</h2><p>请选择一种方式完成注册，注册后数据仅保存在当前浏览器。</p>${state.userAuthFeedback ? `<div class="provider-feedback">${state.userAuthFeedback}</div>` : ""}<div class="admin-action-row" style="flex-direction:column; gap:12px; margin-top:18px;"><button class="btn btn-primary" type="button" data-user-auth-mode="registerPhone" style="width:100%; justify-content:center; min-height:52px;"><span style="margin-right:8px; font-size:18px;">📱</span>手机号注册</button><button class="btn btn-secondary" type="button" data-user-auth-mode="registerWechat" style="width:100%; justify-content:center; min-height:52px;"><span style="margin-right:8px; font-size:18px;">💬</span>微信注册</button></div><div style="text-align:center; margin-top:16px;"><button type="button" data-user-auth-mode="login" style="background:none; border:none; color:var(--text-muted); font-size:13px; cursor:pointer;">已有账号？去登录</button></div></section></div>`;
+    }
+
+    if (isPhone) {
+      return `<div class="user-auth-screen"><section class="user-auth-card"><div class="user-auth-kicker">MAN GAI Mock</div><h2>手机号注册</h2><p>推荐码可选，注册后会一次性绑定来源。</p>${state.userAuthFeedback ? `<div class="provider-feedback">${state.userAuthFeedback}</div>` : ""}<form class="provider-complete-form user-auth-form" data-user-auth-form data-auth-mode="registerPhone"><div class="form-grid"><div class="field-group"><label class="field-label" for="auth-phone">手机号</label><input class="input" id="auth-phone" name="phone" type="tel" value="13800138000" required></div><div class="field-group"><label class="field-label" for="auth-code">验证码</label><input class="input" id="auth-code" name="code" type="text" value="888888" required></div><div class="field-group"><label class="field-label" for="auth-nickname">昵称</label><input class="input" id="auth-nickname" name="nickname" type="text" value="顾铭" required></div><div class="field-group"><label class="field-label" for="auth-invite">推荐码</label><input class="input" id="auth-invite" name="inviteCode" type="text" placeholder="可不填，如 YC2026"></div><div class="field-group"><label class="field-label" for="auth-password">密码</label><input class="input" id="auth-password" name="password" type="password" value="mock1234" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">注册并进入</button></div></form><div style="text-align:center; margin-top:14px;"><button type="button" data-user-auth-mode="registerChoice" style="background:none; border:none; color:var(--text-muted); font-size:13px; cursor:pointer;">← 返回上一步</button></div></section></div>`;
+    }
+
+    if (isWechat) {
+      const wxBindHtml = wx ? `<div style="display:flex; flex-direction:column; align-items:center; gap:10px; padding:18px 14px; border-radius:14px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); margin-bottom:14px;"><div style="width:72px; height:72px; border-radius:50%; background:linear-gradient(135deg, #07c160, #05a350); display:flex; align-items:center; justify-content:center; font-size:36px; box-shadow:0 4px 12px rgba(7,193,96,0.25);">🌿</div><strong style="font-size:17px;">${safe(wx.nickname, "微信用户")}</strong><div style="font-size:12px; color:var(--text-muted);">已获取微信头像和昵称</div><button class="btn btn-secondary btn-sm" type="button" data-user-action="user-wechat-unbind">重新获取</button></div>` : `<button class="btn btn-secondary" type="button" data-user-action="user-wechat-bind" style="width:100%; margin-bottom:14px; min-height:48px;"><span style="margin-right:6px;">💬</span>点击获取微信头像和昵称</button>`;
+      return `<div class="user-auth-screen"><section class="user-auth-card"><div class="user-auth-kicker">MAN GAI Mock</div><h2>微信注册</h2><p>授权微信后将自动获取头像和昵称，补充手机号即可完成注册。</p>${state.userAuthFeedback ? `<div class="provider-feedback">${state.userAuthFeedback}</div>` : ""}${wxBindHtml}<form class="provider-complete-form user-auth-form" data-user-auth-form data-auth-mode="registerWechat"><div class="form-grid"><div class="field-group"><label class="field-label" for="auth-phone">手机号</label><input class="input" id="auth-phone" name="phone" type="tel" value="13800138000" required></div><div class="field-group"><label class="field-label" for="auth-invite">推荐码</label><input class="input" id="auth-invite" name="inviteCode" type="text" placeholder="可不填，如 YC2026"></div><div class="field-group"><label class="field-label" for="auth-password">密码</label><input class="input" id="auth-password" name="password" type="password" value="mock1234" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">注册并进入</button></div></form><div style="text-align:center; margin-top:14px;"><button type="button" data-user-auth-mode="registerChoice" style="background:none; border:none; color:var(--text-muted); font-size:13px; cursor:pointer;">← 返回上一步</button></div></section></div>`;
+    }
+
+    return `<div class="user-auth-screen"><section class="user-auth-card"><div class="user-auth-kicker">MAN GAI Mock</div><h2>用户登录</h2><p>使用 mock 账号进入用户 App，数据仅保存在当前浏览器。</p>${state.userAuthFeedback ? `<div class="provider-feedback">${state.userAuthFeedback}</div>` : ""}<form class="provider-complete-form user-auth-form" data-user-auth-form data-auth-mode="login"><div class="form-grid"><div class="field-group"><label class="field-label" for="auth-phone">手机号</label><input class="input" id="auth-phone" name="phone" type="tel" value="13800138000" required></div><div class="field-group"><label class="field-label" for="auth-password">密码</label><input class="input" id="auth-password" name="password" type="password" value="mock1234" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">登录</button></div></form><div style="text-align:center; margin-top:16px;"><button type="button" data-user-auth-mode="registerChoice" style="background:none; border:none; color:var(--text-muted); font-size:13px; cursor:pointer;">还没有账号？去注册</button></div></section></div>`;
   }
 
   function getVehicleHistoryEntries(vehicle) {
@@ -2088,7 +2134,7 @@
   function renderUserMessages() {
     const rows = fallback.providerMessages.filter((item) => item.messages.some((message) => message.from === "user" || message.from === "provider" || message.from === "platform"));
     const selected = rows.find((item) => item.id === state.userMe.selectedMessage) || rows[0];
-    return `<div class="stack">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="provider-chat-shell"><div class="provider-chat-list">${rows.map((item) => `<div class="admin-inline-block"><button class="provider-chat-thread ${selected?.id === item.id ? "active" : ""}" type="button" data-user-action="user-message-pick" data-user-id="${item.id}"><div class="provider-chat-thread-head"><strong>${safe(item.title, "消息")}</strong><span>${safe(item.time, "刚刚")}</span></div><div class="provider-chat-thread-preview">${safe(item.preview, "暂无消息内容")}</div><div class="provider-chat-thread-meta">${tag(safe(item.status, "正常"))}</div></button>${selected?.id === item.id ? `<section class="provider-chat-panel"><header class="provider-chat-header"><div><div class="eyebrow">Realtime Chat</div><h3>${safe(item.title, "即时对话")}</h3></div>${tag(safe(item.status, "正常"))}</header><div class="provider-chat-body">${item.messages.map((message) => `<article class="provider-chat-bubble ${message.from === "user" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "user" ? "我" : message.from === "provider" ? "服务商" : "平台"}</div><p>${message.text}</p><time>${message.time}</time></article>`).join("")}</div><form class="provider-chat-composer" data-user-chat-form data-user-id="${item.id}"><input class="input" name="userChatMessage" type="text" placeholder="输入消息并实时发送" autocomplete="off" required><button class="btn btn-primary" type="submit">发送</button></form></section>` : ""}</div>`).join("")}</div></section></div>`;
+    return `<div class="stack">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="provider-chat-shell"><div class="provider-chat-list">${rows.map((item) => `<div class="admin-inline-block"><button class="provider-chat-thread ${selected?.id === item.id ? "active" : ""}" type="button" data-user-action="user-message-pick" data-user-id="${item.id}"><div class="provider-chat-thread-head"><strong>${safe(item.title, "消息")}</strong><span>${safe(item.time, "刚刚")}</span></div><div class="provider-chat-thread-preview">${safe(item.preview, "暂无消息内容")}</div><div class="provider-chat-thread-meta">${tag(safe(item.status, "正常"))}</div></button>${selected?.id === item.id ? `<section class="provider-chat-panel"><header class="provider-chat-header"><div><div class="eyebrow">Realtime Chat</div><h3>${safe(item.title, "即时对话")}</h3></div>${tag(safe(item.status, "正常"))}</header><div class="provider-chat-body">${item.messages.map((message) => `<article class="provider-chat-bubble ${message.from === "user" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "user" ? "我" : "服务商"}</div><p>${message.text}</p><time>${message.time}</time></article>`).join("")}</div><form class="provider-chat-composer" data-user-chat-form data-user-id="${item.id}"><input class="input" name="userChatMessage" type="text" placeholder="输入消息并实时发送" autocomplete="off" required><button class="btn btn-primary" type="submit">发送</button></form></section>` : ""}</div>`).join("")}</div></section></div>`;
   }
 
   function renderUserAddress() {
@@ -2158,7 +2204,7 @@
       return `<section class="admin-detail-card"><div class="eyebrow">Edit Post</div><h3>编辑帖子</h3>${renderUserForumEditForm(item)}</section>`;
     }
     const boardName = (forumBoards || []).find((b) => b.id === item.board)?.name || "-";
-    return `<section class="admin-detail-card"><div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;"><button class="btn btn-secondary btn-sm" type="button" data-user-action="user-forum-back" style="padding:6px 12px;">‹ 返回列表</button><div class="eyebrow">Forum Detail</div></div><h3>${safe(item.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>作者</span><strong>${safe(item.author, "-")}</strong></div><div><span>版面</span><strong>${safe(boardName, "-")}</strong></div><div><span>发布时间</span><strong>${safe(item.time, "-")}</strong></div><div><span>互动数据</span><strong>回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</strong></div><div><span>状态</span><strong>${nForum(item.status)}</strong></div></div>${item.content ? `<div class="rich-editor-area" style="margin:12px 0; padding:12px 14px; border:1px solid rgba(255,255,255,0.06); border-radius:12px; background:rgba(255,255,255,0.02);">${item.content}</div>` : ""}<div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${related.length ? related.map((comment) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(comment.author, "评论用户")}</strong><span class="muted">${safe(comment.time, "刚刚")}</span>${isUserOwnComment(comment) ? `<button class="btn btn-danger btn-sm user-comment-delete-btn" type="button" data-user-action="user-forum-comment-delete" data-user-id="${comment.id}">删除</button>` : ""}</div><p>${safe(comment.content, "评论内容")}</p></div>`).join("") : `<div class="muted">当前暂无评论</div>`}</div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-user-action="user-forum-like" data-user-id="${item.id}">点赞</button><button class="btn btn-secondary" type="button" data-user-action="${replyOpen ? "user-forum-reply-cancel" : "user-forum-reply"}" data-user-id="${item.id}">${replyOpen ? "取消回复" : "回复"}</button>${mine ? `<button class="btn btn-secondary" type="button" data-user-action="user-forum-edit" data-user-id="${item.id}">编辑</button><button class="btn btn-danger" type="button" data-user-action="user-forum-delete" data-user-id="${item.id}">删除</button>` : ""}</div>${replyOpen ? renderUserForumReplyForm(item) : ""}</section>`;
+    return `<section class="admin-detail-card"><div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;"><button class="btn btn-secondary btn-sm" type="button" data-user-action="user-forum-back" style="padding:6px 12px;">‹ 返回列表</button><div class="eyebrow">Forum Detail</div></div><h3>${safe(item.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>作者</span><strong>${safe(item.author, "-")}</strong></div><div><span>版面</span><strong>${safe(boardName, "-")}</strong></div><div><span>发布时间</span><strong>${safe(item.time, "-")}</strong></div><div><span>互动数据</span><strong>回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</strong></div><div><span>状态</span><strong>${nForum(item.status)}</strong></div></div>${item.content ? `<div class="rich-editor-area" style="margin:12px 0; padding:12px 14px; border:1px solid rgba(255,255,255,0.06); border-radius:12px; background:rgba(255,255,255,0.02);">${item.content}</div>` : ""}<div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${related.length ? related.map((comment) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(comment.author, "评论用户")}</strong><span class="muted">${safe(comment.time, "刚刚")}</span>${isUserOwnComment(comment) ? `<button class="btn btn-danger btn-sm user-comment-delete-btn" type="button" data-user-action="user-forum-comment-delete" data-user-id="${comment.id}">删除</button>` : ""}</div><p>${safe(comment.content, "评论内容")}</p></div>`).join("") : `<div class="muted">当前暂无评论</div>`}</div></div><div class="admin-action-row forum-action-bar"><button class="btn btn-primary" type="button" data-user-action="user-forum-like" data-user-id="${item.id}">点赞</button><button class="btn btn-secondary" type="button" data-user-action="${replyOpen ? "user-forum-reply-cancel" : "user-forum-reply"}" data-user-id="${item.id}">${replyOpen ? "取消回复" : "回复"}</button>${mine ? `<button class="btn btn-secondary" type="button" data-user-action="user-forum-edit" data-user-id="${item.id}">编辑</button><button class="btn btn-danger" type="button" data-user-action="user-forum-delete" data-user-id="${item.id}">删除</button>` : ""}<button class="btn btn-secondary" type="button" data-user-action="user-share-sheet-open" data-user-id="${item.id}" data-user-type="forum">分享</button></div>${replyOpen ? renderUserForumReplyForm(item) : ""}</section>`;
   }
 
   function renderUserForumReplyForm(item) {
@@ -2168,7 +2214,13 @@
   function renderUserMallDetail(item, active) {
     const itemId = active === "goods" ? item.sku : item.id || item.name;
     const orderOpen = state.userOrderForm.type === active && state.userOrderForm.id === itemId;
-    return `<section class="admin-detail-card"><div class="eyebrow">${active === "goods" ? "Mall Goods" : "Service Booking"}</div><h3>${safe(item.name, active === "goods" ? "商品详情" : "服务详情")}</h3><div class="admin-kv-list">${active === "goods" ? `<div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>适配车型</span><strong>${safe(item.fitment || item.model, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>状态</span><strong>${nProduct(item.status)}</strong></div>` : `<div><span>服务名称</span><strong>${safe(item.name, "-")}</strong></div><div><span>服务说明</span><strong>${safe(item.desc, "-")}</strong></div><div><span>价格参考</span><strong>${safe(item.price, "-")}</strong></div><div><span>预约方式</span><strong>${safe(item.duration, "支持到店预约")}</strong></div>`}</div><div class="admin-action-row">${active === "goods" ? `<a class="btn btn-primary" href="${buildUserGoodsOrderLink(item)}">立即下单</a>` : `<button class="btn btn-primary" type="button" data-user-action="${orderOpen ? "user-order-cancel" : "user-order-open"}" data-user-id="${itemId}" data-user-type="${active}">${orderOpen ? "收起下单表单" : "立即下单"}</button>`}</div>${active !== "goods" && orderOpen ? renderUserOrderForm(item, active) : ""}</section>`;
+    const priceHtml = active === "goods" && item.originalPrice
+      ? `<div><span>价格</span><strong>${safe(item.price, "-")} <span style="text-decoration:line-through; color:var(--text-muted); font-size:12px; font-weight:400;">${safe(item.originalPrice, "")}</span></strong></div>`
+      : `<div><span>价格</span><strong>${safe(item.price, "-")}</strong></div>`;
+    const promoHtml = active === "goods" && item.promotion
+      ? `<div style="margin-top:8px; padding:8px 12px; border-radius:10px; background:rgba(255,106,0,0.08); border:1px solid rgba(255,106,0,0.15);"><strong style="font-size:13px; color:#ff6a00;">${safe(item.promotion.label, "")} · ${safe(item.promotion.discount, "")}</strong><div style="font-size:12px; color:var(--text-muted); margin-top:2px;">${safe(item.promotion.desc, "")}</div></div>`
+      : "";
+    return `<section class="admin-detail-card"><div class="eyebrow">${active === "goods" ? "Mall Goods" : "Service Booking"}</div><h3>${safe(item.name, active === "goods" ? "商品详情" : "服务详情")}</h3><div class="admin-kv-list">${active === "goods" ? `<div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>适配车型</span><strong>${safe(item.fitment || item.model, "-")}</strong></div>${priceHtml}<div><span>状态</span><strong>${nProduct(item.status)}</strong></div>` : `<div><span>服务名称</span><strong>${safe(item.name, "-")}</strong></div><div><span>服务说明</span><strong>${safe(item.desc, "-")}</strong></div><div><span>价格参考</span><strong>${safe(item.price, "-")}</strong></div><div><span>预约方式</span><strong>${safe(item.duration, "支持到店预约")}</strong></div>`}</div>${promoHtml}<div class="admin-action-row">${active === "goods" ? `<a class="btn btn-primary" href="${buildUserGoodsOrderLink(item)}">立即下单</a>` : `<button class="btn btn-primary" type="button" data-user-action="${orderOpen ? "user-order-cancel" : "user-order-open"}" data-user-id="${itemId}" data-user-type="${active}">${orderOpen ? "收起下单表单" : "立即下单"}</button>`}<button class="btn btn-secondary" type="button" data-user-action="user-share-sheet-open" data-user-id="${itemId}" data-user-type="mall">分享</button></div>${active !== "goods" && orderOpen ? renderUserOrderForm(item, active) : ""}</section>`;
   }
 
   function getUserVehicleKey(item) {
@@ -2448,6 +2500,17 @@
       render();
       return;
     }
+    if (action === "user-review-open") {
+      state.userMe.reviewOrderId = id;
+      state.userMe.afterSaleOrderId = "";
+      render();
+      return;
+    }
+    if (action === "user-review-cancel") {
+      state.userMe.reviewOrderId = "";
+      render();
+      return;
+    }
     if (action === "user-message-pick") {
       state.userMe.selectedMessage = id;
       render();
@@ -2455,6 +2518,18 @@
     }
     if (action === "user-message-back") {
       state.userMe.selectedMessage = "";
+      render();
+      return;
+    }
+    if (action === "user-wechat-bind") {
+      const mockWxNames = ["满改车友_330i", "性能控_A4L", "碳纤控", "赛道日玩家", "改装小白", "姿态党", "JDM信仰", "德系性能控"];
+      const mockWxName = mockWxNames[Math.floor(Math.random() * mockWxNames.length)];
+      state.wechatBindInfo = { openid: `wx_${Date.now().toString(36)}`, nickname: mockWxName, avatar: "", bindAt: getNowStamp() };
+      render();
+      return;
+    }
+    if (action === "user-wechat-unbind") {
+      state.wechatBindInfo = null;
       render();
       return;
     }
@@ -2547,6 +2622,49 @@
       render();
       return;
     }
+    function doShare(channel) {
+      const shareType = state.userShareSheet.type || type || "forum";
+      const shareId = state.userShareSheet.id || id;
+      let shareTitle = "";
+      let shareLink = "";
+      if (shareType === "forum") {
+        const target = posts.find((item) => item.id === shareId);
+        shareTitle = target ? safe(target.title, "帖子") : "精选帖子";
+        shareLink = `${window.location.origin}${window.location.pathname}?tab=forum&openPost=${shareId}`;
+      } else {
+        const target = products.find((item) => item.sku === shareId);
+        shareTitle = target ? safe(target.name, "商品") : "精选商品";
+        shareLink = `${window.location.origin}/pages/user-product-detail.html?sku=${encodeURIComponent(shareId)}`;
+      }
+      if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(`${shareTitle} — ${shareLink}`).catch(() => {});
+      }
+      const channelText = { wechat: "微信", moments: "朋友圈", douyin: "抖音", copy: "", platform: "" };
+      if (channel === "platform") {
+        state.userFeedback = `「${shareTitle}」已推荐给平台用户。`;
+      } else if (channel === "copy") {
+        state.userFeedback = `「${shareTitle}」链接已复制到剪贴板。`;
+      } else {
+        state.userFeedback = `「${shareTitle}」链接已复制，快去${channelText[channel] || "微信"}粘贴分享吧。`;
+      }
+      state.userShareSheet.open = false;
+      render();
+    }
+    if (action === "user-share-sheet-open") {
+      state.userShareSheet = { open: true, id, type: type || "forum" };
+      render();
+      return;
+    }
+    if (action === "user-share-sheet-close") {
+      state.userShareSheet.open = false;
+      render();
+      return;
+    }
+    if (action === "user-share-wechat") { doShare("wechat"); return; }
+    if (action === "user-share-moments") { doShare("moments"); return; }
+    if (action === "user-share-douyin") { doShare("douyin"); return; }
+    if (action === "user-share-copy") { doShare("copy"); return; }
+    if (action === "user-share-platform") { doShare("platform"); return; }
     if (action === "user-forum-category") {
       state.userForum.category = id;
       render();
@@ -2805,7 +2923,6 @@
       phone,
       avatarUrl,
       inviteProviderName: String(formData.get("profileInviteProviderName") || "").trim() || "自然流量",
-      bio: String(formData.get("profileBio") || "").trim(),
       updatedAt: getNowStamp(),
     });
     state.subTab.me = "profile";
@@ -2841,6 +2958,7 @@
       user: "当前用户",
       vehicle,
       service: `${safe(source.name, "下单项目")} x${quantity}`,
+      sku: type === "goods" ? safe(source.sku, "") : "",
       provider: type === "goods" ? "平台仓" : safe(preferredProvider?.name, "推荐门店"),
       city: type === "goods" ? state.userGarage.locationCity : safe(preferredProvider?.city, "上海"),
       quote: safe(source.price, "待确认"),
@@ -2964,7 +3082,7 @@
   function renderUserProfile() {
     const profile = getMockUserAuth() || {};
     const source = profile.inviteProviderName || "自然流量";
-    return `<div class="stack">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="admin-detail-card"><div class="eyebrow">User Profile</div><h3>用户基本信息</h3><div class="admin-kv-list"><div><span>昵称</span><strong>${safe(profile.nickname, "当前用户")}</strong></div><div><span>手机号</span><strong>${safe(profile.phone, "13800138000")}</strong></div><div><span>绑定来源</span><strong>${safe(source, "自然流量")}</strong></div><div><span>服务商邀请码</span><strong>${safe(profile.inviteCode, "未填写")}</strong></div><div><span>常用城市</span><strong>${String(state.userGarage.locationCity || "上海").replace("市", "")}</strong></div><div><span>默认爱车</span><strong>${safe(getSelectedUserVehicle()?.model, "未绑定车辆")}</strong></div><div><span>账号状态</span><strong>正常</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-user-action="user-logout">退出登录</button></div></section></div>`;
+    return `<div class="stack">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="admin-detail-card"><div class="eyebrow">User Profile</div><h3>用户基本信息</h3><div class="admin-kv-list"><div><span>昵称</span><strong>${safe(profile.nickname, "当前用户")}</strong></div><div><span>手机号</span><strong>${safe(profile.phone, "13800138000")}</strong></div><div><span>绑定来源</span><strong>${safe(source, "自然流量")}</strong></div><div><span>推荐码</span><strong>${safe(profile.inviteCode, "未填写")}</strong></div><div><span>常用城市</span><strong>${String(state.userGarage.locationCity || "上海").replace("市", "")}</strong></div><div><span>默认爱车</span><strong>${safe(getSelectedUserVehicle()?.model, "未绑定车辆")}</strong></div><div><span>账号状态</span><strong>正常</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-user-action="user-logout">退出登录</button></div></section></div>`;
   }
 
   function renderUserOrderForm(item, active) {
@@ -2993,7 +3111,9 @@
     const visibleTimeline = item.userVisibleProgress ? ["订单已提交", item.userVisibleProgress] : getOrderTimeline(item);
     const canAfterSale = isGoodsOrder && (nOrder(item.status) === "已完成" || item.status === "售后中");
     const afterSaleOpen = state.userMe.afterSaleOrderId === item.id;
-    return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>${isGoodsOrder ? "商品" : "服务"}</span><strong>${safe(item.service, "-")}</strong></div>${isGoodsOrder ? `<div><span>收货人</span><strong>${safe(item.recipient, getUserDefaultReceiver())}</strong></div><div><span>收货地址</span><strong>${safe(item.address, getUserDefaultAddress())}</strong></div>` : `<div><span>预约安装时间</span><strong>${safe(item.appointment, "-")}</strong></div>`}<div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>支付方式</span><strong>${safe(item.paymentMethod, "线上支付")}</strong></div><div><span>支付状态</span><strong>${safe(item.payment, "mock 已记录")}</strong></div><div><span>当前进度</span><strong>${visibleProgress}</strong></div>${item.afterSaleType ? `<div><span>售后类型</span><strong>${safe(item.afterSaleType, "-")}</strong></div><div><span>售后状态</span><strong>${safe(item.afterSaleStatus, "处理中")}</strong></div>` : ""}</div><div class="admin-timeline">${visibleTimeline.map((line) => `<div>${line}</div>`).join("")}</div>${afterSaleOpen ? renderUserAfterSaleForm(item) : ""}<div class="admin-action-row">${canAccept ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系服务商</button><button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>` : canAfterSale ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系客服</button><button class="btn btn-danger" type="button" data-user-action="${afterSaleOpen ? "user-after-sale-cancel" : "user-after-sale-open"}" data-user-id="${item.id}">${afterSaleOpen ? "收起售后申请" : item.afterSaleType ? "查看售后进度" : "申请售后"}</button>` : `<button class="btn btn-secondary" type="button" disabled>当前无需验收</button>`}</div></section>`;
+    const canReview = isGoodsOrder && nOrder(item.status) === "已完成" && item.sku && !(window.MockData.productReviews || []).some((r) => r.orderId === item.id);
+    const reviewOpen = state.userMe.reviewOrderId === item.id;
+    return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>${isGoodsOrder ? "商品" : "服务"}</span><strong>${safe(item.service, "-")}</strong></div>${isGoodsOrder ? `<div><span>收货人</span><strong>${safe(item.recipient, getUserDefaultReceiver())}</strong></div><div><span>收货地址</span><strong>${safe(item.address, getUserDefaultAddress())}</strong></div>` : `<div><span>预约安装时间</span><strong>${safe(item.appointment, "-")}</strong></div>`}<div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>支付方式</span><strong>${safe(item.paymentMethod, "线上支付")}</strong></div><div><span>支付状态</span><strong>${safe(item.payment, "mock 已记录")}</strong></div><div><span>当前进度</span><strong>${visibleProgress}</strong></div>${item.afterSaleType ? `<div><span>售后类型</span><strong>${safe(item.afterSaleType, "-")}</strong></div><div><span>售后状态</span><strong>${safe(item.afterSaleStatus, "处理中")}</strong></div>` : ""}</div><div class="admin-timeline">${visibleTimeline.map((line) => `<div>${line}</div>`).join("")}</div>${afterSaleOpen ? renderUserAfterSaleForm(item) : ""}${reviewOpen ? renderUserReviewForm(item) : ""}<div class="admin-action-row">${canAccept ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系服务商</button><button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>` : canReview ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系客服</button><button class="btn btn-primary" type="button" data-user-action="${reviewOpen ? "user-review-cancel" : "user-review-open"}" data-user-id="${item.id}">${reviewOpen ? "收起评价" : "去评价"}</button>${item.afterSaleType ? `<button class="btn btn-danger" type="button" data-user-action="${afterSaleOpen ? "user-after-sale-cancel" : "user-after-sale-open"}" data-user-id="${item.id}">${afterSaleOpen ? "收起售后申请" : "查看售后进度"}</button>` : `<button class="btn btn-danger" type="button" data-user-action="${afterSaleOpen ? "user-after-sale-cancel" : "user-after-sale-open"}" data-user-id="${item.id}">${afterSaleOpen ? "收起售后申请" : "申请售后"}</button>`}` : canAfterSale ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系客服</button><button class="btn btn-danger" type="button" data-user-action="${afterSaleOpen ? "user-after-sale-cancel" : "user-after-sale-open"}" data-user-id="${item.id}">${afterSaleOpen ? "收起售后申请" : item.afterSaleType ? "查看售后进度" : "申请售后"}</button>` : `<button class="btn btn-secondary" type="button" disabled>当前无需验收</button>`}</div></section>`;
   }
 
   function renderUserAfterSaleForm(item) {
@@ -3022,6 +3142,87 @@
     render();
   }
 
+  function renderUserReviewForm(item) {
+    return `<form class="provider-complete-form" data-user-review-form data-order-id="${item.id}" data-order-sku="${item.sku || ""}"><div class="form-grid"><div class="field-group"><label class="field-label">评分</label><select class="input" name="reviewRating" required><option value="5">★★★★★ 非常满意</option><option value="4">★★★★☆ 满意</option><option value="3">★★★☆☆ 一般</option><option value="2">★★☆☆☆ 不满意</option><option value="1">★☆☆☆☆ 非常不满意</option></select></div><div class="field-group field-group-full"><label class="field-label">评价内容</label><textarea class="textarea" name="reviewContent" placeholder="分享你的使用体验，帮助其他车主做选择" required>商品品质不错，安装效果符合预期，值得推荐。</textarea></div><div class="field-group field-group-full"><label class="field-label">图片 / 视频</label><label class="upload-panel" for="review-media-${item.id}" style="min-height:100px;"><input id="review-media-${item.id}" class="upload-input" type="file" accept="image/*,video/*" multiple data-user-review-media data-order-id="${item.id}"><span class="upload-illustration" style="height:44px;"></span><strong>点击上传图片或视频</strong><small>支持多张图片或单个视频，用于展示安装效果或使用体验</small></label><div class="review-media-preview" data-review-preview="${item.id}" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;"></div></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交评价</button><button class="btn btn-secondary" type="button" data-user-action="user-review-cancel" data-user-id="${item.id}">取消</button></div></form>`;
+  }
+
+  function handleUserReviewMediaChange(event) {
+    const input = event.currentTarget;
+    const orderId = input.dataset.orderId || "";
+    const previewEl = document.querySelector(`[data-review-preview="${orderId}"]`);
+    if (!previewEl) return;
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    const existing = previewEl.dataset.media ? JSON.parse(previewEl.dataset.media) : [];
+    const newItems = files.map((file) => ({
+      type: file.type.startsWith("video") ? "video" : "image",
+      url: URL.createObjectURL(file),
+      name: file.name,
+    }));
+    const combined = [...existing, ...newItems].slice(0, 9);
+    previewEl.dataset.media = JSON.stringify(combined);
+    previewEl.innerHTML = combined.map((m, idx) => `
+      <div style="position:relative; width:72px; height:72px; border-radius:10px; overflow:hidden; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06);">
+        ${m.type === "video" ? `<video src="${m.url}" style="width:100%; height:100%; object-fit:cover;" muted playsinline></video><span style="position:absolute; bottom:2px; right:2px; font-size:10px; background:rgba(0,0,0,0.6); color:#fff; padding:1px 4px; border-radius:4px;">视频</span>` : `<img src="${m.url}" style="width:100%; height:100%; object-fit:cover;" alt="">`}
+        <button type="button" data-review-media-remove="${idx}" style="position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%; background:rgba(0,0,0,0.6); color:#fff; border:none; font-size:11px; cursor:pointer; line-height:1;">×</button>
+      </div>
+    `).join("");
+    function bindRemove() {
+      previewEl.querySelectorAll("[data-review-media-remove]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const idx = Number(btn.dataset.reviewMediaRemove);
+          const mediaArr = JSON.parse(previewEl.dataset.media || "[]");
+          mediaArr.splice(idx, 1);
+          previewEl.dataset.media = JSON.stringify(mediaArr);
+          previewEl.innerHTML = mediaArr.map((m, i) => `
+            <div style="position:relative; width:72px; height:72px; border-radius:10px; overflow:hidden; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06);">
+              ${m.type === "video" ? `<video src="${m.url}" style="width:100%; height:100%; object-fit:cover;" muted playsinline></video><span style="position:absolute; bottom:2px; right:2px; font-size:10px; background:rgba(0,0,0,0.6); color:#fff; padding:1px 4px; border-radius:4px;">视频</span>` : `<img src="${m.url}" style="width:100%; height:100%; object-fit:cover;" alt="">`}
+              <button type="button" data-review-media-remove="${i}" style="position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%; background:rgba(0,0,0,0.6); color:#fff; border:none; font-size:11px; cursor:pointer; line-height:1;">×</button>
+            </div>
+          `).join("");
+          bindRemove();
+        });
+      });
+    }
+    bindRemove();
+  }
+
+  function handleUserReviewSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const orderId = form.dataset.orderId || "";
+    const sku = form.dataset.orderSku || "";
+    const target = getUserOrderById(orderId);
+    if (!target || !sku) return;
+    const formData = new FormData(form);
+    const rating = Math.max(1, Math.min(5, Number(formData.get("reviewRating") || 5)));
+    const content = String(formData.get("reviewContent") || "").trim();
+    if (!content) return;
+    const previewEl = document.querySelector(`[data-review-preview="${orderId}"]`);
+    const media = previewEl ? JSON.parse(previewEl.dataset.media || "[]") : [];
+    const profile = getMockUserAuth() || {};
+    const newReview = {
+      id: `RV-${Date.now().toString().slice(-4)}`,
+      sku,
+      orderId,
+      user: profile.nickname || "当前用户",
+      avatar: "",
+      rating,
+      content,
+      tags: [],
+      images: media.map((m) => m.url),
+      vehicle: target.vehicle || "",
+      time: getNowStamp(),
+      likes: 0,
+      auditStatus: "待审核",
+    };
+    window.MockData.productReviews = window.MockData.productReviews || [];
+    window.MockData.productReviews.unshift(newReview);
+    state.userMe.reviewOrderId = "";
+    state.userFeedback = `${orderId} 评价已提交，经平台审核通过后将展示在商品详情页。`;
+    render();
+  }
+
   function handleUserAuthSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -3030,15 +3231,25 @@
     const phone = String(formData.get("phone") || "").trim();
     const password = String(formData.get("password") || "").trim();
     if (!phone || !password) return;
-    if (mode === "register") {
+    if (mode === "registerPhone" || mode === "registerWechat") {
       const inviteCode = String(formData.get("inviteCode") || "").trim();
       const invite = inviteCode ? (window.MockData.providerInvites || []).find((item) => item.code === inviteCode) : null;
       if (inviteCode && !invite) {
-        state.userAuthFeedback = "邀请码无效，请确认后再注册。";
+        state.userAuthFeedback = "推荐码无效，请确认后再注册。";
         render();
         return;
       }
-      setMockUserAuth({ id: `U-${Date.now().toString().slice(-5)}`, phone, nickname: String(formData.get("nickname") || "新用户").trim(), inviteCode, inviteProviderName: invite ? invite.providerName : "自然流量", createdAt: getNowStamp() });
+      const wx = state.wechatBindInfo;
+      const nickname = mode === "registerWechat" && wx
+        ? wx.nickname
+        : String(formData.get("nickname") || "新用户").trim();
+      if (mode === "registerWechat" && !wx) {
+        state.userAuthFeedback = "请先获取微信头像和昵称。";
+        render();
+        return;
+      }
+      setMockUserAuth({ id: `U-${Date.now().toString().slice(-5)}`, phone, nickname, inviteCode, inviteProviderName: invite ? invite.providerName : "自然流量", wechatOpenid: wx?.openid || "", wechatNickname: wx?.nickname || "", createdAt: getNowStamp() });
+      state.wechatBindInfo = null;
     } else {
       const account = (window.MockData.userAccounts || []).find((item) => item.phone === phone);
       setMockUserAuth({ id: account?.id || window.MockData.creditInfo?.userId || "U-20311", phone, nickname: account?.nickname || "顾铭", inviteCode: account?.inviteCode || "", inviteProviderName: account?.inviteProviderName || "自然流量", loginAt: getNowStamp() });
@@ -3121,7 +3332,7 @@
   function renderUserProfile() {
     const profile = getMockUserAuth() || {};
     const source = profile.inviteProviderName || "自然流量";
-    return `<section class="user-me-panel"><div class="user-me-list"><div><span>昵称</span><strong>${safe(profile.nickname, "顾铭")}</strong></div><div><span>手机号</span><strong>${safe(profile.phone, "13800138000")}</strong></div><div><span>绑定来源</span><strong>${safe(source, "自然流量")}</strong></div><div><span>服务商邀请码</span><strong>${safe(profile.inviteCode, "未填写")}</strong></div><div><span>默认爱车</span><strong>${safe(getSelectedUserVehicle()?.model, "未绑定车辆")}</strong></div><div><span>当前定位</span><strong>${getGarageLocationSummary()}</strong></div></div><button class="btn btn-secondary user-me-full-btn" type="button" data-user-action="user-logout">退出登录</button></section>`;
+    return `<section class="user-me-panel"><div class="user-me-list"><div><span>昵称</span><strong>${safe(profile.nickname, "顾铭")}</strong></div><div><span>手机号</span><strong>${safe(profile.phone, "13800138000")}</strong></div><div><span>绑定来源</span><strong>${safe(source, "自然流量")}</strong></div><div><span>服务商推荐码</span><strong>${safe(profile.inviteCode, "未填写")}</strong></div><div><span>默认爱车</span><strong>${safe(getSelectedUserVehicle()?.model, "未绑定车辆")}</strong></div><div><span>当前定位</span><strong>${getGarageLocationSummary()}</strong></div></div><button class="btn btn-secondary user-me-full-btn" type="button" data-user-action="user-logout">退出登录</button></section>`;
   }
 
   function renderUserCollections() {
@@ -3162,6 +3373,9 @@
   function renderUserPortrait(profile = getMockUserAuth() || {}, className = "") {
     const avatarUrl = safe(profile.avatarUrl, "");
     const fallbackText = safe(profile.nickname, "顾").slice(0, 1);
+    if (profile.wechatNickname && !avatarUrl) {
+      return `<div class="user-me-portrait ${className}" style="background:linear-gradient(135deg, #07c160, #05a350); color:#fff; font-size:18px; display:flex; align-items:center; justify-content:center;">🌿</div>`;
+    }
     return `<div class="user-me-portrait ${className}">${avatarUrl ? `<img src="${avatarUrl}" alt="avatar">` : fallbackText}</div>`;
   }
 
@@ -3202,7 +3416,8 @@
     const profile = getMockUserAuth() || {};
     const userId = getUserDisplayId(profile);
     const avatarHelp = profile.avatarUrl ? "已上传头像，保存时不选择新图片会继续保留。" : "未上传头像时，个人中心自动显示用户名第一个字。";
-    return `<div class="user-me-light-subpage"><section class="user-me-white-block user-profile-edit-card"><div class="user-profile-edit-head">${renderUserPortrait(profile, "large")}<div><strong>${safe(profile.nickname, "顾铭")}</strong><span>用户ID ${userId}</span></div></div><form class="user-me-form light" data-user-profile-form><label><span>用户名</span><input class="input" name="profileNickname" type="text" value="${safe(profile.nickname, "顾铭")}" required></label><label class="user-avatar-upload"><span>头像图片</span><div class="user-avatar-file-wrap"><input class="input" name="profileAvatar" type="file" accept="image/*" data-user-avatar-input><div class="user-avatar-file-trigger"><span>⬆</span><span>点击选择图片</span></div><span class="user-avatar-file-name">未选择任何文件</span></div><small>${avatarHelp}</small></label>${profile.avatarUrl ? `<label class="user-avatar-reset"><input name="profileAvatarReset" type="checkbox"> <span>清除头像，改用用户名首字</span></label>` : ""}<label><span>手机号</span><input class="input" name="profilePhone" type="tel" value="${safe(profile.phone, "13800138000")}" required></label><label><span>绑定来源</span><input class="input" name="profileInviteProviderName" type="text" value="${safe(profile.inviteProviderName, "自然流量")}"></label><label><span>个人简介</span><textarea class="textarea" name="profileBio" placeholder="写一句展示在个人主页上的简介">${safe(profile.bio, "热爱姿态与性能改装。")}</textarea></label><button class="btn btn-primary user-me-full-btn" type="submit">保存个人信息</button></form></section></div>`;
+    const wechatHtml = profile.wechatNickname ? `<label><span>微信绑定</span><div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);"><div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg, #07c160, #05a350); display:flex; align-items:center; justify-content:center; font-size:14px;">🌿</div><div style="flex:1; min-width:0;"><strong style="font-size:13px;">${safe(profile.wechatNickname, "微信用户")}</strong><div style="font-size:11px; color:var(--text-muted);">已绑定微信</div></div></div></label>` : "";
+    return `<div class="user-me-light-subpage"><section class="user-me-white-block user-profile-edit-card"><div class="user-profile-edit-head">${renderUserPortrait(profile, "large")}<div><strong>${safe(profile.nickname, "顾铭")}</strong><span>用户ID ${userId}</span></div></div><form class="user-me-form light" data-user-profile-form><label><span>用户名</span><input class="input" name="profileNickname" type="text" value="${safe(profile.nickname, "顾铭")}" required></label><label class="user-avatar-upload"><span>头像图片</span><div class="user-avatar-file-wrap"><input class="input" name="profileAvatar" type="file" accept="image/*" data-user-avatar-input><div class="user-avatar-file-trigger"><span>⬆</span><span>点击选择图片</span></div><span class="user-avatar-file-name">未选择任何文件</span></div><small>${avatarHelp}</small></label>${profile.avatarUrl ? `<label class="user-avatar-reset"><input name="profileAvatarReset" type="checkbox"> <span>清除头像，改用用户名首字</span></label>` : ""}<label><span>手机号</span><input class="input" name="profilePhone" type="tel" value="${safe(profile.phone, "13800138000")}" required></label><label><span>绑定来源</span><input class="input" name="profileInviteProviderName" type="text" value="${safe(profile.inviteProviderName, "自然流量")}"></label>${wechatHtml}<button class="btn btn-primary user-me-full-btn" type="submit">保存个人信息</button></form></section></div>`;
   }
 
   function renderUserSocialList(title, rows, total = rows.length) {
@@ -3312,7 +3527,7 @@
     if (!selected) {
       return `<div class="stack user-message-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-message-head"><div><span>Messages</span><strong>消息</strong></div><small>${rows.length} 个会话</small></section><section class="provider-chat-shell user-message-list-shell"><div class="provider-chat-list user-message-list">${rows.map((item) => `<button class="provider-chat-thread user-message-thread" type="button" data-user-action="user-message-pick" data-user-id="${item.id}"><div class="provider-chat-thread-head"><strong>${safe(item.title, "消息")}</strong><span>${safe(item.time, "刚刚")}</span></div><div class="provider-chat-thread-preview">${safe(item.preview, "暂无消息内容")}</div><div class="provider-chat-thread-meta">${tag(safe(item.status, "正常"))}</div></button>`).join("")}</div></section></div>`;
     }
-    return `<div class="stack user-message-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="provider-chat-panel user-message-detail"><header class="provider-chat-header"><button class="user-message-back" type="button" data-user-action="user-message-back">返回</button><div><div class="eyebrow">Realtime Chat</div><h3>${safe(selected.title, "即时对话")}</h3></div>${tag(safe(selected.status, "正常"))}</header><div class="provider-chat-body">${selected.messages.map((message) => `<article class="provider-chat-bubble ${message.from === "user" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "user" ? "我" : message.from === "provider" ? "服务商" : "平台"}</div><p>${message.text}</p><time>${message.time}</time></article>`).join("")}</div><form class="provider-chat-composer user-message-composer" data-user-chat-form data-user-id="${selected.id}"><label class="user-message-attach" title="添加附件"><input name="userChatAttachment" type="file" accept="image/*,video/*,.pdf,.doc,.docx" multiple><span>＋</span></label><input class="input" name="userChatMessage" type="text" placeholder="输入消息并实时发送" autocomplete="off"><button class="btn btn-primary" type="submit">发送</button></form></section></div>`;
+    return `<div class="stack user-message-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="provider-chat-panel user-message-detail"><header class="provider-chat-header"><button class="user-message-back" type="button" data-user-action="user-message-back">返回</button><div><div class="eyebrow">Realtime Chat</div><h3>${safe(selected.title, "即时对话")}</h3></div>${tag(safe(selected.status, "正常"))}</header><div class="provider-chat-body">${selected.messages.map((message) => `<article class="provider-chat-bubble ${message.from === "user" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "user" ? "我" : "服务商"}</div><p>${message.text}</p><time>${message.time}</time></article>`).join("")}</div><form class="provider-chat-composer user-message-composer" data-user-chat-form data-user-id="${selected.id}"><label class="user-message-attach" title="添加附件"><input name="userChatAttachment" type="file" accept="image/*,video/*,.pdf,.doc,.docx" multiple><span>＋</span></label><input class="input" name="userChatMessage" type="text" placeholder="输入消息并实时发送" autocomplete="off"><button class="btn btn-primary" type="submit">发送</button></form></section></div>`;
   }
 
   function renderUserHistoryOrders() {

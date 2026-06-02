@@ -4,7 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>帖子详情 - 满改平台</title>
-    <link rel="stylesheet" href="../assets/css/styles.css?v=topic-engage-ui-20260528" />
+    <link rel="stylesheet" href="../assets/css/styles.css?v=topic-engage-fix-20260602" />
+    <style>
+      .topic-engage-btn span,
+      .topic-engage-btn strong {
+        white-space: nowrap !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    </style>
   </head>
   <body>
     <main class="page-shell phone-stage">
@@ -32,18 +40,15 @@
                     <div class="topic-engage-bar">
                       <button class="topic-engage-btn" type="button" id="topicLikeBtn" aria-pressed="false">
                         <i>赞</i>
-                        <span id="topicLikeLabel">点赞</span>
-                        <strong>总点赞 <b id="topicLikeCount">98</b></strong>
+                        <strong><b id="topicLikeCount">98</b></strong>
                       </button>
                       <button class="topic-engage-btn" type="button" id="topicCollectBtn" aria-pressed="false">
                         <i>藏</i>
-                        <span id="topicCollectLabel">收藏</span>
-                        <strong>总收藏 <b id="topicCollectCount">26</b></strong>
+                        <strong><b id="topicCollectCount">26</b></strong>
                       </button>
                       <button class="topic-engage-btn" type="button" id="topicShareBtn">
                         <i>享</i>
-                        <span>分享</span>
-                        <strong>分享帖子</strong>
+                        <strong>分享</strong>
                       </button>
                     </div>
                   </div>
@@ -305,7 +310,8 @@
               <button class="share-sheet-close" type="button" data-share-close>取消</button>
             </div>
           `;
-          document.body.appendChild(shareSheet);
+          const phoneScreen = document.querySelector(".phone-screen");
+          (phoneScreen || document.body).appendChild(shareSheet);
 
           function showToast(text) {
             const toast = document.createElement("div");

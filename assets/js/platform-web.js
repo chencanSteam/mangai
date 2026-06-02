@@ -1377,9 +1377,11 @@
         facts: [
           ["类目", row.category],
           ["品牌", row.brand],
-          ["价格", row.price],
+          ["原价", row.originalPrice || "-"],
+          ["现价", row.price],
           ["库存", `${row.stock}`],
           ["适配车型", row.fitment],
+          ["优惠活动", row.promotion ? `${row.promotion.label} · ${row.promotion.discount}` : "暂无活动"],
           ["规格参数", row.spec || "-"],
           ["说明", row.description || "商品说明待补充"],
         ],
@@ -1389,6 +1391,7 @@
           "2026-04-01 同步库存与销售标签",
         ],
         actions: "productList",
+        reviews: (window.MockData.productReviews || []).filter((r) => r.sku === row.sku),
       }),
     }),
     productCategories: simpleListDef("商品分类", "商品分类与层级维护。", categories, ["name", "sort", "status"], ["分类名称", "排序", "状态"]),
@@ -1617,7 +1620,7 @@
         { key: "serviceTimes", label: "服务次数" },
         { key: "referredUsers", label: "推荐用户" },
         { key: "orderAmount", label: "订单金额", tag: false },
-        { key: "inviteCode", label: "邀请码", tag: false },
+        { key: "inviteCode", label: "推荐码", tag: false },
       ],
       rows: providers.filter((p) => p.auditStatus === "已通过").map((p) => {
         const record = settlements.find((item) => item.provider === p.name) || {};
@@ -1636,7 +1639,7 @@
           ["地区", row.providerRegion],
           ["门店地址", row.locationAddress],
           ["联系人", row.contact],
-          ["邀请码", row.inviteCode],
+          ["推荐码", row.inviteCode],
           ["服务次数", `${row.serviceTimes} 次`],
           ["推荐用户", `${row.referredUsers} 人`],
           ["订单金额", row.orderAmount],
@@ -1895,6 +1898,7 @@
         { key: "creatorPinned", label: "主页置顶", tag: true },
         { key: "replies", label: "回复数" },
         { key: "likes", label: "点赞数" },
+        { key: "views", label: "浏览数" },
         { key: "status", label: "状态", tag: true },
       ],
       rows: posts,
@@ -1914,6 +1918,7 @@
           ["创作者主页置顶", row.creatorPinned === "是" ? `第 ${row.creatorHomeRank || 1} 位` : "未置顶"],
           ["回复数", `${row.replies}`],
           ["点赞数", `${row.likes}`],
+          ["浏览数", `${(row.views || 0).toLocaleString("zh-CN")}`],
           ["正文内容", row.content],
           ["治理备注", row.governanceNote || "-"],
           ...(row.status === "已删除" ? [["删除原因", row.deleteReason || "无"]] : []),
@@ -2660,6 +2665,7 @@
                               <span>${row.time}</span>
                               <span>${row.replies} 回复</span>
                               <span>${row.likes} 点赞</span>
+                              <span>${(row.views || 0).toLocaleString("zh-CN")} 浏览</span>
                             </div>
                           </div>
                             <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
@@ -2929,6 +2935,50 @@
                           )
                           .join("")
                       : `<div class="muted">暂无核销记录</div>`
+                  }
+                </div>
+              </div>
+            `
+            : ""
+        }
+        ${
+          detail.reviews
+            ? `
+              <div>
+                <div class="panel-header" style="margin-bottom:12px;">
+                  <div><h3 class="section-title" style="font-size:18px;">商品评价</h3></div>
+                </div>
+                <div class="promotion-redemption-list">
+                  ${
+                    detail.reviews.length
+                      ? detail.reviews
+                          .map(
+                            (item) => {
+                              const mediaHtml = (item.images || []).map((url) => {
+                                const isVideo = String(url).match(/\.(mp4|webm|mov)($|\?)/i) || String(url).startsWith("blob:");
+                                return isVideo
+                                  ? `<video src="${url}" controls playsinline muted style="width:80px; height:80px; object-fit:cover; border-radius:8px; background:#0d0f12; vertical-align:middle;"></video>`
+                                  : `<img src="${url}" style="width:80px; height:80px; object-fit:cover; border-radius:8px; background:#0d0f12; vertical-align:middle;" alt="">`;
+                              }).join("");
+                              return `
+                              <article>
+                                <div>
+                                  <strong>${item.user || "匿名用户"}</strong>
+                                  <span>${"★".repeat(item.rating)}${"☆".repeat(5 - item.rating)} · ${item.vehicle || ""}</span>
+                                </div>
+                                <div>
+                                  ${formatTag(item.auditStatus || "待审核")}
+                                </div>
+                                <small>${item.time || ""}</small>
+                                <p style="margin:6px 0 0; color:var(--text-primary);">${item.content || ""}</p>
+                                ${mediaHtml ? `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">${mediaHtml}</div>` : ""}
+                                ${item.auditStatus !== "已通过" ? `<div style="display:flex; gap:6px; margin-top:8px;"><button class="btn btn-primary btn-sm" type="button" data-review-action="approve" data-review-id="${item.id}">通过</button><button class="btn btn-danger btn-sm" type="button" data-review-action="reject" data-review-id="${item.id}">驳回</button></div>` : ""}
+                              </article>
+                            `;
+                            }
+                          )
+                          .join("")
+                      : `<div class="muted">暂无评价</div>`
                   }
                 </div>
               </div>
@@ -3249,6 +3299,15 @@
         if (button.dataset.productAction === "delete") {
           openProductDeleteModal(selected);
         }
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-review-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const reviewId = button.dataset.reviewId;
+        const action = button.dataset.reviewAction;
+        const review = (window.MockData.productReviews || []).find((r) => r.id === reviewId);
+        if (review) openReviewAuditModal(review, action);
       });
     });
 
@@ -6098,8 +6157,12 @@
           <select class="select" data-product-field="category">${categoryOptions}</select>
         </div>
         <div class="field-group">
-          <div class="field-label">价格</div>
-          <input class="input" data-product-field="price" placeholder="请输入价格" value="${isEdit ? row.price : "¥ 22,800"}" />
+          <div class="field-label">原价</div>
+          <input class="input" data-product-field="originalPrice" placeholder="请输入原价" value="${isEdit ? row.originalPrice || "" : ""}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">现价</div>
+          <input class="input" data-product-field="price" placeholder="请输入现价" value="${isEdit ? row.price : "¥ 22,800"}" />
         </div>
         <div class="field-group">
           <div class="field-label">库存</div>
@@ -6130,6 +6193,15 @@
             <button class="btn btn-secondary btn-sm" type="button" data-product-image-trigger>选择图片</button>
             <input type="file" accept="image/*" data-product-image-input style="display:none;" />
           </div>
+        </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">优惠活动</div>
+          <div class="form-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+            <input class="input" data-product-field="promoType" placeholder="活动类型，如折扣/满减/赠品" value="${isEdit && row.promotion ? row.promotion.type || "" : ""}" />
+            <input class="input" data-product-field="promoLabel" placeholder="活动名称" value="${isEdit && row.promotion ? row.promotion.label || "" : ""}" />
+            <input class="input" data-product-field="promoDiscount" placeholder="优惠力度，如85折/满减2000" value="${isEdit && row.promotion ? row.promotion.discount || "" : ""}" />
+          </div>
+          <input class="input" style="margin-top:10px;" data-product-field="promoDesc" placeholder="活动说明" value="${isEdit && row.promotion ? row.promotion.desc || "" : ""}" />
         </div>
         <div class="field-group field-group-full">
           <div class="field-label">说明</div>
@@ -6925,10 +6997,12 @@
     };
     const fitment = getProductFitmentSelection(modalCardEl.querySelector("[data-product-fitment-picker]")).join(" / ");
 
+    const promoType = getValue("promoType");
     const payload = {
       name: getValue("name"),
       brand: getValue("brand"),
       category: getValue("category"),
+      originalPrice: getValue("originalPrice"),
       price: getValue("price"),
       stock: Number(getValue("stock")) || 0,
       fitment,
@@ -6936,6 +7010,12 @@
       description: getValue("description"),
       status: getValue("status"),
       spec: getValue("spec"),
+      promotion: promoType ? {
+        type: promoType,
+        label: getValue("promoLabel"),
+        discount: getValue("promoDiscount"),
+        desc: getValue("promoDesc"),
+      } : null,
     };
 
     if (!payload.sku || !payload.name || !payload.brand || !payload.category || !payload.fitment) {
@@ -7232,7 +7312,7 @@
         <div><span>服务次数</span><strong>${row.serviceTimes || row.orders || 0} 次</strong></div>
         <div><span>推荐用户</span><strong>${row.referredUsers || row.referralUsers || 0} 人</strong></div>
         <div><span>订单金额</span><strong>${row.orderAmount || row.grossAmount || row.currentRevenue || "¥ 0"}</strong></div>
-        <div><span>邀请码</span><strong>${row.inviteCode || "-"}</strong></div>
+        <div><span>推荐码</span><strong>${row.inviteCode || "-"}</strong></div>
       </div>
       <div class="table-card" style="margin-top:18px;">
         <div class="finance-kv-title" style="margin-bottom:12px;">邀请用户列表</div>
@@ -7622,6 +7702,47 @@
         <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
       </div>
     `);
+  }
+
+  function openReviewAuditModal(review, action) {
+    const isApprove = action === "approve";
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Review Audit</span>
+          <h2 class="section-title">${isApprove ? "通过评价" : "驳回评价"}</h2>
+          <p class="section-subtitle">${review.user || "匿名用户"} · ${review.vehicle || ""}</p>
+        </div>
+      </div>
+      <div style="margin-top:18px;">
+        <div class="kv-row" style="margin-bottom:12px;">
+          <span class="muted">评价内容</span>
+          <strong style="font-weight:500;">${review.content || "-"}</strong>
+        </div>
+        <label style="display:grid; gap:8px;">
+          <span style="color:var(--muted); font-size:13px;">${isApprove ? "通过后将展示在商品详情页" : "请输入驳回原因"}</span>
+          ${isApprove ? "" : `<input class="input" type="text" data-review-reject-reason value="" placeholder="评价内容违规或其他原因" />`}
+        </label>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn ${isApprove ? "btn-primary" : "btn-danger"}" type="button" data-review-audit-submit data-review-id="${review.id}" data-review-action="${action}">${isApprove ? "确认通过" : "确认驳回"}</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+    modalCardEl.querySelectorAll("[data-review-audit-submit]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = (window.MockData.productReviews || []).find((r) => r.id === review.id);
+        if (target) {
+          target.auditStatus = isApprove ? "已通过" : "已驳回";
+          if (!isApprove) {
+            const reasonInput = modalCardEl.querySelector("[data-review-reject-reason]");
+            target.auditRejectReason = reasonInput ? reasonInput.value : "";
+          }
+          closeModal();
+          renderPage();
+        }
+      });
+    });
   }
 
   function openCaseDisplayModal(row) {
