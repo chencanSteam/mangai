@@ -12,6 +12,7 @@
     services,
     orders,
     orderChats,
+    serviceChats,
     shipping,
     signing,
     settlements,
@@ -30,6 +31,13 @@
   const modalCardEl = document.getElementById("platformModalCard");
   const INVOICE_STORAGE_KEY = "mockUserInvoices";
   const MALL_RECOMMENDATION_STORAGE_KEY = "mockMallRecommendations";
+
+  function pushNotification(target, title, content) {
+    const list = window.MockData.notifications = window.MockData.notifications || [];
+    list.unshift({ id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, target, title, content, time: new Date().toLocaleString("zh-CN", { hour12: false }), read: false });
+    while (list.length > 200) list.pop();
+    if (typeof window.saveMockData === "function") window.saveMockData();
+  }
 
   const menu = [
     { id: "home", label: "首页" },
@@ -74,6 +82,7 @@
         { id: "orderAssign", label: "订单分配", badge: orders.filter((item) => item.status === "待分配").length },
         { id: "afterSaleList", label: "售后订单", badge: orders.filter((item) => item.afterSaleStatus === "待平台审核").length },
         { id: "chatRecords", label: "聊天记录", badge: orderChats.length },
+        { id: "serviceChat", label: "客服对话", badge: (serviceChats || []).filter((c) => c.unread > 0).length },
       ],
     },
     { id: "logisticsManage", label: "物流管理" },
@@ -137,6 +146,7 @@
     activeFilter: "全部",
     selectedIndex: 0,
     search: "",
+    serviceChatSelected: null,
     expandedGroups: Object.fromEntries(menu.filter((item) => item.children).map((item) => [item.id, true])),
   };
 
@@ -1595,6 +1605,11 @@
         actions: "chatRecords",
       }),
     }),
+    serviceChat: {
+      type: "chat",
+      title: "客服对话",
+      description: "处理用户与服务商向平台客服发起的在线咨询，支持实时回复与状态标记。",
+    },
     logisticsManage: simpleListDef(
       "物流管理",
       "统一处理商品订单发货、物流单维护、签收确认和异常签收留证。",
@@ -1938,6 +1953,7 @@
         { key: "name", label: "素材名称" },
         { key: "brand", label: "品牌" },
         { key: "model", label: "车型" },
+        { key: "productName", label: "关联商品" },
         { key: "colorCount", label: "颜色数" },
         { key: "status", label: "状态", tag: true },
       ],
@@ -1950,6 +1966,7 @@
           ["素材编号", row.id],
           ["车型品牌", row.brand],
           ["适配车型", row.model],
+          ["关联商品", row.productName ? `${row.productName} (${row.sku})` : "未关联"],
           ["颜色数", `${row.colorCount}`],
           ["适配轮组", row.compatibility],
           ["缩略图", row.thumbnail],
@@ -1970,6 +1987,7 @@
         { key: "name", label: "素材名称" },
         { key: "style", label: "样式" },
         { key: "color", label: "颜色" },
+        { key: "productName", label: "关联商品" },
         { key: "size", label: "尺寸" },
         { key: "status", label: "状态", tag: true },
       ],
@@ -1983,6 +2001,7 @@
           ["样式", row.style],
           ["颜色", row.color],
           ["尺寸", row.size],
+          ["关联商品", row.productName ? `${row.productName} (${row.sku})` : "未关联"],
           ["适配车型组", row.compatibility],
           ["缩略图", row.thumbnail],
           ["素材来源", row.source],
@@ -2114,6 +2133,7 @@
     state.activePage = pageId;
     state.activeFilter = "全部";
     state.selectedIndex = 0;
+    if (pageId !== "serviceChat") state.serviceChatSelected = null;
     const parentGroup = menu.find((group) => group.children && group.children.some((item) => item.id === pageId));
     if (parentGroup) state.expandedGroups[parentGroup.id] = true;
     renderSidebar();
@@ -2127,6 +2147,11 @@
     if (def.type === "dashboard") {
       contentEl.innerHTML = renderDashboard();
       bindDashboardEvents();
+      return;
+    }
+
+    if (def.type === "chat") {
+      renderServiceChatPage();
       return;
     }
 
@@ -2298,6 +2323,133 @@
     contentEl.querySelectorAll("[data-shortcut-page]").forEach((button) => {
       button.addEventListener("click", () => {
         jumpToPage(button.dataset.shortcutPage);
+      });
+    });
+  }
+
+  function renderServiceChatPage() {
+    const chats = serviceChats || [];
+    const selectedId = state.serviceChatSelected || (chats[0]?.id || null);
+    const selected = chats.find((c) => c.id === selectedId);
+    const chatListHtml = chats.map((chat) => {
+      const isActive = chat.id === selectedId;
+      const roleLabel = String(chat.fromId).startsWith("SP-") ? "服务商" : "用户";
+      const statusTag = chat.status === "未处理" ? `<span class="tag warning">未处理</span>` : chat.status === "处理中" ? `<span class="tag info">处理中</span>` : `<span class="tag success">已解决</span>`;
+      const unreadBadge = chat.unread > 0 ? `<span class="nav-badge" style="margin-left:auto;">${chat.unread}</span>` : "";
+      return `
+        <button class="service-chat-thread ${isActive ? "active" : ""}" type="button" data-service-chat-id="${chat.id}">
+          <div class="service-chat-avatar">${chat.avatar}</div>
+          <div class="service-chat-thread-main">
+            <div class="service-chat-thread-head">
+              <strong>${chat.fromName}</strong>
+              <span class="muted">${chat.time}</span>
+            </div>
+            <div class="service-chat-thread-title">${roleLabel}</div>
+            <div class="service-chat-thread-preview">${chat.preview}</div>
+            <div style="margin-top:6px; display:flex; gap:8px; align-items:center;">${statusTag}${unreadBadge}</div>
+          </div>
+        </button>
+      `;
+    }).join("");
+
+    const bubblesHtml = selected?.messages?.map((msg) => {
+      const isPlatform = msg.from === "platform";
+      const alignClass = isPlatform ? "platform-bubble" : msg.from === "user" ? "user-bubble" : "provider-bubble";
+      const roleLabel = isPlatform ? "平台客服" : msg.from === "user" ? "用户" : "服务商";
+      return `
+        <div class="chat-bubble ${alignClass}">
+          <div class="chat-bubble-meta">
+            <span class="chat-role">${roleLabel}</span>
+            <span class="chat-time">${msg.time}</span>
+          </div>
+          <div class="chat-text">${msg.text}</div>
+        </div>
+      `;
+    }).join("") || '<div class="muted">暂无消息</div>';
+
+    contentEl.innerHTML = `
+      <section class="page-heading platform-page-heading">
+        <h1>客服对话</h1>
+        <p class="muted">处理用户与服务商向平台发起的在线咨询</p>
+      </section>
+      <section class="service-chat-layout">
+        <aside class="service-chat-sidebar">
+          <div class="service-chat-sidebar-head">
+            <strong>会话列表 (${chats.length})</strong>
+            <span class="muted">${chats.filter((c) => c.unread > 0).length} 条未读</span>
+          </div>
+          <div class="service-chat-list">${chatListHtml}</div>
+        </aside>
+        <main class="service-chat-main">
+          ${selected ? `
+            <div class="service-chat-main-head">
+              <div>
+                <span class="eyebrow">${String(selected.fromId).startsWith("SP-") ? "服务商咨询" : "用户咨询"}</span>
+                <h2 class="section-title">${selected.fromName}</h2>
+                <p class="section-subtitle">${selected.fromName} · ${selected.status}${selected.orderId ? ` · 关联单号 <a href="#" style="color:#ff6a00;" data-service-chat-goto-order="${selected.orderId}">${selected.orderId}</a>` : ""}</p>
+              </div>
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                ${formatTag(selected.status)}
+                ${selected.status === "未处理" ? `<button class="btn btn-success" type="button" data-service-chat-action="mark-processing" data-service-chat-id="${selected.id}">标记处理中</button>` : ""}
+                ${selected.status !== "已解决" ? `<button class="btn btn-secondary" type="button" data-service-chat-action="mark-resolved" data-service-chat-id="${selected.id}">标记已解决</button>` : ""}
+              </div>
+            </div>
+            <div class="chat-record-panel service-chat-panel">${bubblesHtml}</div>
+            <div class="service-chat-composer">
+              <input class="input" type="text" placeholder="输入回复内容，按 Enter 发送" data-service-chat-input data-service-chat-id="${selected.id}">
+              <button class="btn btn-primary" type="button" data-service-chat-action="send" data-service-chat-id="${selected.id}">发送</button>
+            </div>
+          ` : `<div class="muted" style="display:flex; align-items:center; justify-content:center; height:100%;">暂无会话</div>`}
+        </main>
+      </section>
+    `;
+    bindServiceChatEvents();
+  }
+
+  function bindServiceChatEvents() {
+    contentEl.querySelectorAll("[data-service-chat-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const chatId = button.dataset.serviceChatId;
+        if (button.dataset.serviceChatAction === "send") {
+          const input = contentEl.querySelector(`[data-service-chat-input][data-service-chat-id="${chatId}"]`);
+          const text = input?.value.trim();
+          if (!text) return;
+          const chat = serviceChats.find((c) => c.id === chatId);
+          if (!chat) return;
+          chat.messages = chat.messages || [];
+          chat.messages.push({ from: "platform", text, time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }) });
+          chat.preview = text;
+          chat.time = "刚刚";
+          if (chat.status === "未处理") chat.status = "处理中";
+          input.value = "";
+          renderServiceChatPage();
+          renderSidebar();
+          return;
+        }
+        if (button.dataset.serviceChatAction === "mark-processing") {
+          const chat = serviceChats.find((c) => c.id === chatId);
+          if (chat) { chat.status = "处理中"; renderServiceChatPage(); renderSidebar(); }
+          return;
+        }
+        if (button.dataset.serviceChatAction === "mark-resolved") {
+          const chat = serviceChats.find((c) => c.id === chatId);
+          if (chat) { chat.status = "已解决"; renderServiceChatPage(); renderSidebar(); }
+          return;
+        }
+        const chat = serviceChats.find((c) => c.id === chatId);
+        if (chat) { chat.unread = 0; }
+        state.serviceChatSelected = chatId;
+        renderServiceChatPage();
+        renderSidebar();
+      });
+    });
+    contentEl.querySelectorAll("[data-service-chat-input]").forEach((input) => {
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          const chatId = input.dataset.serviceChatId;
+          const sendBtn = contentEl.querySelector(`[data-service-chat-action="send"][data-service-chat-id="${chatId}"]`);
+          if (sendBtn) sendBtn.click();
+        }
       });
     });
   }
@@ -3838,9 +3990,12 @@
           }
           if (action === "approve") {
             selected.afterSaleStatus = "已通过";
-            selected.progress = `售后申请已通过：${selected.afterSaleType}，平台已安排处理。`;
+            selected.progress = `售后申请已通过：${selected.afterSaleType}，退款将原路退回至用户支付账户。`;
+            selected.refundMethod = "原路退回";
+            selected.refundStatus = "退款处理中";
             if (!selected.timeline) selected.timeline = [];
-            selected.timeline.push(`平台通过售后申请：${selected.afterSaleType} — ${getNowStamp()}`);
+            selected.timeline.push(`平台通过售后申请：${selected.afterSaleType}，退款原路退回 — ${getNowStamp()}`);
+            pushNotification("user", "售后申请已通过", `您的售后申请（${selected.afterSaleType}）已通过审核，退款将原路退回至您的支付账户。订单号：${selected.id}。`);
             renderPage();
             return;
           }
@@ -3849,6 +4004,7 @@
             selected.progress = `售后申请已驳回：${selected.afterSaleType}，如有疑问请联系平台客服。`;
             if (!selected.timeline) selected.timeline = [];
             selected.timeline.push(`平台驳回售后申请：${selected.afterSaleType} — ${getNowStamp()}`);
+            pushNotification("user", "售后申请被驳回", `您的售后申请（${selected.afterSaleType}）未通过审核。如有疑问请联系平台客服。订单号：${selected.id}。`);
             renderPage();
             return;
           }
@@ -4286,7 +4442,12 @@
           }
           if (mode === "close") {
             target.progress = "已完成";
+            target.status = "已完成";
             appendOrderTimeline(target, "平台将订单标记为已完成");
+            pushNotification("user", "订单已完成", `您的订单 ${target.id} 已完成，欢迎评价本次服务。`);
+            if (target.provider && target.provider !== "平台重派中" && target.provider !== "待分配") {
+              pushNotification("provider", "订单已完成", `订单 ${target.id} 已标记为已完成，请确认归档。`);
+            }
           }
         }
         openFeedbackModal(titleMap[mode], messageMap[mode]);
@@ -4309,6 +4470,8 @@
           order.userVisibleStatus = "已接单";
           order.userVisibleProgress = `平台已重新分配给 ${target.name}`;
           appendOrderTimeline(order, `平台重新派单给 ${target.name}，订单状态更新为施工中`);
+          pushNotification("provider", "新订单分配", `您收到一个新订单分配：${order.id}（${order.service || ""}），请尽快确认接单。`);
+          pushNotification("user", "订单已分配服务商", `您的订单 ${order.id} 已分配给 ${target.name}，当前状态为施工中。`);
           openFeedbackModal("派单成功", `${order.id} 已分配给 ${target.name}，当前状态已更新为施工中。`);
         }
       });
@@ -4898,9 +5061,9 @@
           <div class="provider-material-grid">
             ${[
               ["累计订单", `${row.totalOrders || 0} 单`],
+              ["本月订单", `${row.monthOrders || 0} 单`],
               ["当前营收", row.currentRevenue || "-"],
-              ["未结算金额", row.unsettledAmount || "-"],
-              ["已结算金额", row.settledAmount || "-"],
+              ["门店工位", `${row.bays || 0} 个`],
             ].map(([label, value]) => `<div class="provider-material-card"><span>${label}</span><strong>${value}</strong></div>`).join("")}
           </div>
         </section>
@@ -6425,6 +6588,7 @@
       target.auditStatus = "已通过";
       target.status = "正常营业";
       target.timeline.unshift("2026-04-02 15:20 平台审核通过，已开通门店能力");
+      pushNotification("provider", "入驻审核已通过", `恭喜！${target.name} 的入驻申请已通过审核，已开通门店能力，可参与订单分配。`);
       openFeedbackModal("审核已通过", `${target.name} 已进入正式服务商列表，可参与订单分配。`);
       return;
     }
@@ -6432,12 +6596,14 @@
     if (decision === "supplement") {
       target.auditStatus = "待审核";
       target.timeline.unshift("2026-04-02 15:20 平台要求补充：夜景门头照与品牌授权资质");
+      pushNotification("provider", "入驻审核需补充资料", `${target.name} 的入驻审核需要补充资料：夜景门头照与品牌授权资质。`);
       openFeedbackModal("已要求补充资料", `${target.name} 保持待审核状态，并已记录补充要求。`);
       return;
     }
 
     target.auditStatus = "已驳回";
     target.timeline.unshift("2026-04-02 15:20 平台驳回申请：资料不完整，请修正后重提");
+    pushNotification("provider", "入驻审核被驳回", `${target.name} 的入驻审核未通过，原因：资料不完整，请修正后重新提交。`);
     openFeedbackModal("申请已驳回", `${target.name} 已更新为已驳回状态。`);
   }
 
@@ -6457,6 +6623,7 @@
 
     target.auditStatus = "待审核";
     target.timeline.unshift(`2026-04-02 15:20 平台要求补充：${selectedItems.join("、")}。理由：${reason}`);
+    pushNotification("provider", "入驻审核需补充资料", `${target.name} 的入驻审核需要补充资料：${selectedItems.join("、")}。理由：${reason}`);
     openFeedbackModal("已发送补充资料要求", `${target.name} 需补充：${selectedItems.join("、")}。`);
   }
 
@@ -6471,6 +6638,7 @@
 
     target.auditStatus = "已驳回";
     target.timeline.unshift(`2026-04-02 15:20 平台驳回申请。驳回理由：${reason}`);
+    pushNotification("provider", "入驻审核被驳回", `${target.name} 的入驻审核未通过。驳回理由：${reason}`);
     openFeedbackModal("申请已驳回", `${target.name} 已记录驳回理由，并更新为已驳回状态。`);
   }
 
@@ -6490,6 +6658,7 @@
       target.paidAt = target.paidAt || getNowStamp();
       target.timeline = target.timeline || [];
       target.timeline.unshift(`${getNowStamp()} 平台确认服务统计`);
+      pushNotification("provider", "服务统计已归档", `${target.id || target.name} 的服务统计记录已确认归档。`);
       openFeedbackModal("统计已归档", `${target.id || target.name} 已更新为已归档。`);
       return;
     }
@@ -6499,6 +6668,7 @@
     target.paymentNote = `统计记录调整：${reason}`;
     target.timeline = target.timeline || [];
     target.timeline.unshift(`${getNowStamp()} 平台调整统计记录。原因：${reason}`);
+    pushNotification("provider", "服务统计待复核", `${target.id || target.name} 的服务统计记录已被调整，请复核。调整原因：${reason}`);
     openFeedbackModal("统计记录已调整", `${target.id || target.name} 已记录调整原因。`);
   }
 
@@ -6515,6 +6685,7 @@
       target.audit = "已通过";
       target.rejectReason = "";
       target.timeline.unshift("2026-04-03 15:10 平台审核通过，案例已进入展示池");
+      pushNotification("provider", "案例审核已通过", `您提交的案例 ${target.id}（${target.vehicle || ""}）已通过平台审核，已进入展示池。`);
       openFeedbackModal("案例审核已通过", `${target.id} 已审核通过。`);
       return;
     }
@@ -6523,6 +6694,7 @@
     target.display = "未展示";
     target.rejectReason = reason;
     target.timeline.unshift(`2026-04-03 15:10 平台驳回案例。驳回原因：${reason}`);
+    pushNotification("provider", "案例审核被驳回", `您提交的案例 ${target.id}（${target.vehicle || ""}）未通过审核。驳回原因：${reason}`);
     openFeedbackModal("案例已驳回", `${target.id} 已记录驳回原因。`);
   }
 
@@ -6606,6 +6778,7 @@
     const target = forumModerators.find((item) => item.id === id);
     if (!target) return;
     target.status = decision === "approve" ? "已通过" : "已驳回";
+    pushNotification("provider", decision === "approve" ? "版主申请已通过" : "版主申请被驳回", `您的版主申请已更新为${target.status}。`);
     openFeedbackModal(decision === "approve" ? "申请已通过" : "申请已驳回", `${target.account} 的版主申请已更新为${target.status}。`);
   }
 
@@ -6621,6 +6794,7 @@
       target.status = "已删除";
       target.deleteReason = reason;
       target.timeline.unshift(`2026-04-03 16:40 平台删除帖子。删除原因：${reason}`);
+      pushNotification("user", "帖子被平台删除", `您发布的帖子《${target.title || target.id}》已被平台删除。删除原因：${reason}`);
       openFeedbackModal("帖子已删除", `${target.id} 已删除并记录操作原因。`);
       return;
     }
@@ -6628,6 +6802,7 @@
     target.status = "正常";
     target.deleteReason = "";
     target.timeline.unshift("2026-04-03 16:42 平台恢复帖子显示");
+    pushNotification("user", "帖子已恢复显示", `您发布的帖子《${target.title || target.id}》已恢复正常显示。`);
     openFeedbackModal("帖子已恢复", `${target.id} 已恢复正常显示。`);
   }
 
@@ -6727,6 +6902,7 @@
       target.status = "已删除";
       target.deleteReason = reason;
       target.timeline.unshift(`2026-04-03 16:45 平台删除评论。删除原因：${reason}`);
+      pushNotification("user", "评论被平台删除", `您发布的评论已被平台删除。删除原因：${reason}`);
       openFeedbackModal("评论已删除", `${target.id} 已删除并记录操作原因。`);
       return;
     }
@@ -6734,6 +6910,7 @@
     target.status = "正常";
     target.deleteReason = "";
     target.timeline.unshift("2026-04-03 16:47 平台恢复评论显示");
+    pushNotification("user", "评论已恢复显示", `您发布的评论已恢复正常显示。`);
     openFeedbackModal("评论已恢复", `${target.id} 已恢复正常显示。`);
   }
 
@@ -6799,11 +6976,15 @@
       return el ? el.value.trim() : "";
     };
 
+    const selectedSku = getValue("sku");
+    const linkedProduct = products.find((p) => p.sku === selectedSku);
     const payload = {
       id: materialId,
       name: getValue("name"),
       compatibility: getValue("compatibility"),
       thumbnail: getValue("thumbnail"),
+      sku: selectedSku,
+      productName: linkedProduct ? linkedProduct.name : "",
       updatedAt: "2026-04-03 17:15",
       status: "停用",
     };
@@ -6814,10 +6995,20 @@
     }
 
     if (pageKey === "vehicleMaterials") {
+      const colorRows = modalCardEl.querySelectorAll(".material-color-row");
+      const colors = [];
+      colorRows.forEach((row) => {
+        const nameEl = row.querySelector("[data-color-name]");
+        const valueEl = row.querySelector("[data-color-value]");
+        if (nameEl && valueEl && nameEl.value.trim()) {
+          colors.push({ name: nameEl.value.trim(), value: valueEl.value });
+        }
+      });
       Object.assign(payload, {
         brand: getValue("brand"),
         model: getValue("model"),
-        colorCount: Number(getValue("colorCount")) || 1,
+        colorCount: colors.length,
+        colors,
       });
     } else {
       Object.assign(payload, {
@@ -7958,6 +8149,42 @@
     `);
   }
 
+  function updateMaterialModelOptions() {
+    const brandSelect = modalCardEl.querySelector("#materialBrandSelect");
+    const modelSelect = modalCardEl.querySelector("#materialModelSelect");
+    if (!brandSelect || !modelSelect) return;
+    const brand = brandSelect.value;
+    const models = vehicleModels.filter((v) => v.brand === brand);
+    modelSelect.innerHTML = '<option value="">-- 请选择车型 --</option>' + models.map((m) => `<option value="${m.model}">${m.series} ${m.model}</option>`).join("");
+  }
+
+  function addMaterialColor() {
+    const nameInput = modalCardEl.querySelector("#newColorName");
+    const valueInput = modalCardEl.querySelector("#newColorValue");
+    const listEl = modalCardEl.querySelector("#materialColorList");
+    const countEl = modalCardEl.querySelector("#colorCountDisplay");
+    const name = nameInput?.value.trim();
+    const value = valueInput?.value || "#0d0f12";
+    if (!name) return;
+    const idx = listEl?.children.length || 0;
+    const row = document.createElement("div");
+    row.className = "material-color-row";
+    row.setAttribute("data-color-index", idx);
+    row.style.cssText = "display:flex;gap:10px;align-items:center;";
+    row.innerHTML = `<input class="input" style="flex:1;" data-color-name value="${name}" placeholder="颜色名称" /><input class="input" style="width:100px;" type="color" data-color-value value="${value}" /><span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:${value};border:1px solid rgba(255,255,255,0.2);"></span><button class="btn btn-danger" type="button" onclick="removeMaterialColor(${idx})" style="padding:4px 10px;font-size:12px;">删除</button>`;
+    listEl?.appendChild(row);
+    if (nameInput) nameInput.value = "";
+    if (countEl) countEl.textContent = listEl?.children.length || 0;
+  }
+
+  function removeMaterialColor(index) {
+    const listEl = modalCardEl.querySelector("#materialColorList");
+    const countEl = modalCardEl.querySelector("#colorCountDisplay");
+    const row = listEl?.querySelector(`[data-color-index="${index}"]`);
+    if (row) row.remove();
+    if (countEl) countEl.textContent = listEl?.children.length || 0;
+  }
+
   function openMaterialEditorModal(pageKey, row) {
     const isVehicle = pageKey === "vehicleMaterials";
     const isEdit = Boolean(row);
@@ -7971,6 +8198,8 @@
             colorCount: 1,
             compatibility: "",
             thumbnail: "",
+            sku: "",
+            productName: "",
           }
         : {
             id: `WM-${String(materials.wheels.length + 1).padStart(3, "0")}`,
@@ -7980,8 +8209,16 @@
             size: "19 寸",
             compatibility: "",
             thumbnail: "",
+            sku: "",
+            productName: "",
           }
     );
+    const brandOptions = isVehicle
+      ? [...new Set(vehicleModels.map((v) => v.brand))]
+      : [];
+    const modelOptions = isVehicle
+      ? vehicleModels.filter((v) => v.brand === source.brand).map((v) => ({ value: v.model, label: `${v.series} ${v.model}` }))
+      : [];
     openModal(`
       <div class="panel-header">
         <div>
@@ -7995,17 +8232,59 @@
           <div class="field-label">素材名称</div>
           <input class="input" data-material-field="name" value="${source.name}" />
         </div>
-        <div class="field-group">
-          <div class="field-label">${isVehicle ? "品牌" : "样式"}</div>
-          <input class="input" data-material-field="${isVehicle ? "brand" : "style"}" value="${isVehicle ? source.brand : source.style}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">${isVehicle ? "车型" : "颜色"}</div>
-          <input class="input" data-material-field="${isVehicle ? "model" : "color"}" value="${isVehicle ? source.model : source.color}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">${isVehicle ? "颜色数" : "尺寸"}</div>
-          <input class="input" data-material-field="${isVehicle ? "colorCount" : "size"}" value="${isVehicle ? source.colorCount : source.size}" />
+        ${isVehicle ? `
+          <div class="field-group">
+            <div class="field-label">品牌</div>
+            <select class="input" data-material-field="brand" id="materialBrandSelect" onchange="updateMaterialModelOptions()">
+              <option value="">-- 请选择品牌 --</option>
+              ${brandOptions.map((b) => `<option value="${b}" ${source.brand === b ? "selected" : ""}>${b}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field-group">
+            <div class="field-label">车型</div>
+            <select class="input" data-material-field="model" id="materialModelSelect">
+              <option value="">-- 请选择车型 --</option>
+              ${modelOptions.map((m) => `<option value="${m.value}" ${source.model === m.value ? "selected" : ""}>${m.label}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field-group field-group-full">
+            <div class="field-label">车身颜色配置（共 <span id="colorCountDisplay">${(source.colors || []).length}</span> 种）</div>
+            <div id="materialColorList" style="display:flex; flex-direction:column; gap:10px; margin-top:8px;">
+              ${(source.colors || []).map((c, idx) => `
+                <div class="material-color-row" data-color-index="${idx}">
+                  <input class="input" style="flex:1;" data-color-name value="${c.name}" placeholder="颜色名称" />
+                  <input class="input" style="width:100px;" type="color" data-color-value value="${c.value}" />
+                  <span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:${c.value};border:1px solid rgba(255,255,255,0.2);"></span>
+                  <button class="btn btn-danger" type="button" onclick="removeMaterialColor(${idx})" style="padding:4px 10px;font-size:12px;">删除</button>
+                </div>
+              `).join("")}
+            </div>
+            <div style="margin-top:10px; display:flex; gap:10px;">
+              <input class="input" id="newColorName" style="flex:1;" placeholder="新颜色名称" />
+              <input class="input" id="newColorValue" style="width:100px;" type="color" value="#0d0f12" />
+              <button class="btn btn-secondary" type="button" onclick="addMaterialColor()">添加颜色</button>
+            </div>
+          </div>
+        ` : `
+          <div class="field-group">
+            <div class="field-label">样式</div>
+            <input class="input" data-material-field="style" value="${source.style}" />
+          </div>
+          <div class="field-group">
+            <div class="field-label">颜色</div>
+            <input class="input" data-material-field="color" value="${source.color}" />
+          </div>
+          <div class="field-group">
+            <div class="field-label">尺寸</div>
+            <input class="input" data-material-field="size" value="${source.size}" />
+          </div>
+        `}
+        <div class="field-group field-group-full">
+          <div class="field-label">关联商品</div>
+          <select class="input" data-material-field="sku">
+            <option value="">-- 请选择关联商品 --</option>
+            ${products.map((p) => `<option value="${p.sku}" ${source.sku === p.sku ? "selected" : ""}>${p.name} (${p.sku})</option>`).join("")}
+          </select>
         </div>
         <div class="field-group field-group-full">
           <div class="field-label">适配关系</div>
@@ -8013,9 +8292,13 @@
         </div>
         <div class="field-group field-group-full">
           <div class="field-label">缩略图</div>
-          <input class="input" data-material-field="thumbnail" value="${source.thumbnail}" />
+          <label class="input" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+            <input type="file" accept="image/*" data-material-field="thumbnail" style="display:none;" onchange="this.parentElement.querySelector('span').textContent = this.files[0] ? this.files[0].name : '${source.thumbnail || '点击上传图片'}'" />
+            <span>${source.thumbnail || '点击上传图片'}</span>
+          </label>
         </div>
       </div>
+
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-primary" type="button" data-save-material data-material-page="${pageKey}" data-material-id="${source.id}" data-material-mode="${isEdit ? "edit" : "create"}">${isEdit ? "保存修改" : "确认新增"}</button>
         <button class="btn btn-secondary" type="button" data-close-modal>取消</button>

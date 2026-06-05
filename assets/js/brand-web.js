@@ -12,7 +12,6 @@
     { id: "pending", label: "待发货订单" },
     { id: "shipped", label: "已发货订单" },
     { id: "products", label: "商品概览" },
-    { id: "account", label: "账号信息" },
   ];
 
   function safe(value, fallback = "-") {
@@ -104,13 +103,9 @@
     return `<div class="brand-web-stack"><section class="brand-web-panel"><div class="brand-web-section-head"><div><span class="eyebrow">Products</span><h2>商品概览</h2></div><span class="pill">仅展示</span></div><div class="brand-web-products">${rows.map((item) => `<article><span>${escapeHtml(item.category)}</span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.fitment)} / 库存 ${escapeHtml(item.stock)} / 销量 ${escapeHtml(productSales(item))}</small></article>`).join("")}</div></section></div>`;
   }
 
-  function renderAccount() {
-    return `<div class="brand-web-stack"><section class="brand-web-panel"><div class="brand-web-section-head"><div><span class="eyebrow">Account</span><h2>账号信息</h2></div></div><div class="admin-kv-list"><div><span>品牌</span><strong>${escapeHtml(account.brandName)}</strong></div><div><span>账号</span><strong>${escapeHtml(account.account)}</strong></div><div><span>运营名称</span><strong>${escapeHtml(account.name)}</strong></div><div><span>联系人</span><strong>${escapeHtml(account.contact)}</strong></div><div><span>状态</span><strong>${escapeHtml(account.status)}</strong></div></div></section></div>`;
-  }
-
   function render() {
     renderNav();
-    appEl.innerHTML = state.tab === "pending" ? renderPending() : state.tab === "shipped" ? renderShipped() : state.tab === "products" ? renderProducts() : state.tab === "account" ? renderAccount() : renderDashboard();
+    appEl.innerHTML = state.tab === "pending" ? renderPending() : state.tab === "shipped" ? renderShipped() : state.tab === "products" ? renderProducts() : renderDashboard();
     bindEvents();
   }
 

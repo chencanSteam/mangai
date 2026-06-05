@@ -18,7 +18,7 @@
     <main class="page-shell phone-stage">
       <div class="phone-wrap">
         <div class="phone-frame">
-          <div class="phone-screen" data-mobile-shell="user">
+          <div class="phone-screen" data-mobile-shell="provider">
             <div class="android-status"><span>9:41</span><span>5G 92%</span></div>
             <header class="android-topbar topic-detail-topbar">
               <span class="eyebrow">帖子详情</span>
@@ -50,7 +50,10 @@
                         <i>享</i>
                         <strong>分享</strong>
                       </button>
-
+                      <button class="topic-engage-btn" type="button" id="topicDeleteBtn" style="color:#ff4d4f;">
+                        <i>删</i>
+                        <strong>删除帖子</strong>
+                      </button>
                     </div>
                   </div>
                   <div class="topic-hero-visual" data-tone="night"></div>
@@ -116,32 +119,35 @@
                     <div class="topic-comment-count">24 条讨论</div>
                   </div>
                   <div class="topic-comment-list">
-                    <article class="topic-comment-item">
+                    <article class="topic-comment-item" data-comment-id="c1">
                       <div class="topic-comment-avatar">A</div>
                       <div class="topic-comment-body">
                         <div class="topic-comment-head">
                           <strong>RWB_Akira</strong>
                           <span>5 分钟前</span>
+                          <button class="topic-comment-delete" type="button" data-delete-reply="c1">删除</button>
                         </div>
                         <p>这批现场车的轮毂和姿态搭配是真的顺，尤其那台宽体车，轮拱和胎壁比例控制得很舒服。</p>
                       </div>
                     </article>
-                    <article class="topic-comment-item">
+                    <article class="topic-comment-item" data-comment-id="c2">
                       <div class="topic-comment-avatar">B</div>
                       <div class="topic-comment-body">
                         <div class="topic-comment-head">
                           <strong>BoostLife</strong>
                           <span>12 分钟前</span>
+                          <button class="topic-comment-delete" type="button" data-delete-reply="c2">删除</button>
                         </div>
                         <p>最想看施工清单，尤其是前后包围、轮毂 ET 和避震设定，感觉这台车街道和出片都兼顾到了。</p>
                       </div>
                     </article>
-                    <article class="topic-comment-item">
+                    <article class="topic-comment-item" data-comment-id="c3">
                       <div class="topic-comment-avatar">N</div>
                       <div class="topic-comment-body">
                         <div class="topic-comment-head">
                           <strong>NightRunner</strong>
                           <span>18 分钟前</span>
+                          <button class="topic-comment-delete" type="button" data-delete-reply="c3">删除</button>
                         </div>
                         <p>夜景拍摄氛围太顶了，湿地反光把车身线条全部带出来了，这种现场活动就该多办。</p>
                       </div>
@@ -171,11 +177,11 @@
               </div>
             </section>
             <nav class="bottom-nav">
-              <button type="button" class="active" onclick="location.href='user-app.html?tab=forum'"><span>社区</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=mall'"><span>商城</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=garage'"><span>爱车</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=messages'"><span>消息</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=me'"><span>我的</span></button>
+              <button type="button" onclick="location.href='provider-app.html?tab=home'"><span>首页</span></button>
+              <button type="button" onclick="location.href='provider-app.html?tab=orders'"><span>订单</span></button>
+              <button type="button" class="active" onclick="location.href='provider-app.html?tab=operations'"><span>运营</span></button>
+              <button type="button" onclick="location.href='provider-app.html?tab=messages'"><span>消息</span></button>
+              <button type="button" onclick="location.href='provider-app.html?tab=me'"><span>我的</span></button>
             </nav>
           </div>
         </div>
@@ -355,6 +361,28 @@
           });
         })();
 
+        const deleteTopicBtn = document.getElementById("topicDeleteBtn");
+        const topicContent = document.querySelector(".topic-detail-page");
+
+        function showDeletedTopic() {
+          if (!topicContent) return;
+          topicContent.innerHTML = `<div style="text-align:center; padding:60px 20px;"><div style="font-size:48px; margin-bottom:16px;">🗑️</div><h2 style="margin-bottom:8px;">帖子已删除</h2><p class="muted">该帖子已被管理员删除。</p><button class="btn btn-primary" type="button" onclick="history.back()" style="margin-top:24px;">返回</button></div>`;
+        }
+
+        const topicDeletedKey = `mockTopicDeleted:${topicKey}`;
+        if (localStorage.getItem(topicDeletedKey) === "1" && topicContent) {
+          showDeletedTopic();
+          return;
+        }
+
+        if (deleteTopicBtn) {
+          deleteTopicBtn.addEventListener("click", function () {
+            if (!confirm("确定要删除这条帖子吗？")) return;
+            localStorage.setItem(topicDeletedKey, "1");
+            showDeletedTopic();
+          });
+        }
+
         if (!input || !cancelBtn || !submitBtn || !feedback) return;
 
         syncEngageState();
@@ -365,6 +393,8 @@
             const button = event.target.closest("[data-delete-reply]");
             if (!button) return;
             const id = button.dataset.deleteReply;
+            const article = button.closest("[data-comment-id]");
+            if (article) article.remove();
             writeReplyRows(readReplyRows().map((item) => item.id === id ? { ...item, status: "deleted" } : item));
             feedback.textContent = "评论已删除。";
             feedback.hidden = false;
