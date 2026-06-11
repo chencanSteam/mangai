@@ -416,10 +416,6 @@
                 ${store.certifications.map((item) => `<span class="pill">${item}</span>`).join("")}
               </div>
             </div>
-            <div class="showcase-contact-actions">
-              <button class="btn btn-primary" type="button" data-provider-switch="cases">去维护案例</button>
-              <button class="btn btn-secondary" type="button" data-provider-showcase-contact>联系平台</button>
-            </div>
           </article>
           </aside>
         </section>

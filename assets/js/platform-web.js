@@ -2502,116 +2502,150 @@
   }
 
   function renderVisitorMonitorPage(def) {
-    const rows = filterRows(def.rows, def.filterBy);
-    const selected = rows[state.selectedIndex] || rows[0];
+    const stats = window.MockData?.visitorStats || {};
+    const pageViews = stats.pageViews || {};
+    const productCollections = stats.productCollections || {};
+    const postViews = stats.postViews || {};
+    const caseViews = stats.caseViews || {};
+    const productViews = stats.productViews || {};
+
+    const totalPageViews = Object.values(pageViews).reduce((a, b) => a + b, 0);
+    const totalCollections = Object.values(productCollections).reduce((a, b) => a + b, 0);
+    const totalProductViews = Object.values(productViews).reduce((a, b) => a + b, 0);
+    const todayVisits = stats.todayVisits || 0;
+    const totalVisits = stats.totalVisits || 0;
+
+    const pageRank = Object.entries(pageViews)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, views]) => ({ name, views }));
+    const maxPageViews = pageRank[0]?.views || 1;
+
+    const productRank = Object.entries(productCollections)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([sku, count]) => {
+        const product = window.MockData?.products?.find((p) => p.sku === sku);
+        return { name: product?.name || sku, count };
+      });
+
+    const postRank = Object.entries(postViews)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([postId, views]) => {
+        const post = window.MockData?.posts?.find((p) => p.id === postId);
+        return { name: post?.title || postId, views };
+      });
+
+    const caseRank = Object.entries(caseViews)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([caseId, views]) => {
+        const caseItem = window.MockData?.cases?.find((c) => c.id === caseId);
+        return { name: caseItem?.title || caseId, views };
+      });
 
     contentEl.innerHTML = `
       <section class="page-heading">
         <h1>${def.title}</h1>
+        <p class="muted">未登录访客不做用户级追踪，仅展示全局访问统计。</p>
       </section>
       <section class="stats-grid">
-        ${def.stats
-          .map(
-            (item) => `
-              <article class="panel stat-card">
-                <span class="label">${item.label}</span>
-                <strong>${item.value}</strong>
-              </article>
-            `
-          )
-          .join("")}
+        <article class="panel stat-card">
+          <span class="label">今日访客</span>
+          <strong>${todayVisits.toLocaleString("zh-CN")}</strong>
+        </article>
+        <article class="panel stat-card">
+          <span class="label">总访问量</span>
+          <strong>${totalVisits.toLocaleString("zh-CN")}</strong>
+        </article>
+        <article class="panel stat-card">
+          <span class="label">页面浏览总数</span>
+          <strong>${totalPageViews.toLocaleString("zh-CN")}</strong>
+        </article>
+        <article class="panel stat-card">
+          <span class="label">商品收藏总数</span>
+          <strong>${totalCollections.toLocaleString("zh-CN")}</strong>
+        </article>
       </section>
       <section class="visitor-monitor-layout visitor-monitor-list-layout">
         <article class="panel table-card visitor-session-panel">
           <div class="toolbar">
             <div class="toolbar-left">
-              ${def.filters
-                .map(
-                  (item) => `
-                    <button class="filter-chip ${state.activeFilter === item ? "active" : ""}" type="button" data-visitor-filter="${item}">
-                      ${item}
-                    </button>
-                  `
-                )
-                .join("")}
+              <span class="filter-chip active">页面浏览排行</span>
             </div>
           </div>
-          <div class="visitor-session-list">
-            ${
-              rows.length
-                ? rows
-                    .map(
-                      (row, index) => `
-                        <button class="visitor-session-card ${index === state.selectedIndex ? "active" : ""}" type="button" data-visitor-row-index="${index}">
-                          <div class="visitor-session-head">
-                            <div>
-                              <strong>${row.fingerprint}</strong>
-                              <span>${row.city}</span>
-                            </div>
-                          </div>
-                          <div class="visitor-session-meta">
-                            <span>${row.pageViews} PV</span>
-                            <span>${row.duration}</span>
-                            <span>${row.lastActive}</span>
-                          </div>
-                          <div class="visitor-current-page">${row.currentPage}</div>
-                        </button>
-                      `
-                    )
-                    .join("")
-                : `<div class="muted">没有符合当前筛选条件的访客。</div>`
-            }
+          <div class="visitor-rank-list" style="padding:12px;">
+            ${pageRank.length
+              ? pageRank.map((item) => `
+                  <div class="visitor-rank-item">
+                    <div>
+                      <strong>${item.name}</strong>
+                      <span>${item.views} 次浏览</span>
+                    </div>
+                    <div class="progress"><span style="width:${Math.round((item.views / maxPageViews) * 100)}%"></span></div>
+                  </div>
+                `).join("")
+              : `<div class="muted">暂无页面浏览数据。</div>`}
           </div>
         </article>
       </section>
       <section class="visitor-insight-grid">
         <article class="panel dashboard-card">
           <div class="panel-header">
-            <div><h2 class="section-title">热门访问页面</h2></div>
+            <div><h2 class="section-title">热门商品收藏</h2></div>
           </div>
-          <div class="visitor-rank-list">
-            ${visitorPopularPages
-              .map(
-                (item) => `
-                  <div class="visitor-rank-item">
-                    <div>
-                      <strong>${item.name}</strong>
-                      <span>${item.views} 次浏览</span>
-                    </div>
-                    <div class="progress"><span style="width:${item.ratio}%"></span></div>
-                  </div>
-                `
-              )
-              .join("")}
-          </div>
+          <table class="data-table">
+            <thead>
+              <tr><th>商品</th><th>收藏次数</th></tr>
+            </thead>
+            <tbody>
+              ${productRank.length
+                ? productRank.map((item) => `
+                    <tr>
+                      <td>${item.name}</td>
+                      <td>${item.count}</td>
+                    </tr>
+                  `).join("")
+                : `<tr><td colspan="2" class="muted">暂无收藏数据。</td></tr>`}
+            </tbody>
+          </table>
         </article>
         <article class="panel dashboard-card">
           <div class="panel-header">
-            <div><h2 class="section-title">内容浏览排行</h2></div>
+            <div><h2 class="section-title">热门内容浏览</h2></div>
           </div>
           <table class="data-table">
             <thead>
               <tr><th>类型</th><th>内容</th><th>浏览</th></tr>
             </thead>
             <tbody>
-              ${visitorHotItems
-                .map(
-                  (item) => `
+              ${postRank.length
+                ? postRank.map((item) => `
                     <tr>
-                      <td>${item.type}</td>
+                      <td>帖子</td>
                       <td>${item.name}</td>
                       <td>${item.views}</td>
                     </tr>
-                  `
-                )
-                .join("")}
+                  `).join("")
+                : ``}
+              ${caseRank.length
+                ? caseRank.map((item) => `
+                    <tr>
+                      <td>案例</td>
+                      <td>${item.name}</td>
+                      <td>${item.views}</td>
+                    </tr>
+                  `).join("")
+                : ``}
+              ${!postRank.length && !caseRank.length
+                ? `<tr><td colspan="3" class="muted">暂无内容浏览数据。</td></tr>`
+                : ``}
             </tbody>
           </table>
         </article>
       </section>
     `;
-
-    bindVisitorMonitorEvents(def);
   }
 
   function bindVisitorMonitorEvents(def) {
