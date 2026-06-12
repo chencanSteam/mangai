@@ -6,3 +6,9 @@ dist/
 docx_extract/
 outputs/
 *~
+
+# Axhub Make runtime
+.agents/
+.claude/
+.axhub/make/*
+!.axhub/make/client.json
