@@ -113,6 +113,7 @@
       children: [
         { id: "vehicleMaterials", label: "车型素材" },
         { id: "wheelMaterials", label: "轮毂素材" },
+        { id: "wheelConfigurator", label: "轮毂配置" },
       ],
     },
     {
@@ -147,7 +148,35 @@
     selectedIndex: 0,
     search: "",
     serviceChatSelected: null,
+    wheelConfig: null,
     expandedGroups: Object.fromEntries(menu.filter((item) => item.children).map((item) => [item.id, true])),
+  };
+
+  const wheelConfigMock = {
+    vehicle: {
+      id: "VM-001",
+      name: "宝马 G20 330i 侧视素材",
+      brand: "宝马",
+      model: "G20 330i",
+      material: "高清侧视渲染图",
+    },
+    wheelSet: {
+      id: "WM-001",
+      name: "BBS XR 19",
+      color: "银灰",
+      size: "19 寸",
+      status: "启用",
+    },
+    front: {
+      horizontal: 22,
+      vertical: 64,
+      width: 18,
+    },
+    rear: {
+      horizontal: 79,
+      vertical: 64,
+      width: 18,
+    },
   };
 
   const promotionRedemptions = [
@@ -2011,6 +2040,11 @@
         actions: "wheelMaterials",
       }),
     }),
+    wheelConfigurator: {
+      type: "wheelConfig",
+      title: "轮毂配置",
+      description: "配置车型素材上的前后轮位置、垂直高度和轮毂宽度，用于生成可预览的渲染组合。",
+    },
     roles: makeTableDef({
       title: "账号权限",
       description: "维护平台各端角色、权限范围与账号启停状态。",
@@ -2169,7 +2203,224 @@
       return;
     }
 
+    if (def.type === "wheelConfig") {
+      renderWheelConfiguratorPage(def);
+      return;
+    }
+
     renderSimplePage(def);
+  }
+
+  function getWheelConfigState() {
+    if (!state.wheelConfig) {
+      state.wheelConfig = {
+        vehicle: { ...wheelConfigMock.vehicle },
+        wheelSet: { ...wheelConfigMock.wheelSet },
+        front: { ...wheelConfigMock.front },
+        rear: { ...wheelConfigMock.rear },
+      };
+    }
+    return state.wheelConfig;
+  }
+
+  function renderWheelRange(groupKey, fieldKey, label, min = 0, max = 100) {
+    const config = getWheelConfigState();
+    const value = config[groupKey][fieldKey];
+    const progress = ((value - min) / (max - min)) * 100;
+    return `
+      <label class="wheel-config-control">
+        <span>
+          <strong data-wheel-config-label="${groupKey}-${fieldKey}">${label}: ${value}%</strong>
+          <em data-wheel-config-value="${groupKey}-${fieldKey}">${value}%</em>
+        </span>
+        <input
+          type="range"
+          min="${min}"
+          max="${max}"
+          step="1"
+          value="${value}"
+          style="--progress:${progress}%"
+          data-wheel-config-range
+          data-wheel-group="${groupKey}"
+          data-wheel-field="${fieldKey}"
+        />
+      </label>
+    `;
+  }
+
+  function renderWheelConfiguratorPage(def) {
+    const config = getWheelConfigState();
+    const front = config.front;
+    const rear = config.rear;
+    const summaryRows = [
+      ["车型素材", `${config.vehicle.brand} / ${config.vehicle.model}`],
+      ["轮毂素材", `${config.wheelSet.name} / ${config.wheelSet.size}`],
+      ["前轮参数", `水平 ${front.horizontal}% / 垂直 ${front.vertical}% / 宽度 ${front.width}%`],
+      ["后轮参数", `水平 ${rear.horizontal}% / 垂直 ${rear.vertical}% / 宽度 ${rear.width}%`],
+    ];
+
+    contentEl.innerHTML = `
+      <section class="page-heading platform-page-heading">
+        <h1>${def.title}</h1>
+      </section>
+      <section class="wheel-config-layout">
+        <article class="panel wheel-config-preview-panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="section-title">渲染预览</h2>
+              <p class="section-subtitle">基于本地 mock 参数实时预览前后轮位置。</p>
+            </div>
+            ${formatTag(config.wheelSet.status)}
+          </div>
+          <div class="wheel-config-stage">
+            <div class="wheel-config-grid" aria-hidden="true"></div>
+            <svg class="wheel-config-car" viewBox="0 0 780 270" role="img" aria-label="车辆侧视预览">
+              <defs>
+                <linearGradient id="platformWheelBodyPaint" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#f7f9fb"/>
+                  <stop offset="46%" stop-color="#b9c2cc"/>
+                  <stop offset="78%" stop-color="#eef2f5"/>
+                  <stop offset="100%" stop-color="#87919b"/>
+                </linearGradient>
+                <linearGradient id="platformWheelGlass" x1="0" x2="1">
+                  <stop offset="0%" stop-color="#0a1118"/>
+                  <stop offset="55%" stop-color="#25313d"/>
+                  <stop offset="100%" stop-color="#05080c"/>
+                </linearGradient>
+              </defs>
+              <path class="wheel-config-shadow" d="M87 211 C167 234 559 234 686 214 C664 248 115 252 87 211Z"/>
+              <path class="wheel-config-body-main" d="M76 175 C78 141 107 128 151 124 C183 92 236 67 321 62 C408 56 472 78 523 119 C590 121 654 134 694 160 C716 173 727 189 723 205 C717 230 669 234 610 230 C604 176 565 145 510 146 C455 148 421 184 414 229 L260 229 C252 181 217 149 163 148 C109 148 72 179 67 226 C42 226 31 218 38 199 C44 187 56 180 76 175Z"/>
+              <path class="wheel-config-belt" d="M116 140 C256 126 473 126 634 141" />
+              <path class="wheel-config-window" d="M385 78 C437 84 478 101 512 126 L388 126 Z"/>
+              <path class="wheel-config-window" d="M268 77 C307 68 351 67 383 77 L382 126 L260 126 Z"/>
+              <path class="wheel-config-window" d="M166 121 C187 98 220 84 258 78 L253 126 L151 128 Z"/>
+              <path class="wheel-config-line" d="M382 78 L382 217"/>
+              <path class="wheel-config-line" d="M257 86 L260 217"/>
+              <path class="wheel-config-line" d="M424 143 L460 143"/>
+              <path class="wheel-config-line" d="M282 143 L318 143"/>
+              <path class="wheel-config-lamp-front" d="M678 165 C704 169 714 178 714 187 C693 185 679 180 668 171Z"/>
+              <path class="wheel-config-lamp-rear" d="M55 167 C82 162 102 165 111 176 C86 181 64 179 49 174Z"/>
+              <path class="wheel-config-line" d="M126 197 C257 215 441 214 629 196"/>
+            </svg>
+            ${renderWheelMarker("front", front)}
+            ${renderWheelMarker("rear", rear)}
+          </div>
+          <div class="wheel-config-summary">
+            ${summaryRows.map(([label, value]) => `
+              <div>
+                <span>${label}</span>
+                <strong>${value}</strong>
+              </div>
+            `).join("")}
+          </div>
+        </article>
+        <aside class="panel wheel-config-form-panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="section-title">参数配置</h2>
+              <p class="section-subtitle">参考图片默认参数，可拖动后即时查看预览。</p>
+            </div>
+          </div>
+          <div class="wheel-config-field-grid">
+            <label>
+              <span class="field-label">车型素材</span>
+              <select class="input" data-wheel-config-select="vehicle">
+                <option selected>${escapeHtml(config.vehicle.name)}</option>
+                <option>奔驰 C260L 夜景素材</option>
+                <option>极氪 001 FR 猎装素材</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">轮毂素材</span>
+              <select class="input" data-wheel-config-select="wheel">
+                <option selected>${escapeHtml(config.wheelSet.name)}</option>
+                <option>HRE FlowForm 20</option>
+                <option>Monarch Aero 19</option>
+              </select>
+            </label>
+          </div>
+          <div class="wheel-config-control-group">
+            <h3>前轮位置调整</h3>
+            ${renderWheelRange("front", "horizontal", "前轮水平位置")}
+            ${renderWheelRange("front", "vertical", "前轮垂直位置")}
+            ${renderWheelRange("front", "width", "前轮宽度", 10, 34)}
+          </div>
+          <div class="wheel-config-control-group">
+            <h3>后轮位置调整</h3>
+            ${renderWheelRange("rear", "horizontal", "后轮水平位置")}
+            ${renderWheelRange("rear", "vertical", "后轮垂直位置")}
+            ${renderWheelRange("rear", "width", "后轮宽度", 10, 34)}
+          </div>
+          <div class="wheel-config-actions">
+            <button class="btn btn-primary" type="button" data-wheel-config-action="save">保存配置</button>
+          </div>
+        </aside>
+      </section>
+    `;
+
+    bindWheelConfiguratorEvents(def);
+  }
+
+  function renderWheelMarker(key, values) {
+    return `
+      <div
+        class="wheel-config-marker"
+        data-wheel-marker="${key}"
+        style="--x:${values.horizontal}; --y:${values.vertical}; --size:${values.width};"
+      >
+        <div class="wheel-config-rim">
+          <i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindWheelConfiguratorEvents(def) {
+    contentEl.querySelectorAll("[data-wheel-config-range]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const config = getWheelConfigState();
+        const group = input.dataset.wheelGroup;
+        const field = input.dataset.wheelField;
+        const value = Number(input.value);
+        config[group][field] = value;
+        const min = Number(input.min || 0);
+        const max = Number(input.max || 100);
+        input.style.setProperty("--progress", `${((value - min) / (max - min)) * 100}%`);
+        const label = contentEl.querySelector(`[data-wheel-config-label="${group}-${field}"]`);
+        const valueText = contentEl.querySelector(`[data-wheel-config-value="${group}-${field}"]`);
+        const fieldName = field === "horizontal" ? "水平位置" : field === "vertical" ? "垂直位置" : "宽度";
+        const groupName = group === "front" ? "前轮" : "后轮";
+        const marker = contentEl.querySelector(`[data-wheel-marker="${group}"]`);
+        if (label) label.textContent = `${groupName}${fieldName}: ${value}%`;
+        if (valueText) valueText.textContent = `${value}%`;
+        if (marker) {
+          marker.style.setProperty("--x", config[group].horizontal);
+          marker.style.setProperty("--y", config[group].vertical);
+          marker.style.setProperty("--size", config[group].width);
+        }
+      });
+    });
+
+    contentEl.querySelectorAll("[data-wheel-config-select]").forEach((select) => {
+      select.addEventListener("change", () => {
+        const config = getWheelConfigState();
+        if (select.dataset.wheelConfigSelect === "vehicle") {
+          config.vehicle.name = select.value;
+          config.vehicle.model = select.value.replace(/.*?([A-Za-z0-9 ]+|001 FR).*/, "$1").trim() || select.value;
+        } else {
+          config.wheelSet.name = select.value;
+        }
+        renderWheelConfiguratorPage(def);
+      });
+    });
+
+    contentEl.querySelectorAll("[data-wheel-config-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.wheelConfigAction;
+        const config = getWheelConfigState();
+        openFeedbackModal("轮毂配置已保存", `${config.vehicle.model} 已保存当前轮毂位置配置，本次为前端 mock 状态。`);
+      });
+    });
   }
 
   function renderDashboard() {
