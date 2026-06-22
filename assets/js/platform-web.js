@@ -168,16 +168,34 @@
       status: "启用",
     },
     front: {
-      horizontal: 22,
-      vertical: 64,
-      width: 18,
-    },
-    rear: {
       horizontal: 79,
       vertical: 64,
       width: 18,
     },
+    rear: {
+      horizontal: 22,
+      vertical: 64,
+      width: 18,
+    },
   };
+
+  const wheelVehicleOptions = [
+    { id: "VM-001", name: "宝马 G20 330i 侧视素材", brand: "宝马", model: "G20 330i", material: "高清侧视渲染图" },
+    { id: "VM-002", name: "奔驰 C260L 夜景素材", brand: "奔驰", model: "C260L", material: "夜景棚拍侧视" },
+    { id: "VM-003", name: "极氪 001 FR 猎装素材", brand: "极氪", model: "001 FR", material: "猎装低趴侧视" },
+    { id: "VM-004", name: "奥迪 A4L B9 白车素材", brand: "奥迪", model: "A4L B9", material: "白底标准侧视" },
+    { id: "VM-005", name: "丰田 Supra A90 素材", brand: "丰田", model: "Supra A90", material: "运动姿态侧视" },
+    { id: "VM-006", name: "特斯拉 Model 3 Performance 素材", brand: "特斯拉", model: "Model 3 Performance", material: "新能源街拍侧视" },
+  ];
+
+  const wheelSetOptions = [
+    { id: "WM-001", name: "BBS XR 19", color: "银灰", size: "19 寸", status: "启用" },
+    { id: "WM-002", name: "HRE FlowForm 20", color: "枪灰", size: "20 寸", status: "启用" },
+    { id: "WM-003", name: "Monarch Aero 19", color: "亮黑", size: "19 寸", status: "启用" },
+    { id: "WM-004", name: "RAYS TE37 Ultra", color: "古铜", size: "18 寸", status: "启用" },
+    { id: "WM-005", name: "OZ Racing Superturismo", color: "白色", size: "19 寸", status: "启用" },
+    { id: "WM-006", name: "ADV.1 Track Spec", color: "哑光黑", size: "20 寸", status: "启用" },
+  ];
 
   const promotionRedemptions = [
     { id: "RC-240401-001", promoId: "PROMO-001", coupon: "SPR-WHEEL-0001", user: "顾铭", orderId: "UO-128674", amount: "¥ 2,820", channel: "用户 App", time: "2026-04-02 10:28", status: "已核销" },
@@ -2248,6 +2266,35 @@
     `;
   }
 
+  function renderWheelAssetPicker(type, label, selected, options) {
+    const placeholder = type === "vehicle" ? "搜索品牌 / 车型 / 素材名" : "搜索品牌 / 型号 / 尺寸 / 颜色";
+    return `
+      <div class="wheel-config-picker" data-wheel-asset-picker="${type}">
+        <span class="field-label">${label}</span>
+        <input class="input wheel-config-picker-search" type="search" placeholder="${placeholder}" data-wheel-picker-query="${type}" />
+        <div class="wheel-config-picker-list">
+          ${options.map((item) => {
+            const meta = type === "vehicle" ? `${item.brand} / ${item.model} / ${item.material}` : `${item.size} / ${item.color} / ${item.status}`;
+            const searchText = `${item.name} ${meta}`.toLowerCase();
+            return `
+              <button
+                class="wheel-config-picker-option${item.id === selected.id ? " is-selected" : ""}"
+                type="button"
+                data-wheel-picker-option="${type}"
+                data-wheel-option-id="${item.id}"
+                data-wheel-search="${escapeHtml(searchText)}"
+              >
+                <strong>${escapeHtml(item.name)}</strong>
+                <span>${escapeHtml(meta)}</span>
+              </button>
+            `;
+          }).join("")}
+          <div class="wheel-config-picker-empty" data-wheel-picker-empty="${type}" hidden>没有匹配素材</div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderWheelConfiguratorPage(def) {
     const config = getWheelConfigState();
     const front = config.front;
@@ -2322,22 +2369,8 @@
             </div>
           </div>
           <div class="wheel-config-field-grid">
-            <label>
-              <span class="field-label">车型素材</span>
-              <select class="input" data-wheel-config-select="vehicle">
-                <option selected>${escapeHtml(config.vehicle.name)}</option>
-                <option>奔驰 C260L 夜景素材</option>
-                <option>极氪 001 FR 猎装素材</option>
-              </select>
-            </label>
-            <label>
-              <span class="field-label">轮毂素材</span>
-              <select class="input" data-wheel-config-select="wheel">
-                <option selected>${escapeHtml(config.wheelSet.name)}</option>
-                <option>HRE FlowForm 20</option>
-                <option>Monarch Aero 19</option>
-              </select>
-            </label>
+            ${renderWheelAssetPicker("vehicle", "车型素材", config.vehicle, wheelVehicleOptions)}
+            ${renderWheelAssetPicker("wheel", "轮毂素材", config.wheelSet, wheelSetOptions)}
           </div>
           <div class="wheel-config-control-group">
             <h3>前轮位置调整</h3>
@@ -2401,14 +2434,33 @@
       });
     });
 
-    contentEl.querySelectorAll("[data-wheel-config-select]").forEach((select) => {
-      select.addEventListener("change", () => {
+    contentEl.querySelectorAll("[data-wheel-picker-query]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const type = input.dataset.wheelPickerQuery;
+        const keyword = input.value.trim().toLowerCase();
+        const options = contentEl.querySelectorAll(`[data-wheel-picker-option="${type}"]`);
+        const empty = contentEl.querySelector(`[data-wheel-picker-empty="${type}"]`);
+        let visibleCount = 0;
+        options.forEach((option) => {
+          const matched = !keyword || option.dataset.wheelSearch.includes(keyword);
+          option.hidden = !matched;
+          if (matched) visibleCount += 1;
+        });
+        if (empty) empty.hidden = visibleCount > 0;
+      });
+    });
+
+    contentEl.querySelectorAll("[data-wheel-picker-option]").forEach((button) => {
+      button.addEventListener("click", () => {
         const config = getWheelConfigState();
-        if (select.dataset.wheelConfigSelect === "vehicle") {
-          config.vehicle.name = select.value;
-          config.vehicle.model = select.value.replace(/.*?([A-Za-z0-9 ]+|001 FR).*/, "$1").trim() || select.value;
+        const type = button.dataset.wheelPickerOption;
+        const optionId = button.dataset.wheelOptionId;
+        if (type === "vehicle") {
+          const nextVehicle = wheelVehicleOptions.find((item) => item.id === optionId);
+          if (nextVehicle) config.vehicle = { ...nextVehicle };
         } else {
-          config.wheelSet.name = select.value;
+          const nextWheelSet = wheelSetOptions.find((item) => item.id === optionId);
+          if (nextWheelSet) config.wheelSet = { ...nextWheelSet };
         }
         renderWheelConfiguratorPage(def);
       });
