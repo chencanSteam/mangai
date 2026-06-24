@@ -407,6 +407,29 @@
     if (typeof value !== "string") return value;
     return /�|锟|鏈|璁|闂|鎴|鐢/.test(value) ? fallbackValue : value;
   };
+  const getProductStandardFacts = (item) => [
+    ["系列", item.series],
+    ["车型", item.vehicleModel],
+    ["产品型号", item.productModel],
+    ["材质/颜色", item.materialColor],
+    ["轮毂尺寸(英寸)", item.wheelSizeInch],
+    ["刹车碟规格(mm)", item.brakeDiscSpecMm],
+    ["刹车碟可选花纹", item.brakeDiscPatterns],
+    ["卡钳可选颜色", item.caliperColors],
+    ["产品图2", item.productImage2],
+    ["产品图3", item.productImage3],
+    ["安装图1", item.installImage1],
+    ["安装图2", item.installImage2],
+    ["ENP镀镍/氧化灰版本零售价格", item.nickelGreyRetailPrice],
+    ["折扣力度", item.discountLevel],
+    ["终端零售价", item.terminalRetailPrice],
+    ["是否含税", item.taxIncluded],
+    ["是否包含运费", item.freightIncluded],
+    ["备注", item.remark],
+  ];
+  const renderProductStandardFacts = (item) => getProductStandardFacts(item)
+    .map(([label, value]) => `<div><span>${label}</span><strong>${safe(value, "-")}</strong></div>`)
+    .join("");
   const formatProviderRegion = (item) => {
     const province = safe(item?.locationProvince, "");
     const city = safe(item?.locationCity, item?.city ? `${item.city}${String(item.city).endsWith("市") ? "" : "市"}` : "");
@@ -2241,9 +2264,10 @@
   function renderUserMallDetail(item, active) {
     const itemId = active === "goods" ? item.sku : item.id || item.name;
     const orderOpen = state.userOrderForm.type === active && state.userOrderForm.id === itemId;
+    const standardHtml = active === "goods" ? renderProductStandardFacts(item) : "";
     const priceHtml = active === "goods" && item.originalPrice
-      ? `<div><span>价格</span><strong>${safe(item.price, "-")} <span style="text-decoration:line-through; color:var(--text-muted); font-size:12px; font-weight:400;">${safe(item.originalPrice, "")}</span></strong></div>`
-      : `<div><span>价格</span><strong>${safe(item.price, "-")}</strong></div>`;
+      ? `<div><span>价格</span><strong>${safe(item.price, "-")} <span style="text-decoration:line-through; color:var(--text-muted); font-size:12px; font-weight:400;">${safe(item.originalPrice, "")}</span></strong></div>${standardHtml}`
+      : `<div><span>价格</span><strong>${safe(item.price, "-")}</strong></div>${standardHtml}`;
     const promoHtml = active === "goods" && item.promotion
       ? `<div style="margin-top:8px; padding:8px 12px; border-radius:10px; background:rgba(255,106,0,0.08); border:1px solid rgba(255,106,0,0.15);"><strong style="font-size:13px; color:#ff6a00;">${safe(item.promotion.label, "")} · ${safe(item.promotion.discount, "")}</strong><div style="font-size:12px; color:var(--text-muted); margin-top:2px;">${safe(item.promotion.desc, "")}</div></div>`
       : "";

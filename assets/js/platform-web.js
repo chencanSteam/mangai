@@ -233,6 +233,27 @@
     if (Array.isArray(value)) return value.length ? value.join(" / ") : fallback;
     return value === undefined || value === null || value === "" ? fallback : value;
   };
+  const productStandardFields = [
+    { key: "series", label: "系列" },
+    { key: "vehicleModel", label: "车型" },
+    { key: "productModel", label: "产品型号" },
+    { key: "materialColor", label: "材质/颜色" },
+    { key: "wheelSizeInch", label: "轮毂尺寸(英寸)" },
+    { key: "brakeDiscSpecMm", label: "刹车碟规格(mm)" },
+    { key: "brakeDiscPatterns", label: "刹车碟可选花纹" },
+    { key: "caliperColors", label: "卡钳可选颜色" },
+    { key: "productImage2", label: "产品图2" },
+    { key: "productImage3", label: "产品图3" },
+    { key: "installImage1", label: "安装图1" },
+    { key: "installImage2", label: "安装图2" },
+    { key: "nickelGreyRetailPrice", label: "ENP镀镍/氧化灰版本零售价格" },
+    { key: "discountLevel", label: "折扣力度" },
+    { key: "terminalRetailPrice", label: "终端零售价" },
+    { key: "taxIncluded", label: "是否含税" },
+    { key: "freightIncluded", label: "是否包含运费" },
+    { key: "remark", label: "备注" },
+  ];
+  const getProductStandardFacts = (row) => productStandardFields.map(({ key, label }) => [label, row[key]]);
   const formatTag = (text) => {
     const value = displayValue(text);
     return `<span class="tag ${tagType(value)}">${value}</span>`;
@@ -1441,6 +1462,7 @@
           ["优惠活动", row.promotion ? `${row.promotion.label} · ${row.promotion.discount}` : "暂无活动"],
           ["规格参数", row.spec || "-"],
           ["说明", row.description || "商品说明待补充"],
+          ...getProductStandardFacts(row),
         ],
         timeline: [
           "2026-03-15 创建商品",
@@ -6635,6 +6657,19 @@
     const categoryOptions = getBrandCategories(selectedBrand)
       .map((name) => `<option value="${name}" ${selectedCategory === name ? "selected" : ""}>${name}</option>`)
       .join("");
+    const skuValue = isEdit ? row.sku : `PR-${String(products.length + 8801).padStart(4, "0")}`;
+    const standardFieldHtml = productStandardFields.map(({ key, label }) => {
+      const value = isEdit ? row[key] || "" : "";
+      const isLong = key === "remark";
+      return `
+        <div class="field-group ${isLong ? "field-group-full" : ""}">
+          <div class="field-label">${label}</div>
+          ${isLong
+            ? `<textarea class="textarea" data-product-field="${key}" rows="3">${value}</textarea>`
+            : `<input class="input" data-product-field="${key}" value="${value}" />`}
+        </div>
+      `;
+    }).join("");
     openModal(`
       <div class="panel-header">
         <div>
@@ -6644,6 +6679,10 @@
         </div>
       </div>
       <div class="form-grid">
+        <div class="field-group">
+          <div class="field-label">SKU</div>
+          <input class="input" data-product-field="sku" value="${skuValue}" ${isEdit ? "readonly" : ""} />
+        </div>
         <div class="field-group">
           <div class="field-label">商品名称</div>
           <input class="input" data-product-field="name" placeholder="请输入商品名称" value="${isEdit ? row.name : "OZ 锻造轮毂 20寸"}" />
@@ -6710,6 +6749,12 @@
         <div class="field-group field-group-full">
           <div class="field-label">规格参数</div>
           <input class="input" data-product-field="spec" placeholder="例如 19×8.5J ET35 / 5×112 / 单只重量约 8.2kg" value="${isEdit ? row.spec || "" : ""}" />
+        </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">商品标准字段</div>
+          <div class="form-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+            ${standardFieldHtml}
+          </div>
         </div>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
@@ -7527,6 +7572,7 @@
 
     const promoType = getValue("promoType");
     const payload = {
+      sku: mode === "edit" ? sourceSku : getValue("sku"),
       name: getValue("name"),
       brand: getValue("brand"),
       category: getValue("category"),
@@ -7545,6 +7591,9 @@
         desc: getValue("promoDesc"),
       } : null,
     };
+    productStandardFields.forEach(({ key }) => {
+      payload[key] = getValue(key);
+    });
 
     if (!payload.sku || !payload.name || !payload.brand || !payload.category || !payload.fitment) {
       openFeedbackModal("信息不完整", "请至少填写 SKU、商品名称、品牌、类目，并选择一个适配车型后再提交。");
