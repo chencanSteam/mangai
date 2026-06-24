@@ -5,7 +5,7 @@
   "description": "Official Axhub Make client runtime",
   "type": "module",
   "scripts": {
-    "build": "node scripts/build-static.js",
+    "build": "node scripts/build-static.cjs",
     "build:axhub": "node scripts/sync-vendor-if-present.mjs && node scripts/scan-entries.js && node scripts/build-all.js",
     "deploy": "npm run build && wrangler deploy",
     "dev": "node scripts/sync-vendor-if-present.mjs && vite",
