@@ -275,6 +275,43 @@
         window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(rows));
       }
 
+      const POINTS_STORAGE_KEY = "mockUserPoints";
+      function pad2(value) {
+        return String(value).padStart(2, "0");
+      }
+      function getNowStamp() {
+        const date = new Date();
+        return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+      }
+      function readPoints() {
+        try {
+          const raw = window.localStorage.getItem(POINTS_STORAGE_KEY);
+          const rows = JSON.parse(raw || "[]");
+          return Array.isArray(rows) ? rows : [];
+        } catch (error) {
+          return [];
+        }
+      }
+      function writePoints(rows) {
+        window.localStorage.setItem(POINTS_STORAGE_KEY, JSON.stringify(rows));
+      }
+      function appendPointRow(row) {
+        const rows = readPoints();
+        if (row.sourceId && rows.some((item) => item.type === row.type && item.sourceId === row.sourceId)) return null;
+        const nextRow = {
+          id: row.id || `PT-${Date.now().toString().slice(-6)}`,
+          type: row.type || "manual",
+          title: row.title || "积分获得",
+          points: Number(row.points || 0),
+          source: row.source || "用户端",
+          sourceId: row.sourceId || "",
+          time: row.time || getNowStamp(),
+          desc: row.desc || "",
+        };
+        writePoints([nextRow, ...rows].slice(0, 80));
+        return nextRow;
+      }
+
       const availableCoupons = [
         { id: "C001", name: "新用户专享券", type: "fixed", value: 200, threshold: 2000, desc: "满¥2,000减¥200" },
         { id: "C002", name: "618改装节", type: "percent", value: 0.9, threshold: 5000, desc: "满¥5,000享9折" },
@@ -414,10 +451,20 @@
           writeCart(readCart().filter((item) => String(item.sku || "") !== sku));
         }
 
+        const points = Math.floor(finalTotal / 100);
+        appendPointRow({
+          type: "order",
+          title: "商品付款获得积分",
+          points,
+          source: name,
+          sourceId: orderId,
+          desc: `商品订单支付成功，按每满 100 元获得 1 积分，共 ${points} 积分。`,
+        });
+
         orderCreateForm.hidden = true;
         orderSuccess.hidden = false;
-        orderSuccessText.textContent = `${name} 已下单成功，订单编号 ${orderId}。${deliveryType === "provider" ? "商品将配送至您指定的服务商门店。" : ""}`;
-        orderCenterLink.href = `user-app.html?tab=me&meTab=orders&orderId=${encodeURIComponent(orderId)}&feedback=${encodeURIComponent(`${name} 已下单成功。`)}`;
+        orderSuccessText.textContent = `${name} 已下单成功，获得 ${points} 积分，订单编号 ${orderId}。${deliveryType === "provider" ? "商品将配送至您指定的服务商门店。" : ""}`;
+        orderCenterLink.href = `user-app.html?tab=me&meTab=orders&orderId=${encodeURIComponent(orderId)}&feedback=${encodeURIComponent(`${name} 已下单成功，获得 ${points} 积分。`)}`;
       });
 
       // 服务商选择页逻辑

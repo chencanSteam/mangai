@@ -5884,6 +5884,13 @@
   }
 
   const promotionScopeOptions = ["轮毂", "车衣", "制动", "排气", "内饰", "底盘", "保养精品"];
+  const promotionScopeTypes = [
+    { id: "all", label: "全部平台" },
+    { id: "category", label: "指定类目" },
+    { id: "brand", label: "指定品牌" },
+    { id: "brandCategory", label: "指定品牌及类目" },
+    { id: "product", label: "指定商品" },
+  ];
 
   function normalizePromotionRule(row = {}) {
     const type = row.type || "满减";
@@ -5901,10 +5908,23 @@
     return { minAmount: Number(text.match(/满(\d+)/)?.[1] || 20000), reduceAmount: Number(text.match(/减(\d+)/)?.[1] || 3000) };
   }
 
+  function getPromotionScopeType(row = {}) {
+    if (row.scopeType) return row.scopeType;
+    if (Array.isArray(row.scopeProducts) && row.scopeProducts.length) return "product";
+    if (Array.isArray(row.scopeBrands) && row.scopeBrands.length && Array.isArray(row.scopeCategories) && row.scopeCategories.length) return "brandCategory";
+    if (Array.isArray(row.scopeBrands) && row.scopeBrands.length) return "brand";
+    if (Array.isArray(row.scopeCategories) && row.scopeCategories.length) return "category";
+    return "all";
+  }
+
   function normalizePromotionScopes(row = {}) {
-    if (Array.isArray(row.scopeCategories) && row.scopeCategories.length) return row.scopeCategories;
-    const scope = String(row.scope || "");
-    return promotionScopeOptions.filter((item) => scope.includes(item));
+    const type = getPromotionScopeType(row);
+    return {
+      type,
+      categories: Array.isArray(row.scopeCategories) ? row.scopeCategories : [],
+      brands: Array.isArray(row.scopeBrands) ? row.scopeBrands : [],
+      products: Array.isArray(row.scopeProducts) ? row.scopeProducts : [],
+    };
   }
 
   function formatPromotionDiscount(type, rule) {
@@ -5913,18 +5933,146 @@
     return `满${Number(rule.minAmount || 0)}减${Number(rule.reduceAmount || 0)}`;
   }
 
-  function formatPromotionScope(scopeCategories) {
-    return scopeCategories.length ? scopeCategories.join(" / ") : "全部类目";
+  function formatPromotionScope(scope) {
+    if (scope && typeof scope === "object") {
+      if (scope.type === "all") return "全部平台";
+      if (scope.type === "category") return scope.categories.length ? scope.categories.join(" / ") : "未指定类目";
+      if (scope.type === "brand") return scope.brands.length ? scope.brands.join(" / ") : "未指定品牌";
+      if (scope.type === "brandCategory") {
+        const brands = scope.brands.length ? scope.brands.join(" / ") : "未指定品牌";
+        const categories = scope.categories.length ? scope.categories.join(" / ") : "未指定类目";
+        return `${brands} + ${categories}`;
+      }
+      if (scope.type === "product") return scope.products.length ? `指定 ${scope.products.length} 个商品` : "未指定商品";
+    }
+    const categories = Array.isArray(scope) ? scope : [];
+    return categories.length ? categories.join(" / ") : "全部类目";
   }
 
-  function calculatePromotionDiscount(promotion, amount, category) {
+  function calculatePromotionDiscount(promotion, amount, product = {}) {
     const rule = normalizePromotionRule(promotion);
-    const scopes = normalizePromotionScopes(promotion);
+    const scope = normalizePromotionScopes(promotion);
     const amountValue = Number(amount || 0);
-    if (scopes.length && category && !scopes.includes(category)) return 0;
+    const category = typeof product === "string" ? product : product.category;
+    const brand = product.brand;
+    const sku = product.sku;
+    let inScope = false;
+    if (scope.type === "all") inScope = true;
+    else if (scope.type === "category") inScope = category && scope.categories.includes(category);
+    else if (scope.type === "brand") inScope = brand && scope.brands.includes(brand);
+    else if (scope.type === "brandCategory") inScope = brand && scope.brands.includes(brand) && category && scope.categories.includes(category);
+    else if (scope.type === "product") inScope = sku && scope.products.includes(sku);
+    if (!inScope) return 0;
     if (promotion.type === "折扣") return Math.max(0, Math.round(amountValue * (1 - Number(rule.discountRate || 100) / 100)));
     if (promotion.type === "优惠券") return amountValue >= Number(rule.minAmount || 0) ? Number(rule.couponAmount || 0) : 0;
     return amountValue >= Number(rule.minAmount || 0) ? Number(rule.reduceAmount || 0) : 0;
+  }
+
+  function renderPromotionScopePanel(scope, categoryOptions, brandOptions, productOptions) {
+    const { type, categories, brands, products } = scope;
+    if (type === "all") {
+      return `<div class="promotion-scope-hint">活动将适用于平台全部商品。</div>`;
+    }
+    if (type === "category") {
+      return `<div class="promotion-scope-grid">
+        ${categoryOptions.map((item) => `<label class="promotion-scope-option"><input type="checkbox" data-promotion-scope value="${item}" ${categories.includes(item) ? "checked" : ""} /><span>${item}</span></label>`).join("")}
+      </div>`;
+    }
+    if (type === "brand") {
+      return `<div class="promotion-scope-list">
+        ${brandOptions.map((item) => `<label class="promotion-scope-item"><input type="checkbox" data-promotion-scope-brand value="${item}" ${brands.includes(item) ? "checked" : ""} /><span>${item}</span></label>`).join("")}
+      </div>`;
+    }
+    if (type === "brandCategory") {
+      const allBrands = window.MockData.brands || [];
+      const availableCategories = brands.length
+        ? Array.from(new Set(allBrands.filter((b) => brands.includes(b.name)).flatMap((b) => b.categories || [])))
+        : [];
+      const categoryList = availableCategories;
+      const categoryHint = !brands.length
+        ? `<div class="promotion-scope-hint">请先选择品牌，再选择该品牌下的类目。</div>`
+        : !availableCategories.length
+        ? `<div class="promotion-scope-hint">所选品牌暂无类目。</div>`
+        : "";
+      const categoryGrid = categoryList.length
+        ? `<div class="promotion-scope-grid">
+            ${categoryList.map((item) => `<label class="promotion-scope-option"><input type="checkbox" data-promotion-scope value="${item}" ${categories.includes(item) ? "checked" : ""} /><span>${item}</span></label>`).join("")}
+          </div>`
+        : "";
+      return `<div class="promotion-scope-dual" data-promotion-scope-mode="brandCategory">
+        <div class="promotion-scope-dual-column">
+          <strong class="promotion-scope-dual-title">选择品牌</strong>
+          <div class="promotion-scope-list">
+            ${brandOptions.map((item) => `<label class="promotion-scope-item"><input type="checkbox" data-promotion-scope-brand value="${item}" ${brands.includes(item) ? "checked" : ""} /><span>${item}</span></label>`).join("")}
+          </div>
+        </div>
+        <div class="promotion-scope-dual-column">
+          <strong class="promotion-scope-dual-title">选择类目</strong>
+          ${categoryHint}
+          ${categoryGrid}
+        </div>
+      </div>`;
+    }
+    if (type === "product") {
+      return `<div class="promotion-scope-product-search"><input class="input" type="text" data-promotion-product-search placeholder="搜索商品名称、品牌、类目" /></div>
+      <div class="promotion-scope-list promotion-scope-product-list">
+        ${productOptions.length ? productOptions.map((item) => `<label class="promotion-scope-item" data-promotion-product-item data-name="${String(item.name || "").replace(/"/g, "&quot;")}" data-brand="${String(item.brand || "").replace(/"/g, "&quot;")}" data-category="${String(item.category || "").replace(/"/g, "&quot;")}"><input type="checkbox" data-promotion-scope-product value="${item.sku}" ${products.includes(item.sku) ? "checked" : ""} /><span>${item.name || item.sku}</span><small>${item.brand || "-"} / ${item.category || "-"}</small></label>`).join("") : `<div class="promotion-scope-empty">暂无商品数据</div>`}
+      </div>`;
+    }
+    return "";
+  }
+
+  function renderPromotionScopeEditor(row = {}) {
+    const scope = normalizePromotionScopes(row);
+    const categoryOptions = promotionScopeOptions;
+    const brandOptions = (window.MockData.brands || []).map((b) => b.name);
+    const productOptions = (window.MockData.products || []).map((p) => ({ sku: p.sku, name: p.name, brand: p.brand, category: p.category }));
+    return `
+      <select class="input promotion-scope-type" data-promotion-scope-type>
+        ${promotionScopeTypes.map((item) => `<option value="${item.id}" ${item.id === scope.type ? "selected" : ""}>${item.label}</option>`).join("")}
+      </select>
+      <div class="promotion-scope-panel" data-promotion-scope-panel>
+        ${renderPromotionScopePanel(scope, categoryOptions, brandOptions, productOptions)}
+      </div>
+    `;
+  }
+
+  function readPromotionScopeFromModal() {
+    const type = modalCardEl.querySelector('[data-promotion-scope-type]')?.value || "all";
+    const categories = Array.from(modalCardEl.querySelectorAll('[data-promotion-scope]:checked')).map((input) => input.value);
+    const brands = Array.from(modalCardEl.querySelectorAll('[data-promotion-scope-brand]:checked')).map((input) => input.value);
+    const products = Array.from(modalCardEl.querySelectorAll('[data-promotion-scope-product]:checked')).map((input) => input.value);
+    return { type, categories, brands, products };
+  }
+
+  function bindPromotionProductSearch(panel) {
+    const search = panel?.querySelector('[data-promotion-product-search]');
+    if (!search) return;
+    search.addEventListener("input", () => {
+      const term = String(search.value || "").trim().toLowerCase();
+      panel.querySelectorAll('[data-promotion-product-item]').forEach((item) => {
+        const text = [item.dataset.name, item.dataset.brand, item.dataset.category].join(" ").toLowerCase();
+        item.style.display = !term || text.includes(term) ? "" : "none";
+      });
+    });
+  }
+
+  function bindPromotionScopePanelEvents(panel) {
+    if (!panel) return;
+    const isBrandCategory = panel.querySelector('[data-promotion-scope-mode="brandCategory"]');
+    if (isBrandCategory) {
+      panel.querySelectorAll('[data-promotion-scope-brand]').forEach((input) => {
+        input.addEventListener("change", () => {
+          const currentScope = readPromotionScopeFromModal();
+          const categoryOptions = promotionScopeOptions;
+          const brandOptions = (window.MockData.brands || []).map((b) => b.name);
+          const productOptions = (window.MockData.products || []).map((p) => ({ sku: p.sku, name: p.name, brand: p.brand, category: p.category }));
+          panel.innerHTML = renderPromotionScopePanel({ ...currentScope, type: "brandCategory" }, categoryOptions, brandOptions, productOptions);
+          bindPromotionScopePanelEvents(panel);
+        });
+      });
+    }
+    bindPromotionProductSearch(panel);
   }
 
   function renderPromotionRuleFields(type, rule = {}) {
@@ -5972,7 +6120,6 @@
     const nextId = `PROMO-${String((window.MockData.promotions || []).length + 1).padStart(3, "0")}`;
     const type = row.type || "满减";
     const rule = normalizePromotionRule(row);
-    const scopes = normalizePromotionScopes(row);
     openModal(`
       <div class="platform-detail-modal">
         <div class="panel-header">
@@ -6009,14 +6156,7 @@
           </div>
           <div class="field-group field-group-full">
             <label class="field-label">适用范围</label>
-            <div class="promotion-scope-grid">
-              ${promotionScopeOptions.map((item) => `
-                <label class="promotion-scope-option">
-                  <input type="checkbox" data-promotion-scope value="${item}" ${scopes.includes(item) ? "checked" : ""} />
-                  <span>${item}</span>
-                </label>
-              `).join("")}
-            </div>
+            ${renderPromotionScopeEditor(row)}
           </div>
           <div class="field-group">
             <label class="field-label">开始时间</label>
@@ -6036,6 +6176,18 @@
     modalCardEl.querySelector('[data-promotion-field="type"]')?.addEventListener("change", (event) => {
       refreshPromotionRuleEditor(event.target.value);
     });
+    modalCardEl.querySelector('[data-promotion-scope-type]')?.addEventListener("change", (event) => {
+      const newType = event.target.value;
+      const currentScope = readPromotionScopeFromModal();
+      const panel = modalCardEl.querySelector('[data-promotion-scope-panel]');
+      if (!panel) return;
+      const categoryOptions = promotionScopeOptions;
+      const brandOptions = (window.MockData.brands || []).map((b) => b.name);
+      const productOptions = (window.MockData.products || []).map((p) => ({ sku: p.sku, name: p.name, brand: p.brand, category: p.category }));
+      panel.innerHTML = renderPromotionScopePanel({ ...currentScope, type: newType }, categoryOptions, brandOptions, productOptions);
+      bindPromotionScopePanelEvents(panel);
+    });
+    bindPromotionScopePanelEvents(modalCardEl.querySelector('[data-promotion-scope-panel]'));
   }
 
   function openPromotionRedemptionModal(row) {
@@ -6091,15 +6243,18 @@
     modalCardEl.querySelectorAll("[data-promotion-rule]").forEach((input) => {
       rule[input.dataset.promotionRule] = Number(input.value || 0);
     });
-    const scopeCategories = Array.from(modalCardEl.querySelectorAll("[data-promotion-scope]:checked")).map((input) => input.value);
+    const scope = readPromotionScopeFromModal();
     const payload = {
       id: getValue("id"),
       name: getValue("name"),
       type,
       rule,
       discount: formatPromotionDiscount(type, rule),
-      scopeCategories,
-      scope: formatPromotionScope(scopeCategories),
+      scopeType: scope.type,
+      scopeCategories: scope.type === "category" ? scope.categories : [],
+      scopeBrands: scope.type === "brand" || scope.type === "brandCategory" ? scope.brands : [],
+      scopeProducts: scope.type === "product" ? scope.products : [],
+      scope: formatPromotionScope(scope),
       start: getValue("start"),
       end: getValue("end"),
       stock: Number(getValue("stock") || 0),
@@ -6112,6 +6267,22 @@
     }
     if (payload.stock <= 0) {
       openFeedbackModal("库存不合法", "活动库存必须大于 0。");
+      return;
+    }
+    if (scope.type === "category" && !scope.categories.length) {
+      openFeedbackModal("适用范围不完整", "请至少选择一个类目。");
+      return;
+    }
+    if (scope.type === "brand" && !scope.brands.length) {
+      openFeedbackModal("适用范围不完整", "请至少选择一个品牌。");
+      return;
+    }
+    if (scope.type === "brandCategory" && (!scope.brands.length || !scope.categories.length)) {
+      openFeedbackModal("适用范围不完整", "请至少选择一个品牌和一个类目。");
+      return;
+    }
+    if (scope.type === "product" && !scope.products.length) {
+      openFeedbackModal("适用范围不完整", "请至少选择一个商品。");
       return;
     }
     if (type === "满减" && (!rule.minAmount || !rule.reduceAmount || rule.reduceAmount >= rule.minAmount)) {

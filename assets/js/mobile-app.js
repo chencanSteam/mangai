@@ -16,6 +16,7 @@
   const COLLECTIONS_STORAGE_KEY = "mockUserCollections";
   const AUTH_STORAGE_KEY = "mockUserAuth";
   const INVOICE_STORAGE_KEY = "mockUserInvoices";
+  const POINTS_STORAGE_KEY = "mockUserPoints";
   const MALL_RECOMMENDATION_STORAGE_KEY = "mockMallRecommendations";
 
   function priceToNumber(value) {
@@ -1915,6 +1916,77 @@
     window.localStorage.setItem(key, JSON.stringify(rows));
   }
 
+  function getDateKey(date = new Date()) {
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+
+  function getDefaultUserPointRows() {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return [
+      {
+        id: "PT-INIT-ORDER",
+        type: "order",
+        title: "商品付款获得积分",
+        points: 188,
+        source: "BBS 锻造轮毂 19寸",
+        sourceId: "UO-240401",
+        time: "2026-04-01 14:30",
+        desc: "商品订单支付成功，按每满 100 元获得 1 积分。",
+      },
+      {
+        id: "PT-INIT-SIGN",
+        type: "checkin",
+        title: "每日签到",
+        points: 10,
+        source: "我的页面",
+        sourceId: getDateKey(yesterday),
+        time: `${getDateKey(yesterday)} 09:12`,
+        desc: "连续访问用户端并完成签到。",
+      },
+    ];
+  }
+
+  function getUserPointRows() {
+    const localRows = readStorageRows(POINTS_STORAGE_KEY);
+    const rows = localRows.length ? localRows : getDefaultUserPointRows();
+    return rows
+      .filter((item) => item && item.id)
+      .map((item) => ({ ...item, points: Number(item.points || 0) }))
+      .sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
+  }
+
+  function getUserPointTotal(rows = getUserPointRows()) {
+    return rows.reduce((sum, item) => sum + Math.max(0, Number(item.points || 0)), 0);
+  }
+
+  function hasUserCheckedInToday(rows = getUserPointRows()) {
+    const today = getDateKey();
+    return rows.some((item) => item.type === "checkin" && (item.sourceId === today || String(item.time || "").startsWith(today)));
+  }
+
+  function appendUserPointRow(row) {
+    const rows = getUserPointRows();
+    if (row.sourceId && rows.some((item) => item.type === row.type && item.sourceId === row.sourceId)) return null;
+    const nextRow = {
+      id: row.id || `PT-${Date.now().toString().slice(-6)}`,
+      type: row.type || "manual",
+      title: row.title || "积分获得",
+      points: Number(row.points || 0),
+      source: row.source || "用户端",
+      sourceId: row.sourceId || "",
+      time: row.time || getNowStamp(),
+      desc: row.desc || "",
+    };
+    writeStorageRows(POINTS_STORAGE_KEY, [nextRow, ...rows].slice(0, 80));
+    return nextRow;
+  }
+
+  function calculateOrderPoints(item, quantity = 1) {
+    return Math.floor((priceToNumber(item?.price) * Math.max(1, Number(quantity || 1))) / 100);
+  }
+
   function getMallRecommendationRows() {
     const localRows = readStorageRows(MALL_RECOMMENDATION_STORAGE_KEY);
     return localRows.length ? localRows : (window.MockData.mallRecommendations || []);
@@ -2511,6 +2583,23 @@
       render();
       return;
     }
+    if (action === "user-points-checkin") {
+      if (hasUserCheckedInToday()) {
+        state.userFeedback = "今日已签到，明天再来继续获得积分。";
+      } else {
+        const row = appendUserPointRow({
+          type: "checkin",
+          title: "每日签到",
+          points: 10,
+          source: "我的页面",
+          sourceId: getDateKey(),
+          desc: "每日签到获得 10 积分。",
+        });
+        state.userFeedback = row ? "签到成功，获得 10 积分。" : "今日已签到，明天再来继续获得积分。";
+      }
+      render();
+      return;
+    }
     if (action === "user-credit-apply") {
       state.userMe.creditApplyOpen = true;
       render();
@@ -3068,11 +3157,21 @@
     orders.unshift(newOrder);
     setStoredUserOrders([newOrder, ...getStoredUserOrders()].slice(0, 20));
     state.userOrderForm = { type: "", id: "" };
-    state.userFeedback = `${safe(source.name, "订单")} 已提交，下单编号 ${orderId}。`;
     if (type === "goods") {
+      const points = calculateOrderPoints(source, quantity);
+      appendUserPointRow({
+        type: "order",
+        title: "商品付款获得积分",
+        points,
+        source: safe(source.name, "商品"),
+        sourceId: orderId,
+        desc: `商品订单支付成功，按每满 100 元获得 1 积分，共 ${points} 积分。`,
+      });
+      state.userFeedback = `${safe(source.name, "订单")} 已提交，获得 ${points} 积分。`;
       state.userDialog = { type: "service-upsell", orderId, sourceName: safe(source.name, "商品"), rating: 0 };
       state.tab = "mall";
     } else {
+      state.userFeedback = `${safe(source.name, "订单")} 已提交，下单编号 ${orderId}。`;
       state.tab = "me";
     }
     render();
@@ -3445,6 +3544,14 @@
     return `<div class="user-me-invoice-page"><section class="user-me-panel user-me-invoice-summary"><div><span>可申请订单</span><strong>${orderRows.length}</strong></div><div><span>已提交申请</span><strong>${invoiceRows.length}</strong></div></section><section class="user-me-panel"><form class="user-me-form" data-user-invoice-form><label><span>选择订单</span><select class="input" name="orderId" required>${orderRows.map((item) => `<option value="${item.id}">${item.id} / ${safe(item.service, "订单")} / ${safe(item.quote, "-")}</option>`).join("")}</select></label><div class="user-me-form-row"><label><span>发票类型</span><select class="input" name="invoiceType"><option value="普票">普票</option><option value="专票">专票</option></select></label><label><span>发票抬头</span><input class="input" name="title" type="text" value="${safe(getMockUserAuth()?.nickname, "顾铭")}" required></label></div><label><span>税号</span><input class="input" name="taxNo" type="text" placeholder="专票必填"></label><label><span>接收邮箱</span><input class="input" name="email" type="email" value="user@example.com" required></label><label><span>联系电话</span><input class="input" name="phone" type="tel" value="${safe(getMockUserAuth()?.phone, "13800138000")}" required></label><label><span>注册地址</span><input class="input" name="address" type="text" value="${getUserDefaultAddress()}" required></label><label><span>开户行</span><input class="input" name="bankName" type="text" placeholder="专票填写开户行"></label><label><span>账号</span><input class="input" name="bankAccount" type="text" placeholder="专票填写账号"></label><button class="btn btn-primary user-me-full-btn" type="submit">提交发票申请</button></form></section><section class="user-me-panel"><div class="user-me-section-head"><strong>申请记录</strong><span>${invoiceRows.length} 条</span></div><div class="user-me-record-list">${invoiceRows.map((item) => renderInvoiceRecordRow(item)).join("") || `<article><div><strong>暂无发票申请</strong><span>提交后会保存在当前浏览器的 mock 数据中。</span></div></article>`}</div></section></div>`;
   }
 
+  function renderUserPoints() {
+    const rows = getUserPointRows();
+    const total = getUserPointTotal(rows);
+    const checkedIn = hasUserCheckedInToday(rows);
+    const totalEarned = total;
+    return `<div class="user-me-light-subpage"><section class="user-me-white-block"><div style="display:flex; justify-content:space-between; align-items:center; padding:16px 0 12px;"><div><span style="color:var(--text-muted); font-size:13px;">当前积分</span><strong style="display:block; font-size:32px; font-weight:500; color:var(--text);">${total.toLocaleString("zh-CN")}</strong></div><button class="btn btn-primary" type="button" data-user-action="user-points-checkin" ${checkedIn ? "disabled" : ""} style="min-height:40px; padding:0 16px; font-size:13px; border-radius:20px;">${checkedIn ? "今日已签到" : "每日签到 +10"}</button></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; padding-bottom:6px;"><div><span style="color:var(--text-muted); font-size:12px;">累计获得</span><strong style="display:block; font-size:16px; color:var(--text);">${totalEarned.toLocaleString("zh-CN")}</strong></div><div><span style="color:var(--text-muted); font-size:12px;">今日签到</span><strong style="display:block; font-size:16px; color:var(--text);">${checkedIn ? "已完成" : "未签到"}</strong></div></div></section><section class="user-me-white-block" style="margin-top:10px;"><div class="user-me-block-head"><strong>积分账单</strong><span>${rows.length} 条记录</span></div><div class="user-me-record-list light">${rows.length ? rows.map((item) => `<article><div><strong>${safe(item.title, "积分记录")}</strong><span>${safe(item.source, "-")} · ${safe(item.time, "-")}</span><span>${safe(item.desc, "")}</span></div><span style="color:#ff8b48; font-weight:500; font-size:15px; white-space:nowrap;">+${Number(item.points || 0)}</span></article>`).join("") : `<article><div><strong>暂无积分记录</strong><span>完成签到或商品付款后生成积分记录。</span></div></article>`}</div></section></div>`;
+  }
+
   function renderUserMe() {
     const active = state.subTab.me || "profile";
     const profile = getMockUserAuth() || {};
@@ -3461,8 +3568,9 @@
       following: "我的关注",
       postCollections: "帖子收藏",
       followers: "我的粉丝",
+      points: "积分管理",
     };
-    const content = active === "profile" ? renderUserProfile() : active === "profileDetail" ? renderUserProfileDetail() : active === "orders" ? renderUserHistoryOrders() : active === "cart" ? renderUserCart() : active === "collections" ? renderUserCollections() : active === "invoices" ? renderUserInvoices() : active === "coupons" ? renderUserCoupons() : active === "address" ? renderUserAddress() : active === "following" ? renderUserFollowing() : active === "postCollections" ? renderUserPostCollections() : active === "followers" ? renderUserFollowers() : renderUserCredit();
+    const content = active === "profile" ? renderUserProfile() : active === "profileDetail" ? renderUserProfileDetail() : active === "orders" ? renderUserHistoryOrders() : active === "cart" ? renderUserCart() : active === "collections" ? renderUserCollections() : active === "invoices" ? renderUserInvoices() : active === "coupons" ? renderUserCoupons() : active === "address" ? renderUserAddress() : active === "following" ? renderUserFollowing() : active === "postCollections" ? renderUserPostCollections() : active === "followers" ? renderUserFollowers() : active === "points" ? renderUserPoints() : renderUserCredit();
     return `<div class="user-me-page user-me-page-light"><header class="user-me-top"><strong>${titleMap[active] || "个人中心"}</strong>${active !== "profile" ? `<button type="button" data-sub-tab="profile">返回</button>` : ""}</header>${state.userFeedback ? `<div class="provider-feedback user-me-feedback">${state.userFeedback}</div>` : ""}${content}</div>`;
   }
 
@@ -3489,6 +3597,9 @@
   function renderUserProfile() {
     const profile = getMockUserAuth() || {};
     const socialStats = { following: 3, postCollections: 6, followers: 128 };
+    const pointRows = getUserPointRows();
+    const pointTotal = getUserPointTotal(pointRows);
+    const checkedIn = hasUserCheckedInToday(pointRows);
     const orderRows = [
       { label: "待付款", value: "0", tone: "pay" },
       { label: "待发货", value: String(getUserOrders().filter((item) => nOrder(item.status).includes("待发货")).length), tone: "box" },
@@ -3497,6 +3608,7 @@
       { label: "售后", value: "0", tone: "refund" },
     ];
     const menuRows = [
+      { label: "积分管理", sub: "points", icon: "✦" },
       { label: "我的收藏", sub: "collections", icon: "☆" },
       { label: "电子凭证", sub: "invoices", icon: "▭" },
       { label: "我的购物车", sub: "cart", icon: "□" },
@@ -3505,7 +3617,7 @@
       { label: "优惠券管理", sub: "coupons", icon: "🎫" },
       { label: "退出登录", action: "user-logout", icon: "↧" },
     ];
-    return `<div class="user-me-light-home">${renderUserMeProfileHero(profile)}<section class="user-me-red-metrics"><button type="button" data-sub-tab="following"><strong>${socialStats.following}</strong><span>关注</span></button><button type="button" data-sub-tab="postCollections"><strong>${socialStats.postCollections}</strong><span>收藏</span></button><button type="button" data-sub-tab="followers"><strong>${socialStats.followers}</strong><span>粉丝</span></button></section><section class="user-me-white-block"><div class="user-me-block-head"><strong>我的订单</strong><button type="button" data-sub-tab="orders">全部订单</button></div><div class="user-me-order-icons">${orderRows.map((item) => `<button type="button" data-sub-tab="orders"><i data-tone="${item.tone}">${item.value}</i><span>${item.label}</span></button>`).join("")}</div></section><section class="user-me-menu-grid">${menuRows.map((item) => item.action ? `<button class="user-me-menu-tile" type="button" data-user-action="${item.action}"><i>${item.icon}</i><span>${item.label}</span></button>` : `<button class="user-me-menu-tile" type="button" data-sub-tab="${item.sub}"><i>${item.icon}</i><span>${item.label}</span></button>`).join("")}</section></div>`;
+    return `<div class="user-me-light-home">${renderUserMeProfileHero(profile)}<section class="user-me-red-metrics"><button type="button" data-sub-tab="following"><strong>${socialStats.following}</strong><span>关注</span></button><button type="button" data-sub-tab="postCollections"><strong>${socialStats.postCollections}</strong><span>收藏</span></button><button type="button" data-sub-tab="followers"><strong>${socialStats.followers}</strong><span>粉丝</span></button></section><section class="user-me-white-block"><div style="display:flex; justify-content:space-between; align-items:center; padding:16px 0;"><div><span style="color:var(--text-muted); font-size:13px;">当前积分</span><strong style="display:block; font-size:28px; font-weight:500; color:var(--text);">${pointTotal.toLocaleString("zh-CN")}</strong></div><button class="btn btn-primary" type="button" data-user-action="user-points-checkin" ${checkedIn ? "disabled" : ""} style="min-height:38px; padding:0 14px; font-size:13px; border-radius:20px;">${checkedIn ? "今日已签到" : "每日签到 +10"}</button></div></section><section class="user-me-white-block"><div class="user-me-block-head"><strong>我的订单</strong><button type="button" data-sub-tab="orders">全部订单</button></div><div class="user-me-order-icons">${orderRows.map((item) => `<button type="button" data-sub-tab="orders"><i data-tone="${item.tone}">${item.value}</i><span>${item.label}</span></button>`).join("")}</div></section><section class="user-me-menu-grid">${menuRows.map((item) => item.action ? `<button class="user-me-menu-tile" type="button" data-user-action="${item.action}"><i>${item.icon}</i><span>${item.label}</span></button>` : `<button class="user-me-menu-tile" type="button" data-sub-tab="${item.sub}"><i>${item.icon}</i><span>${item.label}</span></button>`).join("")}</section></div>`;
   }
 
   function renderUserProfileDetail() {
