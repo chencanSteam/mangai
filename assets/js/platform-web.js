@@ -308,6 +308,35 @@
     ];
   }
 
+  function deriveProviderStatusFromStores(row) {
+    const stores = getProviderStores(row);
+    const statuses = stores.map((s) => s.auditStatus);
+    if (statuses.every((s) => s === "已通过")) {
+      row.auditStatus = "已通过";
+      row.status = "正常营业";
+    } else if (statuses.every((s) => s === "已驳回")) {
+      row.auditStatus = "已驳回";
+      row.status = "已驳回";
+    } else if (statuses.some((s) => s === "待补充")) {
+      row.auditStatus = "待补充";
+      row.status = "";
+    } else {
+      row.auditStatus = "待审核";
+      row.status = "";
+    }
+  }
+
+  function setStoreAuditStatus(row, storeId, auditStatus) {
+    const store = getProviderStores(row).find((s) => s.id === storeId);
+    if (!store) return;
+    store.auditStatus = auditStatus;
+    if (auditStatus === "已通过") store.status = "正常营业";
+    else if (auditStatus === "已驳回") store.status = "已驳回";
+    else if (auditStatus === "待补充") store.status = "";
+    else store.status = "";
+    deriveProviderStatusFromStores(row);
+  }
+
   providers.forEach((item) => {
     item.contractNo = item.contractNo || `HT-2026-${item.id.slice(-4)}`;
     item.contractStatus = item.contractStatus || (item.auditStatus === "已通过" ? "履约中" : "待签约");
@@ -1284,23 +1313,34 @@
       ],
       rows: providers,
       filterBy: "auditStatus",
-      detail: (row) => ({
-        title: row.name,
-        badges: [...new Set([row.auditStatus, row.auditStatus === "待审核" ? "" : row.status].filter(Boolean))],
-        facts: [
-          ["联系人", row.contact],
-          ["位置", row.providerRegion],
-          ["详细地址", row.locationAddress],
-          ["门店数量", `${getProviderStores(row).length} 家`],
-          ["工位数量", `${row.bays} 个`],
-          ["营业执照", row.license],
-          ["合同编号", row.contractNo],
-          ["合同状态", row.contractStatus],
-          ["服务能力", row.specialties],
-          ["月订单量", `${row.monthOrders} 单`],
-        ],
-        timeline: row.timeline,
-      }),
+      detail: (row) => {
+        const stores = getProviderStores(row);
+        const statusSummary = ["已通过", "待审核", "待补充", "已驳回"]
+          .map((s) => {
+            const count = stores.filter((store) => store.auditStatus === s).length;
+            return count ? `${s} ${count} 家` : "";
+          })
+          .filter(Boolean)
+          .join(" / ");
+        return {
+          title: row.name,
+          badges: [...new Set([row.auditStatus, row.auditStatus === "待审核" ? "" : row.status].filter(Boolean))],
+          facts: [
+            ["联系人", row.contact],
+            ["位置", row.providerRegion],
+            ["详细地址", row.locationAddress],
+            ["门店数量", `${stores.length} 家`],
+            ["门店状态", statusSummary || "-"],
+            ["工位数量", `${row.bays} 个`],
+            ["营业执照", row.license],
+            ["合同编号", row.contractNo],
+            ["合同状态", row.contractStatus],
+            ["服务能力", row.specialties],
+            ["月订单量", `${row.monthOrders} 单`],
+          ],
+          timeline: row.timeline,
+        };
+      },
     }),
     providerList: makeTableDef({
       title: "服务商列表",
@@ -3534,9 +3574,8 @@
               `
               : state.activePage === "providerAudit"
                 ? `
-                  <button class="btn btn-primary" type="button" data-audit-action="approve">审核通过</button>
-                  <button class="btn btn-warning" type="button" data-audit-action="supplement">要求补充</button>
-                  <button class="btn btn-danger" type="button" data-audit-action="reject">驳回申请</button>
+                  <button class="btn btn-primary" type="button" data-provider-action="process">按门店审核</button>
+                  <button class="btn btn-secondary" type="button" data-provider-action="materials">查看详情</button>
                 `
                 : detail.actions === "providerList"
                 ? `
@@ -4667,14 +4706,32 @@
       });
     });
 
+    modalCardEl.querySelectorAll("[data-store-audit-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const providerId = button.dataset.providerId;
+        const storeId = button.dataset.storeId;
+        const action = button.dataset.storeAuditAction;
+        if (action === "supplement") {
+          openSupplementModalForStore(providerId, storeId);
+          return;
+        }
+        if (action === "reject") {
+          openRejectModalForStore(providerId, storeId);
+          return;
+        }
+        handleStoreAuditDecision(providerId, storeId, action);
+      });
+    });
+
     const supplementSubmit = modalCardEl.querySelector("[data-submit-supplement]");
     if (supplementSubmit) {
       supplementSubmit.addEventListener("click", () => {
         const providerId = supplementSubmit.dataset.providerId;
+        const storeId = supplementSubmit.dataset.storeId || "";
         const selectedItems = Array.from(modalCardEl.querySelectorAll("[data-supplement-item]:checked")).map((input) => input.value);
         const reasonInput = modalCardEl.querySelector("[data-supplement-reason]");
         const reason = reasonInput ? reasonInput.value.trim() : "";
-        submitSupplement(providerId, selectedItems, reason);
+        submitSupplement(providerId, selectedItems, reason, storeId);
       });
     }
 
@@ -4682,9 +4739,10 @@
     if (rejectSubmit) {
       rejectSubmit.addEventListener("click", () => {
         const providerId = rejectSubmit.dataset.providerId;
+        const storeId = rejectSubmit.dataset.storeId || "";
         const reasonInput = modalCardEl.querySelector("[data-reject-reason]");
         const reason = reasonInput ? reasonInput.value.trim() : "";
-        submitReject(providerId, reason);
+        submitReject(providerId, reason, storeId);
       });
     }
 
@@ -5196,26 +5254,44 @@
   }
 
   function openProviderAuditProcessModal(row) {
+    const stores = getProviderStores(row);
+    const storeRows = stores
+      .map(
+        (store, index) => `
+        <article class="provider-material-card" style="display:grid; gap:10px;">
+          <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
+            <strong style="color:#fff;">${index + 1}. ${store.name || row.name}${store.isPrimary ? ' <span class="pill">主门店</span>' : ""}</strong>
+            ${store.auditStatus ? formatTag(store.auditStatus) : ""}
+          </div>
+          <div class="muted">${formatStoreAddress(store)}</div>
+          ${store.auditStatus === "已通过" ? "" : `<div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="btn btn-primary btn-sm" type="button" data-store-audit-action="approve" data-store-id="${store.id}" data-provider-id="${row.id}">通过</button><button class="btn btn-warning btn-sm" type="button" data-store-audit-action="supplement" data-store-id="${store.id}" data-provider-id="${row.id}">补充</button><button class="btn btn-danger btn-sm" type="button" data-store-audit-action="reject" data-store-id="${store.id}" data-provider-id="${row.id}">驳回</button></div>`}
+        </article>
+      `
+      )
+      .join("");
+
     openModal(`
       <div class="panel-header">
         <div>
           <span class="eyebrow">Provider Audit</span>
-          <h2 class="section-title">处理入驻审核</h2>
-          <p class="section-subtitle">${row.name} / ${row.providerRegion} / ${row.specialties}</p>
+          <h2 class="section-title">按门店审核</h2>
+          <p class="section-subtitle">${row.name} / 共 ${stores.length} 家门店 / 可分别审核各门店资质</p>
         </div>
+      </div>
+      <div class="provider-store-list" style="display:grid; gap:12px; margin-bottom:18px;">
+        ${storeRows}
+      </div>
+      <div class="panel-header" style="margin-bottom:12px;">
+        <div><h3 class="section-title" style="font-size:16px;">批量操作</h3></div>
       </div>
       <div class="action-grid" data-order-id="${row.id}">
         <button class="action-tile" type="button" data-audit-decision="approve" data-provider-id="${row.id}">
-          <strong>审核通过</strong>
-          <p>将服务商状态更新为正常营业，并进入平台服务商列表。</p>
-        </button>
-        <button class="action-tile" type="button" data-audit-decision="supplement" data-provider-id="${row.id}">
-          <strong>要求补充资料</strong>
-          <p>要求补齐门头照、施工位照片或授权资质后再次提交。</p>
+          <strong>全部通过</strong>
+          <p>将所有门店一次性审核通过，服务商进入正常营业状态。</p>
         </button>
         <button class="action-tile" type="button" data-audit-decision="reject" data-provider-id="${row.id}">
-          <strong>驳回申请</strong>
-          <p>本次申请不通过，记录驳回原因并结束当前审核流程。</p>
+          <strong>全部驳回</strong>
+          <p>一次性驳回所有门店申请，结束当前服务商审核流程。</p>
         </button>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
@@ -5408,12 +5484,16 @@
             ${stores
               .map(
                 (store, index) => `
-              <div class="provider-material-card" style="display:grid; gap:8px;">
+              <div class="provider-material-card" style="display:grid; gap:10px;" data-store-id="${store.id}">
                 <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
                   <strong style="color:#fff;">${index + 1}. ${store.name || row.name}${store.isPrimary ? " <span class=\"pill\">主门店</span>" : ""}</strong>
-                  ${store.status ? formatTag(store.status) : ""}${store.auditStatus && store.auditStatus !== row.auditStatus ? formatTag(store.auditStatus) : ""}
+                  <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    ${store.auditStatus ? formatTag(store.auditStatus) : ""}
+                    ${store.status && store.status !== row.status ? formatTag(store.status) : ""}
+                  </div>
                 </div>
                 <div class="muted">${formatStoreAddress(store)}</div>
+                ${store.auditStatus === "已通过" ? "" : `<div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="btn btn-primary btn-sm" type="button" data-store-audit-action="approve" data-store-id="${store.id}" data-provider-id="${row.id}">审核通过</button><button class="btn btn-warning btn-sm" type="button" data-store-audit-action="supplement" data-store-id="${store.id}" data-provider-id="${row.id}">要求补充</button><button class="btn btn-danger btn-sm" type="button" data-store-audit-action="reject" data-store-id="${store.id}" data-provider-id="${row.id}">驳回申请</button></div>`}
               </div>
             `
               )
@@ -7126,7 +7206,8 @@
     `);
   }
 
-  function openSupplementModal(row) {
+  function openSupplementModal(row, storeId = "") {
+    const storeLabel = storeId ? ` / ${getProviderStores(row).find((s) => s.id === storeId)?.name || "指定门店"}` : "";
     const options = [
       { value: "门头照", desc: "补充清晰门头正面图与夜景图，便于平台核验门店真实性。" },
       { value: "施工位照片", desc: "补充施工工位、设备区与交付区照片，确认施工能力。" },
@@ -7141,7 +7222,7 @@
         <div>
           <span class="eyebrow">Supplement</span>
           <h2 class="section-title">要求补充资料</h2>
-          <p class="section-subtitle">${row.name} / 可多选补充项，并填写补充理由</p>
+          <p class="section-subtitle">${row.name}${storeLabel} / 可多选补充项，并填写补充理由</p>
         </div>
       </div>
       <div class="check-grid">
@@ -7164,19 +7245,20 @@
         <textarea class="textarea" data-supplement-reason>请补充夜景门头照、施工工位照片，并补传高端改装品牌授权资质，方便平台完成最终审核。</textarea>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
-        <button class="btn btn-primary" type="button" data-submit-supplement data-provider-id="${row.id}">提交补充要求</button>
+        <button class="btn btn-primary" type="button" data-submit-supplement data-provider-id="${row.id}" data-store-id="${storeId}">提交补充要求</button>
         <button class="btn btn-secondary" type="button" data-close-modal>返回</button>
       </div>
     `);
   }
 
-  function openRejectModal(row) {
+  function openRejectModal(row, storeId = "") {
+    const storeLabel = storeId ? ` / ${getProviderStores(row).find((s) => s.id === storeId)?.name || "指定门店"}` : "";
     openModal(`
       <div class="panel-header">
         <div>
           <span class="eyebrow">Reject</span>
           <h2 class="section-title">驳回申请</h2>
-          <p class="section-subtitle">${row.name} / 请填写明确的驳回理由</p>
+          <p class="section-subtitle">${row.name}${storeLabel} / 请填写明确的驳回理由</p>
         </div>
       </div>
       <div class="field-group field-group-full">
@@ -7184,7 +7266,7 @@
         <textarea class="textarea" data-reject-reason>当前提交资料无法满足平台高端改装服务商入驻标准，请补齐有效资质和完整门店资料后重新申请。</textarea>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
-        <button class="btn btn-primary" type="button" data-submit-reject data-provider-id="${row.id}">确认驳回</button>
+        <button class="btn btn-primary" type="button" data-submit-reject data-provider-id="${row.id}" data-store-id="${storeId}">确认驳回</button>
         <button class="btn btn-secondary" type="button" data-close-modal>返回</button>
       </div>
     `);
@@ -7197,6 +7279,10 @@
     if (decision === "approve") {
       target.auditStatus = "已通过";
       target.status = "正常营业";
+      getProviderStores(target).forEach((store) => {
+        store.auditStatus = "已通过";
+        store.status = "正常营业";
+      });
       target.timeline.unshift("2026-04-02 15:20 平台审核通过，已开通门店能力");
       pushNotification("provider", "入驻审核已通过", `恭喜！${target.name} 的入驻申请已通过审核，已开通门店能力，可参与订单分配。`);
       openFeedbackModal("审核已通过", `${target.name} 已进入正式服务商列表，可参与订单分配。`);
@@ -7212,12 +7298,57 @@
     }
 
     target.auditStatus = "已驳回";
+    target.status = "已驳回";
+    getProviderStores(target).forEach((store) => {
+      store.auditStatus = "已驳回";
+      store.status = "已驳回";
+    });
     target.timeline.unshift("2026-04-02 15:20 平台驳回申请：资料不完整，请修正后重提");
     pushNotification("provider", "入驻审核被驳回", `${target.name} 的入驻审核未通过，原因：资料不完整，请修正后重新提交。`);
     openFeedbackModal("申请已驳回", `${target.name} 已更新为已驳回状态。`);
   }
 
-  function submitSupplement(providerId, selectedItems, reason) {
+  function handleStoreAuditDecision(providerId, storeId, decision) {
+    const target = providers.find((item) => item.id === providerId);
+    if (!target || !storeId) return;
+    const store = getProviderStores(target).find((s) => s.id === storeId);
+    if (!store) return;
+
+    if (decision === "approve") {
+      setStoreAuditStatus(target, storeId, "已通过");
+      target.timeline.unshift(`2026-04-02 15:20 ${store.name} 审核通过`);
+      pushNotification("provider", "门店审核已通过", `恭喜！${store.name} 的门店审核已通过，可参与订单分配。`);
+      openFeedbackModal("门店审核已通过", `${store.name} 已通过审核。当前服务商整体状态：${target.auditStatus}。`);
+      return;
+    }
+
+    if (decision === "supplement") {
+      setStoreAuditStatus(target, storeId, "待补充");
+      target.timeline.unshift(`2026-04-02 15:20 ${store.name} 被要求补充资料`);
+      pushNotification("provider", "门店审核需补充资料", `${store.name} 的门店审核需要补充资料。`);
+      openFeedbackModal("已要求门店补充资料", `${store.name} 需补充资料后重新审核。当前服务商整体状态：${target.auditStatus}。`);
+      return;
+    }
+
+    setStoreAuditStatus(target, storeId, "已驳回");
+    target.timeline.unshift(`2026-04-02 15:20 ${store.name} 被驳回申请`);
+    pushNotification("provider", "门店审核被驳回", `${store.name} 的门店审核未通过。`);
+    openFeedbackModal("门店申请已驳回", `${store.name} 已更新为已驳回状态。当前服务商整体状态：${target.auditStatus}。`);
+  }
+
+  function openSupplementModalForStore(providerId, storeId) {
+    const target = providers.find((item) => item.id === providerId);
+    if (!target) return;
+    openSupplementModal(target, storeId);
+  }
+
+  function openRejectModalForStore(providerId, storeId) {
+    const target = providers.find((item) => item.id === providerId);
+    if (!target) return;
+    openRejectModal(target, storeId);
+  }
+
+  function submitSupplement(providerId, selectedItems, reason, storeId = "") {
     const target = providers.find((item) => item.id === providerId);
     if (!target) return;
 
@@ -7231,13 +7362,24 @@
       return;
     }
 
+    if (storeId) {
+      const store = getProviderStores(target).find((s) => s.id === storeId);
+      if (store) {
+        setStoreAuditStatus(target, storeId, "待补充");
+        target.timeline.unshift(`2026-04-02 15:20 ${store.name} 被要求补充：${selectedItems.join("、")}。理由：${reason}`);
+        pushNotification("provider", "门店审核需补充资料", `${store.name} 的门店审核需要补充资料：${selectedItems.join("、")}。理由：${reason}`);
+        openFeedbackModal("已发送门店补充资料要求", `${store.name} 需补充：${selectedItems.join("、")}。当前服务商整体状态：${target.auditStatus}。`);
+        return;
+      }
+    }
+
     target.auditStatus = "待审核";
     target.timeline.unshift(`2026-04-02 15:20 平台要求补充：${selectedItems.join("、")}。理由：${reason}`);
     pushNotification("provider", "入驻审核需补充资料", `${target.name} 的入驻审核需要补充资料：${selectedItems.join("、")}。理由：${reason}`);
     openFeedbackModal("已发送补充资料要求", `${target.name} 需补充：${selectedItems.join("、")}。`);
   }
 
-  function submitReject(providerId, reason) {
+  function submitReject(providerId, reason, storeId = "") {
     const target = providers.find((item) => item.id === providerId);
     if (!target) return;
 
@@ -7246,7 +7388,23 @@
       return;
     }
 
+    if (storeId) {
+      const store = getProviderStores(target).find((s) => s.id === storeId);
+      if (store) {
+        setStoreAuditStatus(target, storeId, "已驳回");
+        target.timeline.unshift(`2026-04-02 15:20 ${store.name} 被驳回。驳回理由：${reason}`);
+        pushNotification("provider", "门店审核被驳回", `${store.name} 的门店审核未通过。驳回理由：${reason}`);
+        openFeedbackModal("门店申请已驳回", `${store.name} 已记录驳回理由。当前服务商整体状态：${target.auditStatus}。`);
+        return;
+      }
+    }
+
     target.auditStatus = "已驳回";
+    target.status = "已驳回";
+    getProviderStores(target).forEach((store) => {
+      store.auditStatus = "已驳回";
+      store.status = "已驳回";
+    });
     target.timeline.unshift(`2026-04-02 15:20 平台驳回申请。驳回理由：${reason}`);
     pushNotification("provider", "入驻审核被驳回", `${target.name} 的入驻审核未通过。驳回理由：${reason}`);
     openFeedbackModal("申请已驳回", `${target.name} 已记录驳回理由，并更新为已驳回状态。`);

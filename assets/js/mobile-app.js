@@ -463,6 +463,32 @@
       },
     ];
   };
+  const deriveProviderStatusFromStores = (row) => {
+    const stores = getProviderStores(row);
+    const statuses = stores.map((s) => s.auditStatus);
+    if (statuses.every((s) => s === "已通过")) {
+      row.auditStatus = "已通过";
+      row.status = "正常营业";
+    } else if (statuses.every((s) => s === "已驳回")) {
+      row.auditStatus = "已驳回";
+      row.status = "已驳回";
+    } else if (statuses.some((s) => s === "待补充")) {
+      row.auditStatus = "待补充";
+      row.status = "";
+    } else {
+      row.auditStatus = "待审核";
+      row.status = "";
+    }
+  };
+  const setStoreAuditStatus = (row, storeId, auditStatus) => {
+    const store = getProviderStores(row).find((s) => s.id === storeId);
+    if (!store) return;
+    store.auditStatus = auditStatus;
+    if (auditStatus === "已通过") store.status = "正常营业";
+    else if (auditStatus === "已驳回") store.status = "已驳回";
+    else store.status = "";
+    deriveProviderStatusFromStores(row);
+  };
   const tagType = (text) => ["正常营业", "已通过", "正常", "首页展示", "正常展示", "上架", "启用", "已完成", "已结清", "已归档", "已开具"].includes(text) ? "success" : ["待审核", "待分配", "待接单", "待发货", "待验收", "待签收", "待补充", "审核中", "售后中", "待付款", "待确认", "待复核", "待开票"].includes(text) ? "warning" : ["已驳回", "已拒单", "暂停接单", "已删除", "缺货", "停用"].includes(text) ? "danger" : ["施工中"].includes(text) ? "info" : "neutral";
   const tag = (text) => `<span class="tag ${tagType(text)}">${text}</span>`;
   const nAudit = (v) => String(v || "").includes("通过") ? "已通过" : String(v || "").includes("驳") ? "已驳回" : String(v || "").includes("补") ? "待补充" : "待审核";
@@ -796,7 +822,7 @@
 
   function renderAdminProviderDetail(item, active) {
     const stores = getProviderStores(item);
-    return `<section class="admin-detail-card"><div class="eyebrow">${active === "audit" ? "Provider Audit" : "Provider Detail"}</div><h3>${safe(item.name, "服务商详情")}</h3><div class="admin-kv-list"><div><span>联系人</span><strong>${safe(item.contact, "-")}</strong></div><div><span>所在区域</span><strong>${formatProviderRegion(item)}</strong></div><div><span>门店数量</span><strong>${stores.length} 家</strong></div><div><span>主营能力</span><strong>${safe(item.specialties, "-")}</strong></div><div><span>营业执照</span><strong>${safe(item.license, "-")}</strong></div></div><div class="admin-doc-list"><div class="admin-doc-item">营业执照副本</div><div class="admin-doc-item">门头照片</div><div class="admin-doc-item">施工环境照</div><div class="admin-doc-item">案例图片包</div></div><div class="admin-action-row">${active === "audit" ? `<button class="btn btn-primary" type="button" data-admin-action="provider-approve" data-admin-id="${item.id}">审核通过</button><button class="btn btn-secondary" type="button" data-admin-action="provider-supplement" data-admin-id="${item.id}">补充资料</button><button class="btn btn-danger" type="button" data-admin-action="provider-reject" data-admin-id="${item.id}">驳回</button>` : `<button class="btn btn-primary" type="button" data-admin-action="provider-toggle" data-admin-id="${item.id}">${nProvider(item.status) === "暂停接单" ? "恢复营业" : "暂停接单"}</button><button class="btn btn-secondary" type="button" data-admin-action="provider-detail" data-admin-id="${item.id}">查看详情</button>`}</div><div class="admin-timeline">${(item.timeline || []).slice(0, 4).map((l) => `<div>${l}</div>`).join("")}</div></section>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">${active === "audit" ? "Provider Audit" : "Provider Detail"}</div><h3>${safe(item.name, "服务商详情")}</h3><div class="admin-kv-list"><div><span>联系人</span><strong>${safe(item.contact, "-")}</strong></div><div><span>所在区域</span><strong>${formatProviderRegion(item)}</strong></div><div><span>门店数量</span><strong>${stores.length} 家</strong></div><div><span>主营能力</span><strong>${safe(item.specialties, "-")}</strong></div><div><span>营业执照</span><strong>${safe(item.license, "-")}</strong></div></div><div class="admin-doc-list"><div class="admin-doc-item">营业执照副本</div><div class="admin-doc-item">门头照片</div><div class="admin-doc-item">施工环境照</div><div class="admin-doc-item">案例图片包</div></div><div class="admin-action-row">${active === "audit" ? `<button class="btn btn-primary" type="button" data-admin-action="provider-detail" data-admin-id="${item.id}">按门店审核</button>` : `<button class="btn btn-primary" type="button" data-admin-action="provider-toggle" data-admin-id="${item.id}">${nProvider(item.status) === "暂停接单" ? "恢复营业" : "暂停接单"}</button><button class="btn btn-secondary" type="button" data-admin-action="provider-detail" data-admin-id="${item.id}">查看详情</button>`}</div><div class="admin-timeline">${(item.timeline || []).slice(0, 4).map((l) => `<div>${l}</div>`).join("")}</div></section>`;
   }
 
   function getAdminProviderRelatedOrders(item) {
@@ -833,9 +859,10 @@
       <article class="mobile-item">
         <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
           <strong>${index + 1}. ${safe(store.name, item.name)}${store.isPrimary ? ' <span class="pill">主门店</span>' : ""}</strong>
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">${store.status ? tag(nProvider(store.status)) : ""}${store.auditStatus && store.auditStatus !== item.auditStatus ? tag(nAudit(store.auditStatus)) : ""}</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">${store.auditStatus ? tag(nAudit(store.auditStatus)) : ""}${store.status && store.status !== item.status ? tag(nProvider(store.status)) : ""}</div>
         </div>
         <div class="muted" style="margin-top:8px;">${formatStoreAddress(store)}</div>
+        ${store.auditStatus === "已通过" ? "" : `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;"><button class="btn btn-primary btn-sm" type="button" data-admin-action="provider-store-approve" data-admin-id="${item.id}" data-store-id="${store.id}">通过</button><button class="btn btn-secondary btn-sm" type="button" data-admin-action="provider-store-supplement" data-admin-id="${item.id}" data-store-id="${store.id}">补充</button><button class="btn btn-danger btn-sm" type="button" data-admin-action="provider-store-reject" data-admin-id="${item.id}" data-store-id="${store.id}">驳回</button></div>`}
       </article>
     `
       )
@@ -942,13 +969,33 @@
       } else if (action === "provider-approve") {
         target.auditStatus = "已通过";
         target.status = "正常营业";
+        getProviderStores(target).forEach((store) => {
+          store.auditStatus = "已通过";
+          store.status = "正常营业";
+        });
       } else if (action === "provider-supplement") {
         target.auditStatus = "待补充";
       } else if (action === "provider-reject") {
         target.auditStatus = "已驳回";
         target.status = "已驳回";
+        getProviderStores(target).forEach((store) => {
+          store.auditStatus = "已驳回";
+          store.status = "已驳回";
+        });
       } else if (action === "provider-toggle") {
         target.status = nProvider(target.status) === "暂停接单" ? "正常营业" : "暂停接单";
+      } else if (action === "provider-store-approve") {
+        const storeId = button.dataset.storeId;
+        setStoreAuditStatus(target, storeId, "已通过");
+        state.providerFeedback = `${getProviderStores(target).find((s) => s.id === storeId)?.name || "门店"} 已通过审核`;
+      } else if (action === "provider-store-supplement") {
+        const storeId = button.dataset.storeId;
+        setStoreAuditStatus(target, storeId, "待补充");
+        state.providerFeedback = `${getProviderStores(target).find((s) => s.id === storeId)?.name || "门店"} 被要求补充资料`;
+      } else if (action === "provider-store-reject") {
+        const storeId = button.dataset.storeId;
+        setStoreAuditStatus(target, storeId, "已驳回");
+        state.providerFeedback = `${getProviderStores(target).find((s) => s.id === storeId)?.name || "门店"} 已被驳回`;
       }
       render();
       return;
