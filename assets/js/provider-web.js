@@ -265,7 +265,6 @@
         <div class="panel-header">
           <div>
             <h2 class="section-title">门店信息</h2>
-            <p class="section-subtitle">一个服务商可提交多个门店，平台将分别审核各门店资质</p>
           </div>
           <button class="btn btn-secondary" type="button" data-join-store-add>新增门店</button>
         </div>
