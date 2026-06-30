@@ -2045,6 +2045,47 @@ body.provider-screen-mode {
   margin-top: 18px;
 }
 
+.provider-join-stores {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.provider-join-store {
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.provider-join-store-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.provider-join-store .provider-join-form {
+  margin-top: 0;
+}
+
+.provider-profile-stores {
+  margin-top: 8px;
+}
+
+.provider-profile-store-row {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 12px;
+}
+
+.provider-profile-store-row .form-grid {
+  gap: 10px;
+}
+
 .provider-upload-board {
   margin-top: 26px;
 }

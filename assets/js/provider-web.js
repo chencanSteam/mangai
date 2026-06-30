@@ -22,12 +22,25 @@
     stats: providerWeb.store?.stats || [],
     services: providerWeb.store?.services || [],
     certifications: providerWeb.store?.certifications || [],
+    stores: providerWeb.stores?.length
+      ? providerWeb.stores
+      : [
+          {
+            id: "ST-0001-01",
+            name: providerWeb.store?.name || "御驰 Performance Studio",
+            city: "上海",
+            district: "闵行",
+            address: providerWeb.store?.location || "上海市闵行区申长路 1688 号改装产业园 A2-301",
+            isPrimary: true,
+          },
+        ],
   };
 
   const state = {
     activeTab: "join",
     showcaseIndex: 0,
     caseIndex: 0,
+    joinStores: JSON.parse(JSON.stringify(store.stores)),
   };
 
   const showcaseServices = services
@@ -217,6 +230,73 @@
     });
   }
 
+  function renderJoinStoreRow(item, index) {
+    return `
+      <div class="provider-join-store" data-join-store-index="${index}">
+        <div class="provider-join-store-head">
+          <span class="pill">门店 ${index + 1}${item.isPrimary ? " · 主门店" : ""}</span>
+          ${state.joinStores.length > 1 ? `<button class="btn btn-danger btn-sm" type="button" data-join-store-remove="${index}">删除</button>` : ""}
+        </div>
+        <div class="provider-join-form">
+          <div class="field-group">
+            <div class="field-label">门店名称</div>
+            <input class="input" data-join-store-field="name" value="${escapeHtml(item.name)}" />
+          </div>
+          <div class="field-group">
+            <div class="field-label">所在城市</div>
+            <input class="input" data-join-store-field="city" value="${escapeHtml(item.city)}" />
+          </div>
+          <div class="field-group">
+            <div class="field-label">所在区县</div>
+            <input class="input" data-join-store-field="district" value="${escapeHtml(item.district)}" />
+          </div>
+          <div class="field-group field-group-full">
+            <div class="field-label">详细地址</div>
+            <input class="input" data-join-store-field="address" value="${escapeHtml(item.address)}" />
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderJoinStoresSection() {
+    return `
+      <section class="provider-upload-board">
+        <div class="panel-header">
+          <div>
+            <h2 class="section-title">门店信息</h2>
+            <p class="section-subtitle">一个服务商可提交多个门店，平台将分别审核各门店资质</p>
+          </div>
+          <button class="btn btn-secondary" type="button" data-join-store-add>新增门店</button>
+        </div>
+        <div class="provider-join-stores">
+          ${state.joinStores.map((item, index) => renderJoinStoreRow(item, index)).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function bindJoinStoreEvents() {
+    contentEl.querySelector("[data-join-store-add]")?.addEventListener("click", () => {
+      state.joinStores.push({
+        id: `ST-NEW-${Date.now()}`,
+        name: "",
+        city: "",
+        district: "",
+        address: "",
+        isPrimary: false,
+      });
+      renderJoinPage();
+    });
+    contentEl.querySelectorAll("[data-join-store-remove]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number(button.dataset.joinStoreRemove);
+        state.joinStores.splice(index, 1);
+        renderJoinPage();
+      });
+    });
+  }
+
   function renderJoinPage() {
     contentEl.innerHTML = `
       <section class="provider-join-layout">
@@ -224,7 +304,7 @@
           <h1>服务商入驻申请</h1>
           <div class="provider-join-form">
             <div class="field-group">
-              <div class="field-label">门店名称</div>
+              <div class="field-label">服务商名称</div>
               <input class="input" value="${store.name}" />
             </div>
             <div class="field-group">
@@ -232,12 +312,12 @@
               <input class="input" value="陈骁 / 138****9088" />
             </div>
             <div class="field-group">
-              <div class="field-label">所在区域</div>
+              <div class="field-label">主要服务城市</div>
               <input class="input" value="${store.city}" />
             </div>
             <div class="field-group">
-              <div class="field-label">详细地址</div>
-              <input class="input" value="${store.address}" />
+              <div class="field-label">统一客服热线</div>
+              <input class="input" value="${store.hotline}" />
             </div>
             <div class="field-group">
               <div class="field-label">合同编号</div>
@@ -252,10 +332,11 @@
               <input class="input" value="${store.services.join(" / ")}" />
             </div>
             <div class="field-group field-group-full">
-              <div class="field-label">门店说明</div>
+              <div class="field-label">服务商说明</div>
               <textarea class="textarea">${store.intro}</textarea>
             </div>
           </div>
+          ${renderJoinStoresSection()}
           <section class="provider-upload-board">
             <div class="panel-header">
               <div>
@@ -309,6 +390,10 @@
               <strong>6 项待提交</strong>
             </article>
             <article>
+              <span>门店数量</span>
+              <strong>${state.joinStores.length} 家</strong>
+            </article>
+            <article>
               <span>服务区域</span>
               <strong>${store.city}</strong>
             </article>
@@ -326,8 +411,12 @@
         openFeedbackModal("资料已上传", `${button.dataset.providerUpload} 已加入当前入驻资料列表。`);
       });
     });
+    bindJoinStoreEvents();
     contentEl.querySelector("[data-provider-join-submit]")?.addEventListener("click", () => {
-      openFeedbackModal("申请已提交", "门店资料、合同资料和位置信息已提交，当前进入平台待审核列表。");
+      openFeedbackModal(
+        "申请已提交",
+        `已提交 ${state.joinStores.length} 家门店资料、合同资料和位置信息，当前进入平台待审核列表。`
+      );
     });
     contentEl.querySelector("[data-provider-switch='showcase']")?.addEventListener("click", () => {
       state.activeTab = "showcase";

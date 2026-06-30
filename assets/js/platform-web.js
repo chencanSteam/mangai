@@ -280,6 +280,34 @@
     return [province, city && city !== province ? city : "", county].filter(Boolean).join(" / ");
   }
 
+  function formatStoreAddress(store) {
+    return (
+      store.address ||
+      `${store.locationProvince || ""}${store.locationCity || ""}${store.locationCounty || ""}${store.locationAddress || ""}` ||
+      "-"
+    );
+  }
+
+  function getProviderStores(row) {
+    if (Array.isArray(row.stores) && row.stores.length) return row.stores;
+    return [
+      {
+        id: row.id,
+        name: row.name,
+        address: row.address,
+        city: row.city,
+        district: row.district,
+        locationProvince: row.locationProvince,
+        locationCity: row.locationCity,
+        locationCounty: row.locationCounty,
+        locationAddress: row.locationAddress,
+        status: row.status,
+        auditStatus: row.auditStatus,
+        isPrimary: true,
+      },
+    ];
+  }
+
   providers.forEach((item) => {
     item.contractNo = item.contractNo || `HT-2026-${item.id.slice(-4)}`;
     item.contractStatus = item.contractStatus || (item.auditStatus === "已通过" ? "履约中" : "待签约");
@@ -1263,6 +1291,7 @@
           ["联系人", row.contact],
           ["位置", row.providerRegion],
           ["详细地址", row.locationAddress],
+          ["门店数量", `${getProviderStores(row).length} 家`],
           ["工位数量", `${row.bays} 个`],
           ["营业执照", row.license],
           ["合同编号", row.contractNo],
@@ -1294,6 +1323,7 @@
           ["门店编号", row.id],
           ["地区", row.providerRegion],
           ["门店地址", row.locationAddress],
+          ["门店数量", `${getProviderStores(row).length} 家`],
           ["联系人", row.contact],
           ["合同编号", row.contractNo],
           ["合同状态", row.contractStatus],
@@ -5297,6 +5327,7 @@
 
   function renderProviderMaterialsModal(row, options = {}) {
     const address = row.address || `${row.locationProvince || ""}${row.locationCity || ""}${row.locationCounty || ""}${row.locationAddress || ""}`;
+    const stores = getProviderStores(row);
     const gallery = [
       { title: "门头主视图", desc: "展示门店招牌、主入口和停车落客区", tone: "orange" },
       { title: "接待区", desc: "展示接待台、客户休息区和洽谈区", tone: "blue" },
@@ -5361,6 +5392,32 @@
               <strong>${row.name}</strong>
               <p>${address}</p>
             </div>
+          </div>
+        </section>
+        <section class="provider-material-section">
+          <div class="panel-header" style="margin-bottom:12px;">
+            <div><h3 class="section-title" style="font-size:18px;">门店信息</h3></div>
+          </div>
+          <div class="provider-material-grid provider-material-grid-wide">
+            <div class="provider-material-card">
+              <span>门店总数</span>
+              <strong>${stores.length} 家</strong>
+            </div>
+          </div>
+          <div class="provider-store-list" style="display:grid; gap:12px; margin-top:14px;">
+            ${stores
+              .map(
+                (store, index) => `
+              <div class="provider-material-card" style="display:grid; gap:8px;">
+                <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
+                  <strong style="color:#fff;">${index + 1}. ${store.name || row.name}${store.isPrimary ? " <span class=\"pill\">主门店</span>" : ""}</strong>
+                  ${store.status ? formatTag(store.status) : ""}${store.auditStatus && store.auditStatus !== row.auditStatus ? formatTag(store.auditStatus) : ""}
+                </div>
+                <div class="muted">${formatStoreAddress(store)}</div>
+              </div>
+            `
+              )
+              .join("")}
           </div>
         </section>
         <section class="provider-material-section">

@@ -119,6 +119,7 @@
       profileEditOpen: false,
       moderatorApplyOpen: false,
       moderatorStatus: "", // "" | "待审核" | "已通过" | "已驳回"
+      profileStores: [],
     },
     providerServicePricing: buildProviderServicePricingState(),
     providerDialog: {
@@ -437,6 +438,31 @@
     const county = safe(item?.locationCounty, item?.district ? `${item.district}${String(item.district).endsWith("区") ? "" : "区"}` : "");
     return [province, city && city !== province ? city : "", county].filter(Boolean).join(" / ") || `${safe(item?.city, "-")} / ${safe(item?.district, "-")}`;
   };
+  const formatStoreAddress = (store) =>
+    safe(
+      store?.address ||
+        `${safe(store?.locationProvince, "")}${safe(store?.locationCity, "")}${safe(store?.locationCounty, "")}${safe(store?.locationAddress, "")}`,
+      "-"
+    );
+  const getProviderStores = (row) => {
+    if (Array.isArray(row?.stores) && row.stores.length) return row.stores;
+    return [
+      {
+        id: row?.id,
+        name: row?.name,
+        address: row?.address,
+        city: row?.city,
+        district: row?.district,
+        locationProvince: row?.locationProvince,
+        locationCity: row?.locationCity,
+        locationCounty: row?.locationCounty,
+        locationAddress: row?.locationAddress,
+        status: row?.status,
+        auditStatus: row?.auditStatus,
+        isPrimary: true,
+      },
+    ];
+  };
   const tagType = (text) => ["正常营业", "已通过", "正常", "首页展示", "正常展示", "上架", "启用", "已完成", "已结清", "已归档", "已开具"].includes(text) ? "success" : ["待审核", "待分配", "待接单", "待发货", "待验收", "待签收", "待补充", "审核中", "售后中", "待付款", "待确认", "待复核", "待开票"].includes(text) ? "warning" : ["已驳回", "已拒单", "暂停接单", "已删除", "缺货", "停用"].includes(text) ? "danger" : ["施工中"].includes(text) ? "info" : "neutral";
   const tag = (text) => `<span class="tag ${tagType(text)}">${text}</span>`;
   const nAudit = (v) => String(v || "").includes("通过") ? "已通过" : String(v || "").includes("驳") ? "已驳回" : String(v || "").includes("补") ? "待补充" : "待审核";
@@ -572,7 +598,10 @@
     screenEl.querySelectorAll("[data-provider-purchase-form]").forEach((form) => form.addEventListener("submit", handleProviderPurchaseSubmit));
     screenEl.querySelectorAll("[data-provider-case-form]").forEach((form) => form.addEventListener("submit", handleProviderCaseSubmit));
     screenEl.querySelectorAll("[data-provider-accept-form]").forEach((form) => form.addEventListener("submit", handleProviderAcceptSubmit));
-    screenEl.querySelectorAll("[data-provider-profile-form]").forEach((form) => form.addEventListener("submit", handleProviderProfileSubmit));
+    screenEl.querySelectorAll("[data-provider-profile-form]").forEach((form) => {
+      form.addEventListener("submit", handleProviderProfileSubmit);
+      bindProviderProfileStoreEvents(form);
+    });
     screenEl.querySelectorAll("[data-provider-pricing-form]").forEach((form) => {
       form.addEventListener("submit", handleProviderPricingSubmit);
       syncProviderPricingForm(form);
@@ -766,7 +795,8 @@
   }
 
   function renderAdminProviderDetail(item, active) {
-    return `<section class="admin-detail-card"><div class="eyebrow">${active === "audit" ? "Provider Audit" : "Provider Detail"}</div><h3>${safe(item.name, "服务商详情")}</h3><div class="admin-kv-list"><div><span>联系人</span><strong>${safe(item.contact, "-")}</strong></div><div><span>所在区域</span><strong>${formatProviderRegion(item)}</strong></div><div><span>门店地址</span><strong>${safe(item.address, `${safe(item.city, "-")}${safe(item.district, "")}改装产业园`)}</strong></div><div><span>主营能力</span><strong>${safe(item.specialties, "-")}</strong></div><div><span>营业执照</span><strong>${safe(item.license, "-")}</strong></div></div><div class="admin-doc-list"><div class="admin-doc-item">营业执照副本</div><div class="admin-doc-item">门头照片</div><div class="admin-doc-item">施工环境照</div><div class="admin-doc-item">案例图片包</div></div><div class="admin-action-row">${active === "audit" ? `<button class="btn btn-primary" type="button" data-admin-action="provider-approve" data-admin-id="${item.id}">审核通过</button><button class="btn btn-secondary" type="button" data-admin-action="provider-supplement" data-admin-id="${item.id}">补充资料</button><button class="btn btn-danger" type="button" data-admin-action="provider-reject" data-admin-id="${item.id}">驳回</button>` : `<button class="btn btn-primary" type="button" data-admin-action="provider-toggle" data-admin-id="${item.id}">${nProvider(item.status) === "暂停接单" ? "恢复营业" : "暂停接单"}</button><button class="btn btn-secondary" type="button" data-admin-action="provider-detail" data-admin-id="${item.id}">查看详情</button>`}</div><div class="admin-timeline">${(item.timeline || []).slice(0, 4).map((l) => `<div>${l}</div>`).join("")}</div></section>`;
+    const stores = getProviderStores(item);
+    return `<section class="admin-detail-card"><div class="eyebrow">${active === "audit" ? "Provider Audit" : "Provider Detail"}</div><h3>${safe(item.name, "服务商详情")}</h3><div class="admin-kv-list"><div><span>联系人</span><strong>${safe(item.contact, "-")}</strong></div><div><span>所在区域</span><strong>${formatProviderRegion(item)}</strong></div><div><span>门店数量</span><strong>${stores.length} 家</strong></div><div><span>主营能力</span><strong>${safe(item.specialties, "-")}</strong></div><div><span>营业执照</span><strong>${safe(item.license, "-")}</strong></div></div><div class="admin-doc-list"><div class="admin-doc-item">营业执照副本</div><div class="admin-doc-item">门头照片</div><div class="admin-doc-item">施工环境照</div><div class="admin-doc-item">案例图片包</div></div><div class="admin-action-row">${active === "audit" ? `<button class="btn btn-primary" type="button" data-admin-action="provider-approve" data-admin-id="${item.id}">审核通过</button><button class="btn btn-secondary" type="button" data-admin-action="provider-supplement" data-admin-id="${item.id}">补充资料</button><button class="btn btn-danger" type="button" data-admin-action="provider-reject" data-admin-id="${item.id}">驳回</button>` : `<button class="btn btn-primary" type="button" data-admin-action="provider-toggle" data-admin-id="${item.id}">${nProvider(item.status) === "暂停接单" ? "恢复营业" : "暂停接单"}</button><button class="btn btn-secondary" type="button" data-admin-action="provider-detail" data-admin-id="${item.id}">查看详情</button>`}</div><div class="admin-timeline">${(item.timeline || []).slice(0, 4).map((l) => `<div>${l}</div>`).join("")}</div></section>`;
   }
 
   function getAdminProviderRelatedOrders(item) {
@@ -795,11 +825,29 @@
     ];
   }
 
+  function renderAdminProviderStoreList(item) {
+    const stores = getProviderStores(item);
+    return `<section class="admin-detail-card"><div class="eyebrow">Store List</div><h3>门店列表 <span class="pill">${stores.length} 家</span></h3><div class="mobile-list">${stores
+      .map(
+        (store, index) => `
+      <article class="mobile-item">
+        <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+          <strong>${index + 1}. ${safe(store.name, item.name)}${store.isPrimary ? ' <span class="pill">主门店</span>' : ""}</strong>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">${store.status ? tag(nProvider(store.status)) : ""}${store.auditStatus && store.auditStatus !== item.auditStatus ? tag(nAudit(store.auditStatus)) : ""}</div>
+        </div>
+        <div class="muted" style="margin-top:8px;">${formatStoreAddress(store)}</div>
+      </article>
+    `
+      )
+      .join("")}</div></section>`;
+  }
+
   function renderAdminProviderDetailPage(item) {
     const active = state.adminProviderDetail.tab || "basic";
     const stats = getAdminProviderBusinessStats(item);
     const qualificationRows = getAdminProviderQualificationRows(item);
-    return `<div class="stack"><section class="admin-detail-card"><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-admin-action="provider-detail-back" data-admin-id="${item.id}">返回服务商列表</button><div style="display:flex; gap:10px; flex-wrap:wrap;">${tag(nProvider(item.status))}${tag(nAudit(item.auditStatus))}</div></div><div class="eyebrow">Provider Detail</div><h3>${safe(item.name, "服务商详情")}</h3><div class="muted">${formatProviderRegion(item)} / 评分 ${item.score || "-"}</div></section><div class="sub-tabs">${[{ id: "basic", label: "基础信息页" }, { id: "qualification", label: "资质信息页" }, { id: "business", label: "经营状态页" }].map((tab) => `<button class="sub-tab ${active === tab.id ? "active" : ""}" type="button" data-admin-provider-detail-tab="${tab.id}">${tab.label}</button>`).join("")}</div>${active === "basic" ? `<section class="admin-detail-card"><div class="eyebrow">Basic Information</div><h3>门店基础信息</h3><div class="admin-kv-list"><div><span>门店名称</span><strong>${safe(item.name, "-")}</strong></div><div><span>联系人</span><strong>${safe(item.contact, "-")}</strong></div><div><span>所在区域</span><strong>${formatProviderRegion(item)}</strong></div><div><span>门店地址</span><strong>${safe(item.address, "-")}</strong></div><div><span>主营能力</span><strong>${safe(item.specialties, "-")}</strong></div><div><span>营业执照</span><strong>${safe(item.license, "-")}</strong></div><div><span>入驻状态</span><strong>${nAudit(item.auditStatus)}</strong></div><div><span>接单状态</span><strong>${nProvider(item.status)}</strong></div></div></section>` : active === "qualification" ? `<section class="admin-detail-card"><div class="eyebrow">Qualifications</div><h3>资质信息</h3><div class="mobile-list">${qualificationRows.map((row) => `<article class="mobile-item"><div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;"><strong>${row.title}</strong><span class="pill">${row.status}</span></div><div class="muted" style="margin-top:8px;">${row.note}</div></article>`).join("")}</div></section>` : `<section class="admin-detail-card"><div class="eyebrow">Business Status</div><h3>经营状态</h3><div class="admin-kv-list"><div><span>总接单量</span><strong>${stats.totalOrders}</strong></div><div><span>本月接单量</span><strong>${stats.monthOrders}</strong></div><div><span>当前订单数</span><strong>${stats.currentOrderCount}</strong></div><div><span>当前营业额</span><strong>${stats.currentRevenue}</strong></div><div><span>未结算金额</span><strong>${stats.unsettledAmount}</strong></div><div><span>已结算金额</span><strong>${stats.settledAmount}</strong></div></div></section>`}</div>`;
+    const stores = getProviderStores(item);
+    return `<div class="stack"><section class="admin-detail-card"><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-admin-action="provider-detail-back" data-admin-id="${item.id}">返回服务商列表</button><div style="display:flex; gap:10px; flex-wrap:wrap;">${tag(nProvider(item.status))}${tag(nAudit(item.auditStatus))}</div></div><div class="eyebrow">Provider Detail</div><h3>${safe(item.name, "服务商详情")}</h3><div class="muted">${formatProviderRegion(item)} / 评分 ${item.score || "-"}</div></section><div class="sub-tabs">${[{ id: "basic", label: "基础信息页" }, { id: "qualification", label: "资质信息页" }, { id: "business", label: "经营状态页" }].map((tab) => `<button class="sub-tab ${active === tab.id ? "active" : ""}" type="button" data-admin-provider-detail-tab="${tab.id}">${tab.label}</button>`).join("")}</div>${active === "basic" ? `<section class="admin-detail-card"><div class="eyebrow">Basic Information</div><h3>服务商基础信息</h3><div class="admin-kv-list"><div><span>服务商名称</span><strong>${safe(item.name, "-")}</strong></div><div><span>联系人</span><strong>${safe(item.contact, "-")}</strong></div><div><span>所在区域</span><strong>${formatProviderRegion(item)}</strong></div><div><span>门店数量</span><strong>${stores.length} 家</strong></div><div><span>主营能力</span><strong>${safe(item.specialties, "-")}</strong></div><div><span>营业执照</span><strong>${safe(item.license, "-")}</strong></div><div><span>入驻状态</span><strong>${nAudit(item.auditStatus)}</strong></div><div><span>接单状态</span><strong>${nProvider(item.status)}</strong></div></div></section>${renderAdminProviderStoreList(item)}` : active === "qualification" ? `<section class="admin-detail-card"><div class="eyebrow">Qualifications</div><h3>资质信息</h3><div class="mobile-list">${qualificationRows.map((row) => `<article class="mobile-item"><div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;"><strong>${row.title}</strong><span class="pill">${row.status}</span></div><div class="muted" style="margin-top:8px;">${row.note}</div></article>`).join("")}</div></section>` : `<section class="admin-detail-card"><div class="eyebrow">Business Status</div><h3>经营状态</h3><div class="admin-kv-list"><div><span>总接单量</span><strong>${stats.totalOrders}</strong></div><div><span>本月接单量</span><strong>${stats.monthOrders}</strong></div><div><span>当前订单数</span><strong>${stats.currentOrderCount}</strong></div><div><span>当前营业额</span><strong>${stats.currentRevenue}</strong></div><div><span>未结算金额</span><strong>${stats.unsettledAmount}</strong></div><div><span>已结算金额</span><strong>${stats.settledAmount}</strong></div></div></section>`}</div>`;
   }
   function isAdminGoodsOrder(item) {
     return safe(item.type, "").includes("商品");
@@ -1074,7 +1122,9 @@
 
   function renderProviderMe() {
     const active = state.subTab.me || "profile";
-    return `${subTabs([{ id: "business", label: "营业情况" }, { id: "profile", label: "门店资料" }])}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "profile" ? `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Store Profile</div><h3>门店与账号信息</h3><div class="admin-kv-list"><div><span>门店名称</span><strong>${safe(getProviderStore().name, "高端改装门店")}</strong></div><div><span>联系人</span><strong>${safe(getProviderStore().contact, "-")}</strong></div><div><span>门店地址</span><strong>${safe(getProviderStore().address || `${safe(getProviderStore().city, "-")}${safe(getProviderStore().district, "")}改装产业园 A3-201`, "-")}</strong></div><div><span>主营能力</span><strong>${safe(getProviderStore().specialties, "-")}</strong></div><div><span>审核状态</span><strong>${nAudit(getProviderStore().auditStatus)}</strong></div><div><span>门店状态</span><strong>${nProvider(getProviderStore().status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">${state.providerMe.profileEditOpen ? "收起资料表单" : "更新门店资料"}</button><button class="btn btn-primary" type="button" data-provider-action="provider-profile-contact">联系平台客服</button></div></section>${state.providerMe.profileEditOpen ? renderProviderProfileForm() : ""}</div>` : renderProviderBusiness()}`;
+    const store = getProviderStore();
+    const stores = getProviderStores(store);
+    return `${subTabs([{ id: "business", label: "营业情况" }, { id: "profile", label: "门店资料" }])}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "profile" ? `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Store Profile</div><h3>门店与账号信息</h3><div class="admin-kv-list"><div><span>门店名称</span><strong>${safe(store.name, "高端改装门店")}</strong></div><div><span>联系人</span><strong>${safe(store.contact, "-")}</strong></div><div><span>门店数量</span><strong>${stores.length} 家</strong></div><div><span>主营能力</span><strong>${safe(store.specialties, "-")}</strong></div><div><span>审核状态</span><strong>${nAudit(store.auditStatus)}</strong></div><div><span>门店状态</span><strong>${nProvider(store.status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">${state.providerMe.profileEditOpen ? "收起资料表单" : "更新门店资料"}</button><button class="btn btn-primary" type="button" data-provider-action="provider-profile-contact">联系平台客服</button></div></section>${state.providerMe.profileEditOpen ? renderProviderProfileForm() : ""}</div>` : renderProviderBusiness()}`;
   }
 
   function renderProviderDialog() {
@@ -1376,9 +1426,58 @@
     return `<section class="admin-detail-card"><div class="eyebrow">Service Stats</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>门店</span><strong>${safe(item.provider, "-")}</strong></div><div><span>服务次数</span><strong>${serviceTimes} 次</strong></div><div><span>推荐用户</span><strong>${referredUsers} 人</strong></div><div><span>订单金额</span><strong>${getSettlementGrossAmount(item)}</strong></div><div><span>统计状态</span><strong>${nSettlement(item.status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="settlement-detail" data-provider-id="${item.id}">${opened ? "收起详情" : "查看详情"}</button></div>${opened ? `<div class="admin-timeline"><div>统计周期：近 ${serviceTimes} 次已完工并验收服务</div><div>推荐用户：${referredUsers} 人（推荐码、平台推荐或历史服务转化）</div><div>订单金额合计：${getSettlementGrossAmount(item)}</div><div>记录更新时间：${safe(item.paidAt || item.applyTime, "待更新")}</div></div>` : ""}</section>`;
   }
 
+  function getProviderProfileStores() {
+    const store = getProviderStore();
+    if (state.providerMe.profileStores?.length) return state.providerMe.profileStores;
+    return getProviderStores(store);
+  }
+
+  function renderProviderProfileStoreRow(store, index, total) {
+    return `
+      <div class="provider-profile-store-row" data-provider-profile-store-index="${index}">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px;">
+          <span class="pill">门店 ${index + 1}${store.isPrimary ? " · 主门店" : ""}</span>
+          ${total > 1 ? `<button class="btn btn-danger btn-sm" type="button" data-provider-profile-store-remove="${index}">删除</button>` : ""}
+        </div>
+        <div class="form-grid">
+          <div class="field-group field-group-full">
+            <label class="field-label" for="provider-store-name-${index}">门店名称</label>
+            <input class="input" id="provider-store-name-${index}" name="providerStoreName-${index}" type="text" value="${safe(store.name, "")}" required>
+          </div>
+          <div class="field-group field-group-full">
+            <label class="field-label" for="provider-store-address-${index}">门店地址</label>
+            <input class="input" id="provider-store-address-${index}" name="providerStoreAddress-${index}" type="text" value="${safe(store.address, "")}" required>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindProviderProfileStoreEvents(form) {
+    form.querySelector("[data-provider-profile-store-add]")?.addEventListener("click", () => {
+      state.providerMe.profileStores = getProviderProfileStores();
+      state.providerMe.profileStores.push({
+        id: `ST-NEW-${Date.now()}`,
+        name: "",
+        address: "",
+        isPrimary: false,
+      });
+      render();
+    });
+    form.querySelectorAll("[data-provider-profile-store-remove]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number(button.dataset.providerProfileStoreRemove);
+        state.providerMe.profileStores = getProviderProfileStores();
+        state.providerMe.profileStores.splice(index, 1);
+        render();
+      });
+    });
+  }
+
   function renderProviderProfileForm() {
     const store = getProviderStore();
-    return `<form class="provider-complete-form" data-provider-profile-form><div class="form-grid"><div class="field-group"><label class="field-label" for="provider-contact-edit">联系人</label><input class="input" id="provider-contact-edit" name="providerContact" type="text" value="${safe(store.contact, "")}" required></div><div class="field-group"><label class="field-label" for="provider-address-edit">门店地址</label><input class="input" id="provider-address-edit" name="providerAddress" type="text" value="${safe(store.address || `${safe(store.city, "")}${safe(store.district, "")}改装产业园 A3-201`, "")}" required></div><div class="field-group"><label class="field-label" for="provider-specialties-edit">主营能力</label><input class="input" id="provider-specialties-edit" name="providerSpecialties" type="text" value="${safe(store.specialties, "")}" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">保存资料</button><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">取消</button></div></form>`;
+    const stores = getProviderProfileStores();
+    return `<form class="provider-complete-form" data-provider-profile-form><div class="form-grid"><div class="field-group"><label class="field-label" for="provider-contact-edit">联系人</label><input class="input" id="provider-contact-edit" name="providerContact" type="text" value="${safe(store.contact, "")}" required></div><div class="field-group"><label class="field-label" for="provider-specialties-edit">主营能力</label><input class="input" id="provider-specialties-edit" name="providerSpecialties" type="text" value="${safe(store.specialties, "")}" required></div></div><div class="provider-profile-stores"><div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin:18px 0 12px;"><h3 style="font-size:16px; margin:0;">门店信息</h3><button class="btn btn-secondary btn-sm" type="button" data-provider-profile-store-add>新增门店</button></div>${stores.map((item, index) => renderProviderProfileStoreRow(item, index, stores.length)).join("")}</div><div class="admin-action-row"><button class="btn btn-primary" type="submit">保存资料</button><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">取消</button></div></form>`;
   }
 
   function handleProviderAction(button) {
@@ -1713,16 +1812,27 @@
     const store = getProviderStore();
     const formData = new FormData(form);
     const contact = String(formData.get("providerContact") || "").trim();
-    const address = String(formData.get("providerAddress") || "").trim();
     const specialties = String(formData.get("providerSpecialties") || "").trim();
-    if (!contact || !address || !specialties) return;
+    const stores = getProviderProfileStores();
+    const updatedStores = stores
+      .map((item, index) => ({
+        ...item,
+        name: String(formData.get(`providerStoreName-${index}`) || "").trim(),
+        address: String(formData.get(`providerStoreAddress-${index}`) || "").trim(),
+      }))
+      .filter((item) => item.name && item.address);
+    if (!contact || !specialties || !updatedStores.length) return;
     store.contact = contact;
-    store.address = address;
     store.specialties = specialties;
+    store.stores = updatedStores;
+    const primaryStore = updatedStores.find((item) => item.isPrimary) || updatedStores[0];
+    store.address = primaryStore.address;
+    store.name = primaryStore.name;
     store.auditStatus = "待审核";
+    state.providerMe.profileStores = [];
     state.subTab.me = "profile";
     state.providerMe.profileEditOpen = false;
-    state.providerFeedback = "门店资料已更新，平台将重新审核，审核通过后方可正常接单。";
+    state.providerFeedback = `门店资料已更新，共 ${updatedStores.length} 家门店，平台将重新审核，审核通过后方可正常接单。`;
     render();
   }
 
