@@ -242,10 +242,18 @@
     { key: "brakeDiscSpecMm", label: "刹车碟规格(mm)" },
     { key: "brakeDiscPatterns", label: "刹车碟可选花纹" },
     { key: "caliperColors", label: "卡钳可选颜色" },
+    { key: "productImage1", label: "产品图1" },
     { key: "productImage2", label: "产品图2" },
     { key: "productImage3", label: "产品图3" },
+    { key: "productImage4", label: "产品图4" },
+    { key: "productImage5", label: "产品图5" },
+    { key: "productImage6", label: "产品图6" },
     { key: "installImage1", label: "安装图1" },
     { key: "installImage2", label: "安装图2" },
+    { key: "installImage3", label: "安装图3" },
+    { key: "installImage4", label: "安装图4" },
+    { key: "fiaCertified", label: "国际汽联认证" },
+    { key: "optionalSizes", label: "配件可选码数" },
     { key: "nickelGreyRetailPrice", label: "ENP镀镍/氧化灰版本零售价格" },
     { key: "discountLevel", label: "折扣力度" },
     { key: "terminalRetailPrice", label: "终端零售价" },
@@ -6966,9 +6974,26 @@
       .map((name) => `<option value="${name}" ${selectedCategory === name ? "selected" : ""}>${name}</option>`)
       .join("");
     const skuValue = isEdit ? row.sku : `PR-${String(products.length + 8801).padStart(4, "0")}`;
+    const isImageField = (key) => /^productImage\d+$/.test(key) || /^installImage\d+$/.test(key);
     const standardFieldHtml = productStandardFields.map(({ key, label }) => {
       const value = isEdit ? row[key] || "" : "";
       const isLong = key === "remark";
+      const isImage = isImageField(key);
+      if (isImage) {
+        return `
+          <div class="field-group">
+            <div class="field-label">${label}</div>
+            <input type="hidden" data-product-field="${key}" value="${escapeHtml(value)}" />
+            <div class="product-image-upload product-image-upload-sm">
+              <div class="product-image-preview product-image-preview-sm" data-product-image-preview="${key}">
+                ${value ? `<img src="${escapeHtml(value)}" alt="${escapeHtml(label)}" />` : `<div class="product-image-placeholder">${escapeHtml(label)}</div>`}
+              </div>
+              <button class="btn btn-secondary btn-sm" type="button" data-product-image-trigger="${key}">选择图片</button>
+              <input type="file" accept="image/*" data-product-image-input="${key}" style="display:none;" />
+            </div>
+          </div>
+        `;
+      }
       return `
         <div class="field-group ${isLong ? "field-group-full" : ""}">
           <div class="field-label">${label}</div>
@@ -7091,6 +7116,26 @@
         if (imagePreview) imagePreview.innerHTML = `<img src="${dataUrl}" alt="商品预览" />`;
       };
       reader.readAsDataURL(file);
+    });
+
+    // 标准图片字段上传
+    modalCardEl.querySelectorAll('[data-product-image-input]').forEach((input) => {
+      const key = input.dataset.productImageInput;
+      const trigger = modalCardEl.querySelector(`[data-product-image-trigger="${key}"]`);
+      const preview = modalCardEl.querySelector(`[data-product-image-preview="${key}"]`);
+      const field = modalCardEl.querySelector(`[data-product-field="${key}"]`);
+      trigger?.addEventListener('click', () => input?.click());
+      input?.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target.result;
+          if (field) field.value = dataUrl;
+          if (preview) preview.innerHTML = `<img src="${dataUrl}" alt="${escapeHtml(key)}" />`;
+        };
+        reader.readAsDataURL(file);
+      });
     });
   }
 

@@ -1375,6 +1375,26 @@ select {
   font-family: var(--font-display);
 }
 
+.product-image-upload-sm {
+  gap: 8px;
+}
+
+.product-image-preview-sm {
+  max-height: 96px;
+  border-radius: 8px;
+}
+
+.product-image-preview-sm img {
+  max-height: 96px;
+}
+
+.product-image-preview-sm .product-image-placeholder {
+  height: 96px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+}
+
 .visitor-monitor-layout,
 .visitor-insight-grid {
   display: grid;

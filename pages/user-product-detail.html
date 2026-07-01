@@ -144,7 +144,22 @@
                     </div>
                   </div>
 
-
+                  <!-- 详细参数 -->
+                  <div class="pd-section">
+                    <div class="pd-section-head"><h3>详细参数</h3></div>
+                    <div class="pd-section-body">
+                      <div class="pd-kv-row"><span>国际汽联认证</span><strong id="pdFiaCertified">-</strong></div>
+                      <div class="pd-kv-row"><span>配件可选码数</span><strong id="pdOptionalSizes">-</strong></div>
+                      <div class="pd-kv-row"><span>产品图1</span><strong id="pdProductImage1">-</strong></div>
+                      <div class="pd-kv-row"><span>产品图2</span><strong id="pdProductImage2">-</strong></div>
+                      <div class="pd-kv-row"><span>产品图3</span><strong id="pdProductImage3">-</strong></div>
+                      <div class="pd-kv-row"><span>产品图4</span><strong id="pdProductImage4">-</strong></div>
+                      <div class="pd-kv-row"><span>产品图5</span><strong id="pdProductImage5">-</strong></div>
+                      <div class="pd-kv-row"><span>产品图6</span><strong id="pdProductImage6">-</strong></div>
+                      <div class="pd-kv-row"><span>安装图3</span><strong id="pdInstallImage3">-</strong></div>
+                      <div class="pd-kv-row"><span>安装图4</span><strong id="pdInstallImage4">-</strong></div>
+                    </div>
+                  </div>
 
                   <!-- 案例效果 / 相关案例 -->
                   <div class="pd-section" id="pdCaseSection">
@@ -222,6 +237,16 @@
       document.getElementById("pdParamStatus").textContent = p.status || "在售";
       document.getElementById("pdSpec").textContent = p.spec || "-";
       document.getElementById("pdModel").textContent = p.fitment || fitment;
+      document.getElementById("pdFiaCertified").textContent = p.fiaCertified || "-";
+      document.getElementById("pdOptionalSizes").textContent = p.optionalSizes || "-";
+      document.getElementById("pdProductImage1").textContent = p.productImage1 || "-";
+      document.getElementById("pdProductImage2").textContent = p.productImage2 || "-";
+      document.getElementById("pdProductImage3").textContent = p.productImage3 || "-";
+      document.getElementById("pdProductImage4").textContent = p.productImage4 || "-";
+      document.getElementById("pdProductImage5").textContent = p.productImage5 || "-";
+      document.getElementById("pdProductImage6").textContent = p.productImage6 || "-";
+      document.getElementById("pdInstallImage3").textContent = p.installImage3 || "-";
+      document.getElementById("pdInstallImage4").textContent = p.installImage4 || "-";
 
       // 查找并渲染关联案例
       const allCases = window.MockData?.cases || [];
