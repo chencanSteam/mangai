@@ -79,6 +79,7 @@
       display: item.display || "正常展示",
       image: item.cover || `showcase-cover-${index + 1}.jpg`,
       content: item.summary || "展示门店精品案例的核心卖点、施工内容和交付效果。",
+      linkedProducts: [],
     }));
   }
 
@@ -94,6 +95,11 @@
     if (!rows.length) return null;
     if (state.caseIndex >= rows.length) state.caseIndex = 0;
     return rows[state.caseIndex];
+  }
+
+  function getLinkedProducts(skus) {
+    const all = window.MockData.products || [];
+    return all.filter((item) => (skus || []).includes(item.sku));
   }
 
   function escapeHtml(value) {
@@ -190,6 +196,28 @@
         <div class="case-detail-section">
           <h3>案例说明</h3>
           ${renderCaseRichContent(row.content)}
+        </div>
+        <div class="case-detail-section">
+          <h3>关联商品</h3>
+          <div class="case-linked-products">
+            ${
+              getLinkedProducts(row.linkedProducts).length
+                ? getLinkedProducts(row.linkedProducts)
+                    .map(
+                      (item) => `
+                        <div class="case-linked-product">
+                          <div>
+                            <strong>${escapeHtml(item.name)}</strong>
+                            <span>${escapeHtml(item.category)} · ${escapeHtml(item.price)} · 库存 ${item.stock}</span>
+                          </div>
+                          <span class="tag success">${escapeHtml(item.sku)}</span>
+                        </div>
+                      `
+                    )
+                    .join("")
+                : `<div class="muted">当前案例未绑定商品。</div>`
+            }
+          </div>
         </div>
         <div class="case-detail-section">
           <h3>处理轨迹</h3>
@@ -616,6 +644,7 @@
                         <span class="pill">${item.style}</span>
                         <span class="pill">${item.modType || "-"}</span>
                         <span class="pill">${item.cost}</span>
+                        ${(item.linkedProducts || []).length ? `<span class="pill">已绑定 ${item.linkedProducts.length} 个商品</span>` : ""}
                       </div>
                       <p>${getCaseContentSummary(item.content)}</p>
                     </div>
@@ -706,78 +735,102 @@
             </div>
           </div>
         </div>
-        <div class="case-editor-section">
-          <div class="case-editor-section-head">
-            <h3>基础信息</h3>
-            <span>${source.id}</span>
-          </div>
-          <div class="form-grid">
-            <div class="field-group field-group-full">
-              <div class="field-label">案例标题</div>
-              <input class="input" data-provider-case-field="title" placeholder="请输入案例标题" value="${source.title}" />
+        <div class="case-editor-form-stack">
+          <div class="case-editor-section">
+            <div class="case-editor-section-head">
+              <h3>基础信息</h3>
+              <span>${source.id}</span>
             </div>
-            <div class="field-group">
-              <div class="field-label">适配车型</div>
-              <input class="input" data-provider-case-field="model" placeholder="请输入车型" value="${source.model}" />
-            </div>
-            <div class="field-group">
-              <div class="field-label">改装风格</div>
-              <input class="input" data-provider-case-field="style" placeholder="请输入改装风格" value="${source.style}" />
-            </div>
-            <div class="field-group">
-              <div class="field-label">改装类型</div>
-              <select class="select" data-provider-case-field="modType">
-                <option value="车衣改造" ${source.modType === "车衣改造" ? "selected" : ""}>车衣改造</option>
-                <option value="轮毂改造" ${source.modType === "轮毂改造" ? "selected" : ""}>轮毂改造</option>
-              </select>
-            </div>
-            <div class="field-group">
-              <div class="field-label">案例费用</div>
-              <input class="input" data-provider-case-field="cost" placeholder="例如 ¥ 26,800" value="${source.cost}" />
-            </div>
-          </div>
-        </div>
-        <div class="case-editor-section">
-          <div class="case-editor-section-head">
-            <h3>展示状态</h3>
-            <span>${source.display || "未展示"}</span>
-          </div>
-        </div>
-        <div class="case-editor-section">
-          <div class="case-editor-section-head">
-            <h3>内容素材</h3>
-            <span>支持本地上传封面并实时预览</span>
-          </div>
-          <div class="form-grid">
-            <div class="field-group field-group-full">
-              <div class="field-label">封面图</div>
-              <input type="hidden" data-provider-case-field="imagePreview" value="${source.imagePreview || ""}" />
-              <label class="upload-panel case-upload-panel">
-                <input class="upload-input" data-provider-case-upload type="file" accept="image/*" />
-                <span class="upload-illustration"></span>
-                <strong>上传封面</strong>
-                <small>选择图片后自动回填文件名，并同步更新右侧预览。</small>
-              </label>
-              <input class="input" data-provider-case-field="image" placeholder="上传后自动回填封面图名称" value="${typeof source.image === "object" ? source.image.name || "" : source.image || ""}" readonly />
-            </div>
-            <div class="field-group field-group-full">
-              <div class="field-label">案例说明</div>
-              <div class="case-rich-toolbar">
-                <button class="btn btn-secondary" type="button" data-provider-case-rich-command="paragraph">正文</button>
-                <button class="btn btn-secondary" type="button" data-provider-case-rich-command="heading">标题</button>
-                <button class="btn btn-secondary" type="button" data-provider-case-rich-command="bold">加粗</button>
-                <label class="btn btn-secondary case-rich-upload">
-                  <input class="upload-input" data-provider-case-rich-image type="file" accept="image/*" />
-                  插入图片
-                </label>
-                <label class="btn btn-secondary case-rich-upload">
-                  <input class="upload-input" data-provider-case-rich-video type="file" accept="video/*" />
-                  插入视频
-                </label>
+            <div class="form-grid">
+              <div class="field-group field-group-full">
+                <div class="field-label">案例标题</div>
+                <input class="input" data-provider-case-field="title" placeholder="请输入案例标题" value="${source.title}" />
               </div>
-              <input type="hidden" data-provider-case-field="content" value="${escapeHtml(normalizeCaseRichContent(source.content || ""))}" />
-              <div class="case-rich-editor" data-provider-case-rich-editor contenteditable="true">${normalizeCaseRichContent(source.content || "")}</div>
+              <div class="field-group">
+                <div class="field-label">适配车型</div>
+                <input class="input" data-provider-case-field="model" placeholder="请输入车型" value="${source.model}" />
+              </div>
+              <div class="field-group">
+                <div class="field-label">改装风格</div>
+                <input class="input" data-provider-case-field="style" placeholder="请输入改装风格" value="${source.style}" />
+              </div>
+              <div class="field-group">
+                <div class="field-label">改装类型</div>
+                <select class="select" data-provider-case-field="modType">
+                  <option value="车衣改造" ${source.modType === "车衣改造" ? "selected" : ""}>车衣改造</option>
+                  <option value="轮毂改造" ${source.modType === "轮毂改造" ? "selected" : ""}>轮毂改造</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <div class="field-label">案例费用</div>
+                <input class="input" data-provider-case-field="cost" placeholder="例如 ¥ 26,800" value="${source.cost}" />
+              </div>
             </div>
+          </div>
+          <div class="case-editor-section">
+            <div class="case-editor-section-head">
+              <h3>展示状态</h3>
+              <span>${source.display || "未展示"}</span>
+            </div>
+          </div>
+          <div class="case-editor-section">
+            <div class="case-editor-section-head">
+              <h3>内容素材</h3>
+              <span>支持本地上传封面并实时预览</span>
+            </div>
+            <div class="form-grid">
+              <div class="field-group field-group-full">
+                <div class="field-label">封面图</div>
+                <input type="hidden" data-provider-case-field="imagePreview" value="${source.imagePreview || ""}" />
+                <label class="upload-panel case-upload-panel">
+                  <input class="upload-input" data-provider-case-upload type="file" accept="image/*" />
+                  <span class="upload-illustration"></span>
+                  <strong>上传封面</strong>
+                  <small>选择图片后自动回填文件名，并同步更新右侧预览。</small>
+                </label>
+                <input class="input" data-provider-case-field="image" placeholder="上传后自动回填封面图名称" value="${typeof source.image === "object" ? source.image.name || "" : source.image || ""}" readonly />
+              </div>
+              <div class="field-group field-group-full">
+                <div class="field-label">案例说明</div>
+                <div class="case-rich-toolbar">
+                  <button class="btn btn-secondary" type="button" data-provider-case-rich-command="paragraph">正文</button>
+                  <button class="btn btn-secondary" type="button" data-provider-case-rich-command="heading">标题</button>
+                  <button class="btn btn-secondary" type="button" data-provider-case-rich-command="bold">加粗</button>
+                  <label class="btn btn-secondary case-rich-upload">
+                    <input class="upload-input" data-provider-case-rich-image type="file" accept="image/*" />
+                    插入图片
+                  </label>
+                  <label class="btn btn-secondary case-rich-upload">
+                    <input class="upload-input" data-provider-case-rich-video type="file" accept="video/*" />
+                    插入视频
+                  </label>
+                </div>
+                <input type="hidden" data-provider-case-field="content" value="${escapeHtml(normalizeCaseRichContent(source.content || ""))}" />
+                <div class="case-rich-editor" data-provider-case-rich-editor contenteditable="true">${normalizeCaseRichContent(source.content || "")}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="case-editor-section case-editor-product-section">
+          <div class="case-editor-section-head">
+            <h3>绑定商品</h3>
+            <span>勾选与本案例相关的商品</span>
+          </div>
+          <div class="case-product-picker">
+            ${(window.MockData.products || [])
+              .map(
+                (item) => `
+                  <label class="case-product-option ${(source.linkedProducts || []).includes(item.sku) ? "selected" : ""}">
+                    <input type="checkbox" data-provider-case-product="${item.sku}" ${(source.linkedProducts || []).includes(item.sku) ? "checked" : ""} />
+                    <div>
+                      <strong>${escapeHtml(item.name)}</strong>
+                      <span>${escapeHtml(item.category)} · ${escapeHtml(item.price)} · 库存 ${item.stock}</span>
+                    </div>
+                    <span class="tag success">${escapeHtml(item.sku)}</span>
+                  </label>
+                `
+              )
+              .join("")}
           </div>
         </div>
         <div style="display:flex; gap:12px; margin-top:18px;">
@@ -797,6 +850,9 @@
   function saveProviderCase(mode, caseId) {
     const getValue = (field) => modalCardEl.querySelector(`[data-provider-case-field="${field}"]`)?.value.trim() || "";
     const currentTarget = cases.find((item) => item.id === caseId);
+    const linkedProducts = Array.from(modalCardEl.querySelectorAll("[data-provider-case-product]:checked")).map(
+      (input) => input.dataset.providerCaseProduct
+    );
     const payload = {
       id: caseId,
       title: getValue("title"),
@@ -807,6 +863,7 @@
       image: getValue("image"),
       imagePreview: getValue("imagePreview"),
       content: getValue("content"),
+      linkedProducts,
       display: mode === "edit" ? currentTarget?.display || "未展示" : "未展示",
       audit: "待审核",
       provider: store.name,
@@ -946,6 +1003,12 @@
         syncProviderCaseEditorPreview();
       });
     }
+
+    modalCardEl.querySelectorAll("[data-provider-case-product]").forEach((input) => {
+      input.addEventListener("change", () => {
+        input.closest(".case-product-option")?.classList.toggle("selected", input.checked);
+      });
+    });
 
     syncProviderCaseRichEditorField();
     syncProviderCaseEditorPreview();

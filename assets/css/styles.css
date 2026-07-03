@@ -1071,13 +1071,36 @@ select {
 .case-editor-modal {
   display: grid;
   gap: 16px;
-  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  grid-template-areas:
+    "header header"
+    "preview form"
+    "products form"
+    "actions actions";
   align-items: start;
 }
 
-.case-editor-modal > .panel-header,
+.case-editor-modal > .panel-header {
+  grid-area: header;
+}
+
+.case-editor-preview {
+  grid-area: preview;
+}
+
+.case-editor-form-stack {
+  grid-area: form;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.case-editor-product-section {
+  grid-area: products;
+}
+
 .case-editor-modal > div:last-child {
-  grid-column: 1 / -1;
+  grid-area: actions;
 }
 
 .case-editor-preview {
@@ -1204,7 +1227,7 @@ select {
   grid-column: 1 / -1;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
   .modal-card:has(.case-editor-modal) {
     width: min(860px, 100%);
     padding: 24px;
@@ -1212,7 +1235,115 @@ select {
 
   .case-editor-modal {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "preview"
+      "form"
+      "products"
+      "actions";
   }
+
+  .case-product-picker {
+    grid-template-columns: 1fr;
+  }
+}
+
+.case-product-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.case-product-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.case-product-option:hover {
+  border-color: rgba(255, 106, 0, 0.24);
+  background: rgba(255, 106, 0, 0.04);
+}
+
+.case-product-option.selected {
+  border-color: rgba(255, 106, 0, 0.5);
+  background: rgba(255, 106, 0, 0.08);
+}
+
+.case-product-option input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.case-product-option > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.case-product-option strong {
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.case-product-option span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.case-product-option .tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.case-linked-products {
+  display: grid;
+  gap: 10px;
+}
+
+.case-linked-product {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.case-linked-product strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.case-linked-product span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .case-display-toggle {
@@ -1945,7 +2076,7 @@ select {
 }
 
 .modal-card:has(.case-editor-modal) {
-  width: min(1180px, 100%);
+  width: min(1280px, 100%);
   padding: 30px;
 }
 

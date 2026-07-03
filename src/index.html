@@ -1,177 +1,75 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Axhub Make Project</title>
-  <style>
-    :root {
-      color: #20242a;
-      background: #f7f8fa;
-      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-      font-synthesis: none;
-      text-rendering: optimizeLegibility;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    html,
-    body {
-      min-height: 100vh;
-      margin: 0;
-    }
-
-    body {
-      display: grid;
-      place-items: center;
-    }
-
-    main {
-      box-sizing: border-box;
-      width: min(100%, 680px);
-      padding: 32px;
-      text-align: center;
-    }
-
-    p {
-      margin: 0;
-      color: #22262d;
-      font-size: 22px;
-      font-weight: 500;
-      line-height: 1.7;
-    }
-
-    .actions {
-      display: flex;
-      justify-content: center;
-      margin-top: 20px;
-    }
-
-    button {
-      border: 0;
-      border-radius: 8px;
-      background: #20242a;
-      color: #fff;
-      cursor: pointer;
-      font: inherit;
-      font-size: 15px;
-      font-weight: 600;
-      line-height: 1;
-      min-height: 40px;
-      padding: 0 18px;
-    }
-
-    button:disabled {
-      cursor: progress;
-      opacity: 0.68;
-    }
-
-    .status {
-      color: #5f6673;
-      font-size: 14px;
-      line-height: 1.6;
-      margin-top: 12px;
-      min-height: 22px;
-    }
-
-    @media (max-width: 520px) {
-      main {
-        padding: 24px;
-      }
-
-      p {
-        font-size: 18px;
-      }
-    }
-  </style>
-</head>
-<body>
-  <main>
-    <p>可以通过 npx @axhub/make 启动管理页面。</p>
-    <div class="actions">
-      <button id="start-button" type="button" hidden>启动管理服务</button>
-    </div>
-    <div id="status" class="status">正在检查管理服务...</div>
-  </main>
-  <script>
-    (function () {
-      var statusElement = document.getElementById('status');
-      var startButton = document.getElementById('start-button');
-      var pollTimer = 0;
-
-      function setStatus(text) {
-        if (statusElement) {
-          statusElement.textContent = text;
-        }
-      }
-
-      function redirectWhenReady(payload) {
-        if (payload && payload.ready && payload.adminUrl) {
-          location.replace(payload.adminUrl);
-          return true;
-        }
-        return false;
-      }
-
-      function showStartButton() {
-        if (startButton) {
-          startButton.hidden = false;
-          startButton.disabled = false;
-          startButton.textContent = '启动管理服务';
-        }
-      }
-
-      function schedulePoll() {
-        window.clearTimeout(pollTimer);
-        pollTimer = window.setTimeout(checkStatus, 1200);
-      }
-
-      async function checkStatus() {
-        try {
-          var response = await fetch('/__axhub/make-server/status', { headers: { accept: 'application/json' } });
-          var payload = await response.json();
-          if (redirectWhenReady(payload)) {
-            return;
-          }
-          if (payload && payload.starting) {
-            setStatus('管理服务正在启动...');
-            schedulePoll();
-            return;
-          }
-          setStatus(payload && payload.error ? payload.error : '管理服务尚未启动。');
-          showStartButton();
-        } catch (error) {
-          setStatus('管理服务尚未启动。');
-          showStartButton();
-        }
-      }
-
-      async function startServer() {
-        if (!startButton || startButton.disabled) {
-          return;
-        }
-        startButton.disabled = true;
-        startButton.textContent = '启动中...';
-        setStatus('正在执行 npx @axhub/make...');
-        try {
-          var response = await fetch('/__axhub/make-server/start', { method: 'POST', headers: { accept: 'application/json' } });
-          var payload = await response.json();
-          if (redirectWhenReady(payload)) {
-            return;
-          }
-          setStatus(payload && payload.error ? payload.error : '管理服务正在启动...');
-          schedulePoll();
-        } catch (error) {
-          setStatus('启动失败，请稍后重试。');
-          showStartButton();
-        }
-      }
-
-      if (startButton) {
-        startButton.addEventListener('click', startServer);
-      }
-      checkStatus();
-    }());
-  </script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>满改平台前端演示</title>
+    <link rel="stylesheet" href="/assets/css/styles.css" />
+  </head>
+  <body>
+    <main class="page-shell landing">
+      <section class="landing-hero-premium">
+        <div class="landing-hero-copy">
+          <span class="eyebrow">MAN GAI PLATFORM</span>
+          <h1>满改平台</h1>
+          <p>面向高端汽车改装业务的多端运营界面，覆盖平台管理、服务商展示、门店作业与用户下单体验。</p>
+          <div class="landing-hero-actions">
+            <a class="btn btn-primary" href="/pages/platform-web.html">进入平台端</a>
+            <a class="btn btn-secondary" href="/pages/user-app.html">查看用户端</a>
+          </div>
+        </div>
+        <div class="landing-vehicle-stage" aria-hidden="true">
+          <div class="landing-speed-line"></div>
+          <div class="landing-car">
+            <span class="landing-wheel landing-wheel-left"></span>
+            <span class="landing-wheel landing-wheel-right"></span>
+          </div>
+        </div>
+      </section>
+      <div class="container landing-entry-container">
+        <div class="landing-section-head">
+          <span class="eyebrow">ENTRANCES</span>
+          <h2>选择要检查的端口</h2>
+        </div>
+        <section class="entry-grid">
+          <a class="panel entry-card" href="/pages/platform-web.html">
+            <span class="eyebrow">01</span>
+            <h3>平台端 Web</h3>
+            <p class="muted">一级菜单首页，覆盖订单、服务商、案例、结算、素材和系统配置。</p>
+            <span class="btn btn-primary">进入后台</span>
+          </a>
+          <a class="panel entry-card" href="/pages/provider-web.html">
+            <span class="eyebrow">02</span>
+            <h3>服务商 Web</h3>
+            <p class="muted">高端改装门店展示站，含品牌形象、服务矩阵、案例橱窗与入驻入口。</p>
+            <span class="btn btn-primary">查看站点</span>
+          </a>
+          <a class="panel entry-card" href="/pages/admin-app.html">
+            <span class="eyebrow">03</span>
+            <h3>平台管理端 App</h3>
+            <p class="muted">面向管理人员的移动审批与巡检工作台，突出待办与快速处理。</p>
+            <span class="btn btn-primary">打开 App</span>
+          </a>
+          <a class="panel entry-card" href="/pages/provider-app.html">
+            <span class="eyebrow">04</span>
+            <h3>服务商端 App</h3>
+            <p class="muted">门店作业端，强调待接单、施工进度、采购记录与结算管理。</p>
+            <span class="btn btn-primary">打开 App</span>
+          </a>
+          <a class="panel entry-card" href="/pages/user-app.html">
+            <span class="eyebrow">05</span>
+            <h3>用户 App</h3>
+            <p class="muted">内容消费与服务下单入口，覆盖案例、商城、论坛与爱车渲染。</p>
+            <span class="btn btn-primary">打开 App</span>
+          </a>
+          <a class="panel entry-card" href="/pages/brand-web.html">
+            <span class="eyebrow">06</span>
+            <h3>品牌方 Web</h3>
+            <p class="muted">品牌账号工作台，查看当前品牌商品、待发货订单与物流 mock 履约状态。</p>
+            <span class="btn btn-primary">进入品牌方</span>
+          </a>
+        </section>
+      </div>
+    </main>
+  </body>
 </html>

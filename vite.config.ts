@@ -25,6 +25,52 @@ import {
 const projectRoot = process.cwd();
 const OFFICIAL_CLIENT_DEV_PORT = 51720;
 
+function serveProjectStaticPlugin(): Plugin {
+  return {
+    name: 'serve-project-static',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url || req.method !== 'GET') {
+          next();
+          return;
+        }
+        const pathname = req.url.split('?')[0] || '';
+        if (!pathname.startsWith('/assets/') && !pathname.startsWith('/pages/')) {
+          next();
+          return;
+        }
+        const filePath = path.resolve(projectRoot, pathname.slice(1));
+        const relative = path.relative(projectRoot, filePath);
+        if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+          next();
+          return;
+        }
+        if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+          next();
+          return;
+        }
+        const ext = path.extname(filePath).toLowerCase();
+        const contentTypes: Record<string, string> = {
+          '.css': 'text/css; charset=utf-8',
+          '.js': 'application/javascript; charset=utf-8',
+          '.html': 'text/html; charset=utf-8',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.webp': 'image/webp',
+          '.svg': 'image/svg+xml',
+          '.json': 'application/json; charset=utf-8',
+        };
+        res.statusCode = 200;
+        res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end(fs.readFileSync(filePath));
+      });
+    },
+  };
+}
+
 /** Read allowLAN from the shared make config to align with make-server. */
 function readAllowLAN(): boolean {
   try {
@@ -71,6 +117,7 @@ export default defineConfig(({ command }) => {
 
   const config: any = {
     plugins: [
+      serveProjectStaticPlugin(),
       tailwindcss(),
       isServe ? canvasHotUpdateFilterPlugin() : null,
       injectStablePageIds(),
@@ -137,6 +184,9 @@ export default defineConfig(({ command }) => {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+      fs: {
+        allow: [projectRoot],
       },
     },
 
