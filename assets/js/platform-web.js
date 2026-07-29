@@ -393,6 +393,46 @@
     ],
   };
 
+  const afterSaleMockDefaults = {
+    "OD-240402-011": {
+      afterSaleType: "退款",
+      afterSaleReason: "服务商拒单后等待时间过长，用户取消安装并申请原路退款。",
+      afterSaleStatus: "待平台审核",
+      afterSaleStep: "待平台审核",
+      afterSaleTime: "2026-04-02 09:15",
+      refundStatus: "待确认金额",
+      afterSaleTimeline: [
+        "2026-04-02 09:15 用户提交退款申请",
+        "2026-04-02 09:18 平台客服已接入并核对订单",
+      ],
+    },
+    "OD-240401-023": {
+      afterSaleType: "换货",
+      afterSaleReason: "用户反馈轮毂外包装破损，申请换货并等待寄回物流。",
+      afterSaleStatus: "处理中",
+      afterSaleMethod: "换货",
+      afterSaleStep: "待用户寄回",
+      afterSaleTime: "2026-04-03 10:30",
+      refundStatus: "-",
+      afterSaleTimeline: [
+        "2026-04-03 10:30 用户提交换货申请",
+        "2026-04-03 11:00 平台审核通过，等待用户填写寄回物流",
+      ],
+    },
+    "OD-240329-006": {
+      afterSaleType: "退款",
+      afterSaleReason: "施工完成后用户反馈效果未达预期，平台复核后驳回退款。",
+      afterSaleStatus: "已驳回",
+      afterSaleStep: "售后关闭",
+      afterSaleTime: "2026-04-01 16:20",
+      refundStatus: "-",
+      afterSaleTimeline: [
+        "2026-04-01 16:20 用户提交退款申请",
+        "2026-04-01 17:05 平台复核施工记录并驳回申请",
+      ],
+    },
+  };
+
   function getNowStamp() {
     const date = new Date();
     const pad = (value) => String(value).padStart(2, "0");
@@ -425,12 +465,36 @@
     item.displayType = item.displayType || (item.type === "商品订单" ? "自提" : "改装服务");
     item.paymentMethod = item.paymentMethod || (item.payment === "待支付" ? "微信支付" : "支付宝");
     item.deliveryMethod = item.deliveryMethod || orderDeliveryMethodDefaults[item.id] || "自提";
+    const afterSaleDefault = afterSaleMockDefaults[item.id];
+    if (afterSaleDefault && !item.afterSaleType) {
+      Object.assign(item, afterSaleDefault);
+    }
+    if (item.afterSaleType && !item.afterSaleStep) {
+      if (item.afterSaleStatus === "待平台审核") {
+        item.afterSaleStep = "待平台审核";
+      } else if (item.afterSaleStatus === "已驳回") {
+        item.afterSaleStep = "售后关闭";
+      } else if (String(item.afterSaleType).includes("换货")) {
+        item.afterSaleMethod = "换货";
+        item.afterSaleStatus = "处理中";
+        item.afterSaleStep = "待用户寄回";
+      } else {
+        item.afterSaleMethod = "退款";
+        item.afterSaleStatus = "处理中";
+        item.afterSaleStep = "待确认退款金额";
+        item.refundStatus = item.refundStatus || "待确认金额";
+      }
+    }
     item.timeline =
       item.timeline ||
       orderTimelineDefaults[item.id] || [
         `${item.appointment || "2026-04-02 09:00"} 订单创建`,
         `${item.appointment || "2026-04-02 09:00"} 当前进度：${item.progress || "处理中"}`,
       ];
+    if (afterSaleDefault) {
+      const timeline = new Set([...(item.timeline || []), ...(afterSaleDefault.afterSaleTimeline || [])]);
+      item.timeline = Array.from(timeline);
+    }
   });
 
   signing.forEach((item) => {
@@ -1641,12 +1705,12 @@
     }),
     afterSaleList: makeTableDef({
       title: "售后订单",
-      description: "查看用户提交的售后申请，支持审核通过或驳回。",
-      filters: ["全部", "待审核", "已通过", "已驳回"],
+      description: "按售后业务流程推进申请审核、退款、换货、完成与关闭。",
+      filters: ["全部", "待审核", "处理中", "已完成", "已关闭", "已驳回"],
       stats: [
         metric("待审核", String(orders.filter((item) => item.afterSaleStatus === "待平台审核").length)),
         metric("今日申请", String(orders.filter((item) => item.afterSaleType && item.afterSaleTime && new Date(item.afterSaleTime).toDateString() === new Date().toDateString()).length)),
-        metric("已通过", String(orders.filter((item) => item.afterSaleStatus === "已通过").length)),
+        metric("处理中", String(orders.filter((item) => item.afterSaleStatus === "处理中").length)),
         metric("已驳回", String(orders.filter((item) => item.afterSaleStatus === "已驳回").length)),
       ],
       columns: [
@@ -1654,14 +1718,14 @@
         { key: "user", label: "用户" },
         { key: "service", label: "商品/服务" },
         { key: "afterSaleType", label: "售后类型" },
-        { key: "afterSaleStatus", label: "售后状态", tag: true },
+        { key: "afterSaleStep", label: "当前环节", tag: true },
         { key: "afterSaleTime", label: "申请时间" },
       ],
       rows: orders,
       filterBy: "afterSaleStatus",
       detail: (row) => ({
         title: row.id,
-        badges: [row.afterSaleStatus, row.displayType, row.status].filter(Boolean),
+        badges: [row.afterSaleStatus, row.afterSaleStep, row.afterSaleMethod || row.afterSaleType, row.displayType].filter(Boolean),
         facts: [
           ["用户", row.user],
           ["车辆", row.vehicle],
@@ -1672,10 +1736,17 @@
           ["售后类型", row.afterSaleType],
           ["售后原因", row.afterSaleReason],
           ["售后状态", row.afterSaleStatus],
+          ["当前环节", row.afterSaleStep || "-"],
+          ["处理方式", row.afterSaleMethod || "待平台选择"],
+          ["退款金额", row.refundAmount || "-"],
+          ["退款状态", row.refundStatus || "-"],
+          ["寄回物流", row.returnShippingNo || "-"],
+          ["重发物流", row.exchangeShippingNo || "-"],
           ["申请时间", row.afterSaleTime],
         ],
         timeline: [...(row.timeline || [])],
         actions: "afterSaleList",
+        actionHtml: renderAfterSaleActionButtons(row),
       }),
     }),
     orderAssign: makeTableDef({
@@ -3071,6 +3142,331 @@
     });
   }
 
+  function renderAfterSaleActionButtons(row) {
+    const step = row.afterSaleStep || row.afterSaleStatus || "待平台审核";
+    if (step === "待平台审核") {
+      return `
+        <button class="btn btn-primary" type="button" data-after-sale-action="approve-refund">同意退款</button>
+        <button class="btn btn-primary" type="button" data-after-sale-action="approve-exchange">同意换货</button>
+        <button class="btn btn-danger" type="button" data-after-sale-action="reject">驳回并关闭</button>
+      `;
+    }
+    if (step === "待确认退款金额") {
+      return `<button class="btn btn-primary" type="button" data-after-sale-action="confirm-refund-amount">核定退款金额</button>`;
+    }
+    if (step === "待平台退款") {
+      return `<button class="btn btn-primary" type="button" data-after-sale-action="issue-refund">提交退款</button>`;
+    }
+    if (step === "待退款到账") {
+      return `<button class="btn btn-primary" type="button" data-after-sale-action="refund-arrived">标记退款到账</button>`;
+    }
+    if (step === "待用户寄回") {
+      return `<button class="btn btn-primary" type="button" data-after-sale-action="user-return">填写寄回物流</button>`;
+    }
+    if (step === "待服务商收货") {
+      return `<button class="btn btn-primary" type="button" data-after-sale-action="provider-receive">确认收到退回件</button>`;
+    }
+    if (step === "待重新发货") {
+      return `<button class="btn btn-primary" type="button" data-after-sale-action="provider-reship">填写换货发货物流</button>`;
+    }
+    if (step === "待用户收货") {
+      return `<button class="btn btn-primary" type="button" data-after-sale-action="user-receive">标记用户已收货</button>`;
+    }
+    if (step === "售后完成") {
+      return `<button class="btn btn-primary" type="button" data-after-sale-action="close">关闭售后单</button>`;
+    }
+    return `<button class="btn btn-secondary" type="button" disabled>${step === "售后关闭" ? "售后已关闭" : "暂无下一步"}</button>`;
+  }
+
+  function pushAfterSaleTimeline(row, text) {
+    row.timeline = row.timeline || [];
+    row.timeline.push(`${text} — ${getNowStamp()}`);
+  }
+
+  function setAfterSaleStage(row, step, status) {
+    row.afterSaleStep = step;
+    row.afterSaleStatus = status || (step === "售后完成" ? "已完成" : step === "售后关闭" ? "已关闭" : "处理中");
+    row.progress = `售后${row.afterSaleMethod || row.afterSaleType || ""}当前环节：${step}`;
+    if (typeof window.saveMockData === "function") window.saveMockData();
+  }
+
+  function finishAfterSaleAction(row, title, message) {
+    if (typeof window.saveMockData === "function") window.saveMockData();
+    closeModal();
+    renderSidebar();
+    renderPage();
+    openFeedbackModal(title, message);
+  }
+
+  function openAfterSaleRejectModal(row) {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">After Sale Review</span>
+          <h2 class="section-title">驳回并关闭售后</h2>
+          <p class="section-subtitle">${row.id} / ${row.user} / ${row.afterSaleType}</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group field-group-full">
+          <div class="field-label">驳回原因</div>
+          <textarea class="textarea" data-after-sale-field="rejectReason" rows="4">资料不完整，请补充问题照片后重新提交。</textarea>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-danger" type="button" data-after-sale-submit="reject">确认驳回</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+
+    const submit = modalCardEl.querySelector('[data-after-sale-submit="reject"]');
+    submit?.addEventListener("click", () => {
+      const reason = modalCardEl.querySelector('[data-after-sale-field="rejectReason"]')?.value.trim();
+      if (!reason) {
+        openFeedbackModal("请填写驳回原因", "驳回售后前需要填写明确原因，方便用户重新提交或申诉。");
+        return;
+      }
+      row.rejectReason = reason;
+      row.afterSaleMethod = row.afterSaleMethod || "-";
+      setAfterSaleStage(row, "售后关闭", "已驳回");
+      pushAfterSaleTimeline(row, `平台驳回售后申请：${row.rejectReason}`);
+      pushNotification("user", "售后申请被驳回", `您的售后申请未通过。原因：${row.rejectReason}。订单号：${row.id}。`);
+      finishAfterSaleAction(row, "售后已驳回", "该售后单已关闭。");
+    });
+  }
+
+  function openAfterSaleRefundAmountModal(row) {
+    const defaultAmount = row.refundAmount || row.userPaidAmount || row.quote || "¥ 0";
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Refund Amount</span>
+          <h2 class="section-title">核定退款金额</h2>
+          <p class="section-subtitle">${row.id} / ${row.user} / ${row.service}</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <div class="field-label">订单金额</div>
+          <input class="input" value="${escapeHtml(row.userPaidAmount || row.quote || "-")}" readonly />
+        </div>
+        <div class="field-group">
+          <div class="field-label">退款金额</div>
+          <input class="input" data-after-sale-field="refundAmount" value="${escapeHtml(defaultAmount)}" />
+        </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">核定备注</div>
+          <textarea class="textarea" data-after-sale-field="refundNote" rows="3">按订单实付金额原路退款，平台已核对支付记录。</textarea>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-after-sale-submit="refundAmount">确认金额</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+
+    const submit = modalCardEl.querySelector('[data-after-sale-submit="refundAmount"]');
+    submit?.addEventListener("click", () => {
+      const amount = modalCardEl.querySelector('[data-after-sale-field="refundAmount"]')?.value.trim();
+      const note = modalCardEl.querySelector('[data-after-sale-field="refundNote"]')?.value.trim();
+      if (!amount) {
+        openFeedbackModal("请填写退款金额", "退款金额不能为空。");
+        return;
+      }
+      row.refundAmount = amount;
+      row.refundNote = note || "平台已核定退款金额。";
+      row.refundStatus = "待平台发起";
+      setAfterSaleStage(row, "待平台退款");
+      pushAfterSaleTimeline(row, `平台核定退款金额：${row.refundAmount}`);
+      finishAfterSaleAction(row, "退款金额已核定", "下一步：提交退款。");
+    });
+  }
+
+  function openAfterSaleReturnShippingModal(row) {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Return Shipping</span>
+          <h2 class="section-title">填写寄回物流</h2>
+          <p class="section-subtitle">${row.id} / ${row.user} / 换货流程</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <div class="field-label">物流公司</div>
+          <input class="input" data-after-sale-field="returnShippingCompany" value="${escapeHtml(row.returnShippingCompany || "顺丰速运")}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">物流单号</div>
+          <input class="input" data-after-sale-field="returnShippingNo" value="${escapeHtml(row.returnShippingNo || "SF900123456789")}" />
+        </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">寄回说明</div>
+          <textarea class="textarea" data-after-sale-field="returnShippingNote" rows="3">用户已按平台要求寄回商品，等待服务商确认收货。</textarea>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-after-sale-submit="returnShipping">保存寄回物流</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+
+    const submit = modalCardEl.querySelector('[data-after-sale-submit="returnShipping"]');
+    submit?.addEventListener("click", () => {
+      const company = modalCardEl.querySelector('[data-after-sale-field="returnShippingCompany"]')?.value.trim();
+      const shippingNo = modalCardEl.querySelector('[data-after-sale-field="returnShippingNo"]')?.value.trim();
+      const note = modalCardEl.querySelector('[data-after-sale-field="returnShippingNote"]')?.value.trim();
+      if (!company || !shippingNo) {
+        openFeedbackModal("物流信息不完整", "请填写物流公司和物流单号。");
+        return;
+      }
+      row.returnShippingCompany = company;
+      row.returnShippingNo = shippingNo;
+      row.returnShippingNote = note || "";
+      setAfterSaleStage(row, "待服务商收货");
+      pushAfterSaleTimeline(row, `用户寄回物流：${row.returnShippingCompany} ${row.returnShippingNo}`);
+      finishAfterSaleAction(row, "寄回物流已保存", "下一步：确认收到退回件。");
+    });
+  }
+
+  function openAfterSaleExchangeShippingModal(row) {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Exchange Shipping</span>
+          <h2 class="section-title">填写换货发货物流</h2>
+          <p class="section-subtitle">${row.id} / ${row.provider || "服务商"} / 换货流程</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <div class="field-label">物流公司</div>
+          <input class="input" data-after-sale-field="exchangeShippingCompany" value="${escapeHtml(row.exchangeShippingCompany || "京东物流")}" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">物流单号</div>
+          <input class="input" data-after-sale-field="exchangeShippingNo" value="${escapeHtml(row.exchangeShippingNo || "JDVA900123456")}" />
+        </div>
+        <div class="field-group field-group-full">
+          <div class="field-label">发货备注</div>
+          <textarea class="textarea" data-after-sale-field="exchangeShippingNote" rows="3">服务商已重新发出换货商品，等待用户确认收货。</textarea>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-after-sale-submit="exchangeShipping">保存发货物流</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+
+    const submit = modalCardEl.querySelector('[data-after-sale-submit="exchangeShipping"]');
+    submit?.addEventListener("click", () => {
+      const company = modalCardEl.querySelector('[data-after-sale-field="exchangeShippingCompany"]')?.value.trim();
+      const shippingNo = modalCardEl.querySelector('[data-after-sale-field="exchangeShippingNo"]')?.value.trim();
+      const note = modalCardEl.querySelector('[data-after-sale-field="exchangeShippingNote"]')?.value.trim();
+      if (!company || !shippingNo) {
+        openFeedbackModal("物流信息不完整", "请填写物流公司和物流单号。");
+        return;
+      }
+      row.exchangeShippingCompany = company;
+      row.exchangeShippingNo = shippingNo;
+      row.exchangeShippingNote = note || "";
+      setAfterSaleStage(row, "待用户收货");
+      pushAfterSaleTimeline(row, `换货发货物流：${row.exchangeShippingCompany} ${row.exchangeShippingNo}`);
+      pushNotification("user", "换货商品已发出", `服务商已重新发货，请注意查收。订单号：${row.id}。`);
+      finishAfterSaleAction(row, "换货物流已保存", "下一步：标记用户已收货。");
+    });
+  }
+
+  function handleAfterSaleFlowAction(row, action) {
+    if (!row) return;
+    if (action === "detail") {
+      openGenericDetailModal(defs.afterSaleList.detail(row));
+      return;
+    }
+    if (action === "order") {
+      state.activePage = "orderList";
+      state.activeFilter = "全部";
+      const orderRows = filterRows(defs.orderList.rows, defs.orderList.filterBy);
+      const idx = orderRows.findIndex((o) => o.id === row.id);
+      state.selectedIndex = idx >= 0 ? idx : 0;
+      const parentGroup = menu.find((item) => item.children?.some((c) => c.id === "orderList"));
+      if (parentGroup) state.expandedGroups[parentGroup.id] = true;
+      closeModal();
+      renderSidebar();
+      renderPage();
+      return;
+    }
+    if (action === "approve-refund") {
+      row.afterSaleMethod = "退款";
+      row.refundStatus = "待确认金额";
+      setAfterSaleStage(row, "待确认退款金额", "处理中");
+      pushAfterSaleTimeline(row, "平台审核通过售后申请，处理方式：退款");
+      pushNotification("user", "售后申请已通过", `您的售后申请已通过，平台将确认退款金额。订单号：${row.id}。`);
+      finishAfterSaleAction(row, "已进入退款流程", "下一步：确认退款金额。");
+      return;
+    }
+    if (action === "approve-exchange") {
+      row.afterSaleMethod = "换货";
+      row.refundStatus = "-";
+      setAfterSaleStage(row, "待用户寄回", "处理中");
+      pushAfterSaleTimeline(row, "平台审核通过售后申请，处理方式：换货");
+      pushNotification("user", "售后申请已通过", `您的售后申请已通过，请填写寄回物流。订单号：${row.id}。`);
+      finishAfterSaleAction(row, "已进入换货流程", "下一步：用户告知寄回物流。");
+      return;
+    }
+    if (action === "reject") {
+      openAfterSaleRejectModal(row);
+      return;
+    }
+    if (action === "confirm-refund-amount") {
+      openAfterSaleRefundAmountModal(row);
+      return;
+    }
+    if (action === "issue-refund") {
+      row.refundMethod = "原路退回";
+      row.refundStatus = "退款处理中";
+      setAfterSaleStage(row, "待退款到账");
+      pushAfterSaleTimeline(row, `平台发起退款：${row.refundAmount || row.quote || "-"}，原路退回`);
+      pushNotification("user", "平台已发起退款", `退款已原路退回处理中，预计 1-3 个工作日到账。订单号：${row.id}。`);
+      finishAfterSaleAction(row, "退款已发起", "下一步：确认退款到账。");
+      return;
+    }
+    if (action === "refund-arrived") {
+      row.refundStatus = "已到账";
+      setAfterSaleStage(row, "售后完成", "已完成");
+      pushAfterSaleTimeline(row, "用户退款到账，售后完成");
+      pushNotification("user", "退款已到账", `您的退款已到账，售后流程已完成。订单号：${row.id}。`);
+      finishAfterSaleAction(row, "退款已到账", "下一步：关闭售后。");
+      return;
+    }
+    if (action === "user-return") {
+      openAfterSaleReturnShippingModal(row);
+      return;
+    }
+    if (action === "provider-receive") {
+      setAfterSaleStage(row, "待重新发货");
+      pushAfterSaleTimeline(row, "服务商确认收到用户寄回商品");
+      pushNotification("provider", "售后件已确认收货", `订单 ${row.id} 已确认收货，请尽快重新发货。`);
+      finishAfterSaleAction(row, "服务商已确认收货", "下一步：服务商重新发货。");
+      return;
+    }
+    if (action === "provider-reship") {
+      openAfterSaleExchangeShippingModal(row);
+      return;
+    }
+    if (action === "user-receive") {
+      setAfterSaleStage(row, "售后完成", "已完成");
+      pushAfterSaleTimeline(row, "用户确认收到换货商品，售后完成");
+      finishAfterSaleAction(row, "用户已确认收货", "下一步：关闭售后。");
+      return;
+    }
+    if (action === "close") {
+      setAfterSaleStage(row, "售后关闭", "已关闭");
+      pushAfterSaleTimeline(row, "平台关闭售后单");
+      finishAfterSaleAction(row, "售后已关闭", "该售后流程已结束。");
+    }
+  }
+
   function renderTablePage(def) {
     if (state.activePage === "invoiceManage") {
       def.stats = [
@@ -3619,7 +4015,7 @@
                   ? `
                     <button class="btn btn-secondary" type="button" data-after-sale-action="detail">查看详情</button>
                     <button class="btn btn-primary" type="button" data-after-sale-action="order">跳转订单</button>
-                    ${detail.badges.includes("待平台审核") ? `<button class="btn btn-success" type="button" data-after-sale-action="approve">通过申请</button><button class="btn btn-danger" type="button" data-after-sale-action="reject">驳回申请</button>` : `<button class="btn btn-secondary" type="button" disabled>已处理</button>`}
+                    ${detail.actionHtml || `<button class="btn btn-secondary" type="button" disabled>暂无下一步</button>`}
                   `
                 : detail.actions === "chatRecords"
                   ? `
@@ -3832,6 +4228,12 @@
           return;
         }
         openOrderProcessModal(selected);
+      });
+    });
+
+    modalCardEl.querySelectorAll("[data-after-sale-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        handleAfterSaleFlowAction(selected, button.dataset.afterSaleAction);
       });
     });
 
@@ -4407,43 +4809,7 @@
     if (state.activePage === "afterSaleList" && selected) {
       contentEl.querySelectorAll("[data-after-sale-action]").forEach((button) => {
         button.addEventListener("click", () => {
-          const action = button.dataset.afterSaleAction;
-          if (action === "detail") {
-            openGenericDetailModal(def.detail(selected));
-            return;
-          }
-          if (action === "order") {
-            state.activePage = "orderList";
-            state.activeFilter = "全部";
-            const orderRows = filterRows(defs.orderList.rows, defs.orderList.filterBy);
-            const idx = orderRows.findIndex((o) => o.id === selected.id);
-            state.selectedIndex = idx >= 0 ? idx : 0;
-            const parentGroup = menu.find((item) => item.children?.some((c) => c.id === "orderList"));
-            if (parentGroup) state.expandedGroups[parentGroup.id] = true;
-            renderSidebar();
-            renderPage();
-            return;
-          }
-          if (action === "approve") {
-            selected.afterSaleStatus = "已通过";
-            selected.progress = `售后申请已通过：${selected.afterSaleType}，退款将原路退回至用户支付账户。`;
-            selected.refundMethod = "原路退回";
-            selected.refundStatus = "退款处理中";
-            if (!selected.timeline) selected.timeline = [];
-            selected.timeline.push(`平台通过售后申请：${selected.afterSaleType}，退款原路退回 — ${getNowStamp()}`);
-            pushNotification("user", "售后申请已通过", `您的售后申请（${selected.afterSaleType}）已通过审核，退款将原路退回至您的支付账户。订单号：${selected.id}。`);
-            renderPage();
-            return;
-          }
-          if (action === "reject") {
-            selected.afterSaleStatus = "已驳回";
-            selected.progress = `售后申请已驳回：${selected.afterSaleType}，如有疑问请联系平台客服。`;
-            if (!selected.timeline) selected.timeline = [];
-            selected.timeline.push(`平台驳回售后申请：${selected.afterSaleType} — ${getNowStamp()}`);
-            pushNotification("user", "售后申请被驳回", `您的售后申请（${selected.afterSaleType}）未通过审核。如有疑问请联系平台客服。订单号：${selected.id}。`);
-            renderPage();
-            return;
-          }
+          handleAfterSaleFlowAction(selected, button.dataset.afterSaleAction);
         });
       });
     }
@@ -9549,7 +9915,7 @@
         }
       } else if (filterBy === "afterSaleStatus") {
         result = result.filter((row) => row.afterSaleType);
-        const statusMap = { "待审核": "待平台审核", "已通过": "已通过", "已驳回": "已驳回" };
+        const statusMap = { "待审核": "待平台审核", "处理中": "处理中", "已完成": "已完成", "已关闭": "已关闭", "已驳回": "已驳回" };
         const mapped = statusMap[state.activeFilter];
         if (mapped) {
           result = result.filter((row) => row.afterSaleStatus === mapped);
@@ -9596,12 +9962,22 @@
       "首页展示",
       "正常展示",
       "待审核",
+      "待平台审核",
+      "处理中",
       "待分配",
       "待发货",
       "待签收",
+      "待确认退款金额",
+      "待平台退款",
+      "待退款到账",
+      "待用户寄回",
+      "待服务商收货",
+      "待重新发货",
+      "待用户收货",
       "运输中",
       "待揽收",
       "已驳回",
+      "已关闭",
       "异常签收",
       "缺货",
       "暂停接单",
@@ -9616,6 +9992,8 @@
       "未加精",
       "已授权",
       "未授权",
+      "售后完成",
+      "售后关闭",
     ].includes(value);
   }
 

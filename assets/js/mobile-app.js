@@ -687,6 +687,8 @@
     screenEl.querySelectorAll("[data-user-profile-form]").forEach((form) => form.addEventListener("submit", handleUserProfileSubmit));
     screenEl.querySelectorAll("[data-user-avatar-input]").forEach((input) => input.addEventListener("change", handleUserAvatarChange));
     screenEl.querySelectorAll("[data-user-after-sale-form]").forEach((form) => form.addEventListener("submit", handleUserAfterSaleSubmit));
+    screenEl.querySelectorAll("[data-user-after-sale-return-form]").forEach((form) => form.addEventListener("submit", handleUserAfterSaleReturnSubmit));
+    screenEl.querySelectorAll("[data-user-after-sale-action]").forEach((button) => button.addEventListener("click", () => handleUserAfterSaleAction(button)));
     screenEl.querySelectorAll("[data-user-review-form]").forEach((form) => form.addEventListener("submit", handleUserReviewSubmit));
     screenEl.querySelectorAll("[data-user-review-media]").forEach((input) => input.addEventListener("change", handleUserReviewMediaChange));
     screenEl.querySelectorAll("[data-user-dialog-action]").forEach((b) => b.addEventListener("click", () => handleUserDialogAction(b)));
@@ -2023,7 +2025,29 @@
   }
 
   function getUserOrders() {
-    return [...getStoredUserOrders(), ...fallback.userHistoryOrders, ...orders.filter((item) => safe(item.user, "") === "当前用户")].slice(0, 8);
+    return [...getStoredUserOrders(), ...fallback.userHistoryOrders, ...orders.filter((item) => safe(item.user, "") === "当前用户")]
+      .slice(0, 8)
+      .map((item) => normalizeUserAfterSaleDemoOrder(item));
+  }
+
+  function normalizeUserAfterSaleDemoOrder(item) {
+    if (!item || item.afterSaleType || item.id !== "UO-240328") return item;
+    return {
+      ...item,
+      status: "售后中",
+      afterSaleType: "换货",
+      afterSaleMethod: "换货",
+      afterSaleReason: "排气尾段包装磕碰，申请更换同型号商品。",
+      afterSaleStatus: "处理中",
+      afterSaleStep: "待用户寄回",
+      afterSaleTime: "2026-04-03 10:30",
+      progress: "售后申请已通过，请填写寄回物流。",
+      timeline: [
+        "2026-04-03 10:30 用户提交换货申请",
+        "2026-04-03 11:00 平台审核通过，等待用户填写寄回物流",
+        ...(item.timeline || []),
+      ],
+    };
   }
 
   function getUserOrderById(id) {
@@ -2395,7 +2419,7 @@
     return `<div class="mobile-list">${rows.map((item) => {
       const orderStatus = item.userVisibleStatus || (item.rejectReason ? "待接单" : nOrder(item.status));
       const orderProgress = item.userVisibleProgress || safe(item.progress, "处理中");
-      return `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === item.id ? "active" : ""}" type="button" data-user-action="user-order-pick" data-user-id="${item.id}"><strong>${item.id}</strong><div class="muted" style="margin-top:8px;">${safe(item.vehicle, "车型")} / ${safe(item.appointment, "-")}</div><div style="margin-top:8px;">${safe(item.service, "服务")}</div><div class="muted" style="margin-top:8px;">${orderProgress}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">${safe(item.quote, "-")}</span>${tag(orderStatus)}</div></button>${selected?.id === item.id ? renderUserHistoryOrderDetail(item) : ""}</div>`;
+      return `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === item.id ? "active" : ""}" type="button" data-user-action="user-order-pick" data-user-id="${item.id}"><strong>${item.id}</strong><div class="muted" style="margin-top:8px;">${safe(item.vehicle, "车型")} / ${safe(item.appointment, "-")}</div><div style="margin-top:8px;">${safe(item.service, "服务")}</div><div class="muted" style="margin-top:8px;">${orderProgress}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">${safe(item.quote, "-")}</span>${tag(orderStatus)}</div></button>${selected?.id === item.id ? renderUserHistoryOrderDetailV2(item) : ""}</div>`;
     }).join("") || `<article class="mobile-item"><strong>暂无历史订单</strong></article>`}</div>`;
   }
 
@@ -3472,9 +3496,77 @@
     return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>${isGoodsOrder ? "商品" : "服务"}</span><strong>${safe(item.service, "-")}</strong></div>${isGoodsOrder ? `<div><span>收货人</span><strong>${safe(item.recipient, getUserDefaultReceiver())}</strong></div><div><span>收货地址</span><strong>${safe(item.address, getUserDefaultAddress())}</strong></div>` : `<div><span>预约安装时间</span><strong>${safe(item.appointment, "-")}</strong></div>`}<div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>支付方式</span><strong>${safe(item.paymentMethod, "线上支付")}</strong></div><div><span>支付状态</span><strong>${safe(item.payment, "mock 已记录")}</strong></div><div><span>当前进度</span><strong>${visibleProgress}</strong></div>${item.afterSaleType ? `<div><span>售后类型</span><strong>${safe(item.afterSaleType, "-")}</strong></div><div><span>售后状态</span><strong>${safe(item.afterSaleStatus, "处理中")}</strong></div>` : ""}</div>${afterSaleOpen ? renderUserAfterSaleForm(item) : ""}${reviewOpen ? renderUserReviewForm(item) : ""}<div class="admin-action-row">${canAccept ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系服务商</button><button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>` : canReview ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系客服</button><button class="btn btn-primary" type="button" data-user-action="${reviewOpen ? "user-review-cancel" : "user-review-open"}" data-user-id="${item.id}">${reviewOpen ? "收起评价" : "去评价"}</button>${item.afterSaleType ? `<button class="btn btn-danger" type="button" data-user-action="${afterSaleOpen ? "user-after-sale-cancel" : "user-after-sale-open"}" data-user-id="${item.id}">${afterSaleOpen ? "收起售后申请" : "查看售后进度"}</button>` : `<button class="btn btn-danger" type="button" data-user-action="${afterSaleOpen ? "user-after-sale-cancel" : "user-after-sale-open"}" data-user-id="${item.id}">${afterSaleOpen ? "收起售后申请" : "申请售后"}</button>`}` : canAfterSale ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系客服</button><button class="btn btn-danger" type="button" data-user-action="${afterSaleOpen ? "user-after-sale-cancel" : "user-after-sale-open"}" data-user-id="${item.id}">${afterSaleOpen ? "收起售后申请" : item.afterSaleType ? "查看售后进度" : "申请售后"}</button>` : `<button class="btn btn-secondary" type="button" disabled>当前无需验收</button>`}</div></section>`;
   }
 
+  function getUserAfterSaleStageLabel(item) {
+    const step = item.afterSaleStep || item.afterSaleStatus || "待平台审核";
+    const map = {
+      "待平台审核": "待平台审核",
+      "待确认退款金额": "平台核定退款金额中",
+      "待平台退款": "等待平台提交退款",
+      "待退款到账": "退款处理中",
+      "待用户寄回": "待填写寄回物流",
+      "待服务商收货": "等待商家确认收货",
+      "待重新发货": "等待商家重新发货",
+      "待用户收货": "待确认收货",
+      "售后完成": "售后已完成",
+      "售后关闭": "售后已关闭",
+    };
+    if (item.afterSaleStatus === "已驳回") return "申请已驳回";
+    if (item.afterSaleStatus === "已关闭") return "售后已关闭";
+    return map[step] || safe(step, "处理中");
+  }
+
+  function renderUserAfterSaleProgress(item) {
+    const method = item.afterSaleMethod || (String(item.afterSaleType || "").includes("换货") ? "换货" : "退款");
+    const stage = getUserAfterSaleStageLabel(item);
+    const refundRows = method === "退款" ? `
+      <div><span>退款金额</span><strong>${safe(item.refundAmount, "待平台核定")}</strong></div>
+      <div><span>退款状态</span><strong>${safe(item.refundStatus, stage)}</strong></div>
+    ` : "";
+    const exchangeRows = method === "换货" ? `
+      <div><span>寄回物流</span><strong>${item.returnShippingNo ? `${safe(item.returnShippingCompany, "物流")} ${safe(item.returnShippingNo, "-")}` : "待填写"}</strong></div>
+      <div><span>换货物流</span><strong>${item.exchangeShippingNo ? `${safe(item.exchangeShippingCompany, "物流")} ${safe(item.exchangeShippingNo, "-")}` : "待商家发货"}</strong></div>
+    ` : "";
+    return `<section class="provider-complete-form"><div class="eyebrow">After Sale</div><h3>售后进度</h3><div class="admin-kv-list"><div><span>售后类型</span><strong>${safe(item.afterSaleType, "-")}</strong></div><div><span>处理方式</span><strong>${safe(method, "待平台审核")}</strong></div><div><span>当前进度</span><strong>${stage}</strong></div><div><span>申请时间</span><strong>${safe(item.afterSaleTime, "-")}</strong></div>${refundRows}${exchangeRows}<div><span>问题描述</span><strong>${safe(item.afterSaleReason, "-")}</strong></div></div>${renderUserAfterSaleNextAction(item)}<div class="admin-timeline">${getOrderTimeline(item).filter((line) => String(line).includes("售后") || String(line).includes("退款") || String(line).includes("换货") || String(line).includes("物流") || String(line).includes("寄回")).slice(0, 6).map((line) => `<div>${line}</div>`).join("") || `<div>售后申请已提交，等待平台处理。</div>`}</div></section>`;
+  }
+
+  function renderUserAfterSaleNextAction(item) {
+    const step = item.afterSaleStep || item.afterSaleStatus || "待平台审核";
+    if (step === "待用户寄回") {
+      return `<form class="provider-complete-form" data-user-after-sale-return-form data-order-id="${item.id}" style="margin-top:12px;"><div class="form-grid"><div class="field-group"><label class="field-label">物流公司</label><input class="input" name="returnShippingCompany" value="${safe(item.returnShippingCompany, "顺丰速运")}" required></div><div class="field-group"><label class="field-label">物流单号</label><input class="input" name="returnShippingNo" value="${safe(item.returnShippingNo, "SF900123456789")}" required></div><div class="field-group field-group-full"><label class="field-label">寄回说明</label><textarea class="textarea" name="returnShippingNote">已按平台要求寄回商品，请商家查收。</textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交寄回物流</button></div></form>`;
+    }
+    if (step === "待用户收货") {
+      return `<div class="admin-action-row" style="margin-top:12px;"><button class="btn btn-primary" type="button" data-user-after-sale-action="confirm-receive" data-order-id="${item.id}">确认已收到换货商品</button></div>`;
+    }
+    if (step === "待退款到账") {
+      return `<div class="admin-action-row" style="margin-top:12px;"><button class="btn btn-primary" type="button" data-user-after-sale-action="confirm-refund" data-order-id="${item.id}">确认退款已到账</button></div>`;
+    }
+    return "";
+  }
+
+  function renderUserHistoryOrderDetailV2(item) {
+    const canAccept = nOrder(item.status).includes("待验收");
+    const isGoodsOrder = safe(item.type, "").includes("商品") || ["自提", "快递配送", "平台自提"].some((label) => safe(item.displayType, "").includes(label));
+    const visibleProgress = item.userVisibleProgress || safe(item.progress, "-");
+    const canAfterSale = isGoodsOrder && (nOrder(item.status) === "已完成" || nOrder(item.status) === "售后中" || item.afterSaleType);
+    const afterSaleOpen = state.userMe.afterSaleOrderId === item.id;
+    const canReview = isGoodsOrder && nOrder(item.status) === "已完成" && item.sku && !(window.MockData.productReviews || []).some((r) => r.orderId === item.id);
+    const reviewOpen = state.userMe.reviewOrderId === item.id;
+    const afterSalePanel = afterSaleOpen ? (item.afterSaleType ? renderUserAfterSaleProgress(item) : renderUserAfterSaleForm(item)) : "";
+    const afterSaleButtonLabel = afterSaleOpen ? "收起售后" : item.afterSaleType ? "查看售后进度" : "申请售后";
+    const afterSaleRows = item.afterSaleType ? `<div><span>售后类型</span><strong>${safe(item.afterSaleType, "-")}</strong></div><div><span>售后进度</span><strong>${getUserAfterSaleStageLabel(item)}</strong></div>` : "";
+    const actionButtons = canAccept
+      ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系服务商</button><button class="btn btn-primary" type="button" data-user-action="user-order-acceptance" data-user-id="${item.id}">确认验收</button>`
+      : canReview
+        ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系客服</button><button class="btn btn-primary" type="button" data-user-action="${reviewOpen ? "user-review-cancel" : "user-review-open"}" data-user-id="${item.id}">${reviewOpen ? "收起评价" : "去评价"}</button><button class="btn btn-danger" type="button" data-user-action="${afterSaleOpen ? "user-after-sale-cancel" : "user-after-sale-open"}" data-user-id="${item.id}">${afterSaleButtonLabel}</button>`
+        : canAfterSale
+          ? `<button class="btn btn-secondary" type="button" data-user-action="user-order-contact" data-user-id="${item.id}">联系客服</button><button class="btn btn-danger" type="button" data-user-action="${afterSaleOpen ? "user-after-sale-cancel" : "user-after-sale-open"}" data-user-id="${item.id}">${afterSaleButtonLabel}</button>`
+          : `<button class="btn btn-secondary" type="button" disabled>当前无需处理</button>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">Order Detail</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>${isGoodsOrder ? "商品" : "服务"}</span><strong>${safe(item.service, "-")}</strong></div>${isGoodsOrder ? `<div><span>收货人</span><strong>${safe(item.recipient, getUserDefaultReceiver())}</strong></div><div><span>收货地址</span><strong>${safe(item.address, getUserDefaultAddress())}</strong></div>` : `<div><span>预约安装时间</span><strong>${safe(item.appointment, "-")}</strong></div>`}<div><span>订单金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>支付方式</span><strong>${safe(item.paymentMethod, "线上支付")}</strong></div><div><span>支付状态</span><strong>${safe(item.payment, "mock 已记录")}</strong></div><div><span>当前进度</span><strong>${visibleProgress}</strong></div>${afterSaleRows}</div>${afterSalePanel}${reviewOpen ? renderUserReviewForm(item) : ""}<div class="admin-action-row">${actionButtons}</div></section>`;
+  }
+
   function renderUserAfterSaleForm(item) {
-    const types = ["退款", "退货", "换货", "补发配件"];
-    return `<form class="provider-complete-form" data-user-after-sale-form data-order-id="${item.id}"><div class="form-grid"><div class="field-group"><label class="field-label">售后类型</label><select class="input" name="afterSaleType" required>${types.map((t) => `<option value="${t}">${t}</option>`).join("")}</select></div><div class="field-group"><label class="field-label">问题描述</label><textarea class="textarea" name="afterSaleReason" placeholder="请简述售后原因" required>商品与描述不符，申请退款。</textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交申请</button><button class="btn btn-secondary" type="button" data-user-action="user-after-sale-cancel" data-user-id="${item.id}">取消</button></div></form>`;
+    const types = ["退款", "换货"];
+    return `<form class="provider-complete-form" data-user-after-sale-form data-order-id="${item.id}"><div class="form-grid"><div class="field-group"><label class="field-label">售后类型</label><select class="input" name="afterSaleType" required>${types.map((t) => `<option value="${t}">${t}</option>`).join("")}</select></div><div class="field-group"><label class="field-label">问题描述</label><textarea class="textarea" name="afterSaleReason" placeholder="请简述售后原因" required>商品存在问题，申请平台售后处理。</textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交申请</button><button class="btn btn-secondary" type="button" data-user-action="user-after-sale-cancel" data-user-id="${item.id}">取消</button></div></form>`;
   }
 
   function handleUserAfterSaleSubmit(event) {
@@ -3491,11 +3583,80 @@
     target.afterSaleType = afterSaleType;
     target.afterSaleReason = afterSaleReason;
     target.afterSaleStatus = "待平台审核";
+    target.afterSaleStep = "待平台审核";
+    target.afterSaleMethod = String(afterSaleType).includes("换货") ? "换货" : "退款";
     target.afterSaleTime = getNowStamp();
     appendOrderTimeline(target, `用户提交售后申请：${afterSaleType}`);
+    persistUserOrderState(target);
     state.userMe.afterSaleOrderId = "";
     state.userFeedback = `${orderId} 售后申请已提交，平台将在 1-2 个工作日内处理。`;
     render();
+  }
+
+  function persistUserOrderState(order) {
+    if (!order) return;
+    const stored = getStoredUserOrders();
+    const index = stored.findIndex((item) => item.id === order.id);
+    if (index >= 0) {
+      stored[index] = { ...stored[index], ...order };
+      setStoredUserOrders(stored);
+    } else {
+      setStoredUserOrders([{ ...order }, ...stored].slice(0, 20));
+    }
+  }
+
+  function handleUserAfterSaleReturnSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const orderId = form.dataset.orderId || "";
+    const target = getUserOrderById(orderId);
+    if (!target) return;
+    const formData = new FormData(form);
+    const company = String(formData.get("returnShippingCompany") || "").trim();
+    const shippingNo = String(formData.get("returnShippingNo") || "").trim();
+    const note = String(formData.get("returnShippingNote") || "").trim();
+    if (!company || !shippingNo) {
+      state.userFeedback = "请填写物流公司和物流单号。";
+      render();
+      return;
+    }
+    target.returnShippingCompany = company;
+    target.returnShippingNo = shippingNo;
+    target.returnShippingNote = note;
+    target.afterSaleStatus = "处理中";
+    target.afterSaleStep = "待服务商收货";
+    target.progress = "换货商品已寄回，等待商家确认收货。";
+    appendOrderTimeline(target, `用户提交寄回物流：${company} ${shippingNo}`);
+    persistUserOrderState(target);
+    state.userFeedback = `${orderId} 寄回物流已提交，等待商家确认收货。`;
+    render();
+  }
+
+  function handleUserAfterSaleAction(button) {
+    const orderId = button.dataset.orderId || "";
+    const action = button.dataset.userAfterSaleAction;
+    const target = getUserOrderById(orderId);
+    if (!target) return;
+    if (action === "confirm-receive") {
+      target.afterSaleStatus = "已完成";
+      target.afterSaleStep = "售后完成";
+      target.progress = "换货商品已确认收货，售后完成。";
+      appendOrderTimeline(target, "用户确认收到换货商品，售后完成");
+      persistUserOrderState(target);
+      state.userFeedback = `${orderId} 已确认收到换货商品。`;
+      render();
+      return;
+    }
+    if (action === "confirm-refund") {
+      target.afterSaleStatus = "已完成";
+      target.afterSaleStep = "售后完成";
+      target.refundStatus = "已到账";
+      target.progress = "退款已到账，售后完成。";
+      appendOrderTimeline(target, "用户确认退款到账，售后完成");
+      persistUserOrderState(target);
+      state.userFeedback = `${orderId} 已确认退款到账。`;
+      render();
+    }
   }
 
   function renderUserReviewForm(item) {
@@ -3911,7 +4072,7 @@
     return `<div class="mobile-list">${rows.map((item) => {
       const orderStatus = item.userVisibleStatus || (item.rejectReason ? "待接单" : nOrder(item.status));
       const orderProgress = item.userVisibleProgress || safe(item.progress, "处理中");
-      return `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === item.id ? "active" : ""}" type="button" data-user-action="user-order-pick" data-user-id="${item.id}"><strong>${item.id}</strong><div class="muted" style="margin-top:8px;">${safe(item.vehicle, "车型")} / ${safe(item.appointment, "-")}</div><div style="margin-top:8px;">${safe(item.service, "服务")}</div><div class="muted" style="margin-top:8px;">${orderProgress}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">${safe(item.quote, "-")}</span>${tag(orderStatus)}</div></button>${selected?.id === item.id ? renderUserHistoryOrderDetail(item) : ""}</div>`;
+      return `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === item.id ? "active" : ""}" type="button" data-user-action="user-order-pick" data-user-id="${item.id}"><strong>${item.id}</strong><div class="muted" style="margin-top:8px;">${safe(item.vehicle, "车型")} / ${safe(item.appointment, "-")}</div><div style="margin-top:8px;">${safe(item.service, "服务")}</div><div class="muted" style="margin-top:8px;">${orderProgress}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">${safe(item.quote, "-")}</span>${tag(orderStatus)}</div></button>${selected?.id === item.id ? renderUserHistoryOrderDetailV2(item) : ""}</div>`;
     }).join("") || `<article class="mobile-item"><strong>暂无历史订单</strong></article>`}</div>`;
   }
 

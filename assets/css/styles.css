@@ -7077,6 +7077,12 @@ button:disabled,
     box-shadow 0.18s ease;
 }
 
+body[data-mobile-app] .input option,
+body[data-mobile-app] .select option {
+  background: #2f2927;
+  color: #f7f3ee;
+}
+
 .topbar-search:focus-within,
 .field-group:focus-within .input,
 .field-group:focus-within .select,
