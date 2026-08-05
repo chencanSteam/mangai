@@ -1485,3 +1485,50 @@ window.MockData = {
     Object.assign(item, standardFields[item.sku] || {});
   });
 })();
+
+// Product specification templates and demo variants used by the prototype.
+window.MockData.productSpecTemplates = {
+  "轮毂": [
+    { name: "尺寸", options: ["19寸", "20寸"], required: true, sku: true },
+    { name: "颜色", options: ["哑光枪灰", "亮黑"], required: true, sku: true },
+    { name: "材质", options: ["铝合金", "镁合金"], required: true, sku: true },
+  ],
+  "轮毂轮胎": [
+    { name: "尺寸", options: ["19寸", "20寸"], required: true, sku: true },
+    { name: "颜色", options: ["哑光枪灰", "亮黑"], required: true, sku: true },
+  ],
+  "制动": [
+    { name: "盘径", options: ["355mm", "380mm"], required: true, sku: true },
+    { name: "卡钳颜色", options: ["红色", "黄色", "黑色"], required: true, sku: true },
+    { name: "活塞数量", options: ["四活塞", "六活塞"], required: true, sku: true },
+  ],
+  "制动升级": [
+    { name: "盘径", options: ["355mm", "380mm"], required: true, sku: true },
+    { name: "卡钳颜色", options: ["红色", "黄色", "黑色"], required: true, sku: true },
+  ],
+};
+
+const productVariantDemos = {
+  "PR-8801": {
+    specs: window.MockData.productSpecTemplates["轮毂"],
+    variants: [
+      { sku: "PR-8801-V01", values: { 尺寸: "19寸", 颜色: "哑光枪灰", 材质: "铝合金" }, price: "¥ 18,800", stock: 16, image: "bbs-wheel-19-matte-grey.jpg", status: "上架" },
+      { sku: "PR-8801-V02", values: { 尺寸: "19寸", 颜色: "亮黑", 材质: "铝合金" }, price: "¥ 19,200", stock: 8, image: "bbs-wheel-19-matte-grey.jpg", status: "上架" },
+      { sku: "PR-8801-V03", values: { 尺寸: "20寸", 颜色: "哑光枪灰", 材质: "铝合金" }, price: "¥ 22,800", stock: 5, image: "bbs-wheel-19-matte-grey.jpg", status: "上架" },
+      { sku: "PR-8801-V04", values: { 尺寸: "20寸", 颜色: "亮黑", 材质: "镁合金" }, price: "¥ 26,800", stock: 0, image: "bbs-wheel-19-matte-grey.jpg", status: "缺货" },
+    ],
+  },
+  "PR-8803": {
+    specs: window.MockData.productSpecTemplates["制动"],
+    variants: [
+      { sku: "PR-8803-V01", values: { 盘径: "355mm", 卡钳颜色: "红色", 活塞数量: "四活塞" }, price: "¥ 22,900", stock: 7, image: "brembo-gt-6pot-kit.jpg", status: "上架" },
+      { sku: "PR-8803-V02", values: { 盘径: "380mm", 卡钳颜色: "红色", 活塞数量: "六活塞" }, price: "¥ 26,900", stock: 11, image: "brembo-gt-6pot-kit.jpg", status: "上架" },
+      { sku: "PR-8803-V03", values: { 盘径: "380mm", 卡钳颜色: "黄色", 活塞数量: "六活塞" }, price: "¥ 27,500", stock: 3, image: "brembo-gt-6pot-kit.jpg", status: "上架" },
+    ],
+  },
+};
+
+Object.entries(productVariantDemos).forEach(([sku, data]) => {
+  const product = (window.MockData.products || []).find((item) => item.sku === sku);
+  if (product) Object.assign(product, data);
+});

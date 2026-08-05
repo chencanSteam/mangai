@@ -261,6 +261,25 @@
     { key: "freightIncluded", label: "是否包含运费" },
     { key: "remark", label: "备注" },
   ];
+  const defaultProductSpecTemplates = window.MockData.productSpecTemplates || {};
+  const cloneSpecTemplate = (rows) => (rows || []).map((row) => ({
+    name: String(row.name || "").trim(),
+    options: Array.isArray(row.options) ? row.options.filter(Boolean).map(String) : [],
+    required: row.required !== false,
+    sku: row.sku !== false,
+  })).filter((row) => row.name && row.options.length);
+  const getProductSpecTemplate = (category) => {
+    const categoryRows = window.MockData.categories || [];
+    const exact = categoryRows.find((item) => item.name === category)?.specTemplate;
+    if (exact?.length) return cloneSpecTemplate(exact);
+    const preset = defaultProductSpecTemplates[category];
+    if (preset?.length) return cloneSpecTemplate(preset);
+    const matchedKey = Object.keys(defaultProductSpecTemplates).find((key) => category && (category.includes(key) || key.includes(category)));
+    return cloneSpecTemplate(matchedKey ? defaultProductSpecTemplates[matchedKey] : []);
+  };
+  const parseSpecOptions = (value) => String(value || "").split(/[,，、\n]/).map((item) => item.trim()).filter(Boolean);
+  const cartesianProduct = (rows) => rows.reduce((result, row) => result.flatMap((prefix) => row.options.map((option) => ({ ...prefix, [row.name]: option }))), [{}]);
+  const escapeAttribute = (value) => escapeHtml(String(value || "")).replace(/`/g, "&#96;");
   const getProductStandardFacts = (row) => productStandardFields.map(({ key, label }) => [label, row[key]]);
   const formatTag = (text) => {
     const value = displayValue(text);
@@ -5127,6 +5146,24 @@
       });
     }
 
+    const categorySpecList = modalCardEl.querySelector("[data-category-spec-list]");
+    const categorySpecRowHtml = () => `
+      <div class="category-spec-row" data-category-spec-row>
+        <input class="input" data-category-spec-name placeholder="规格名称，如颜色" />
+        <input class="input" data-category-spec-options placeholder="规格值，使用逗号分隔" />
+        <label class="category-spec-check"><input type="checkbox" data-category-spec-required checked />必填</label>
+        <label class="category-spec-check"><input type="checkbox" data-category-spec-sku checked />参与组合</label>
+        <button class="btn btn-danger btn-sm" type="button" data-category-spec-remove>删除</button>
+      </div>
+    `;
+    modalCardEl.querySelector("[data-category-spec-add]")?.addEventListener("click", () => {
+      categorySpecList?.insertAdjacentHTML("beforeend", categorySpecRowHtml());
+    });
+    categorySpecList?.addEventListener("click", (event) => {
+      const remove = event.target.closest("[data-category-spec-remove]");
+      if (remove) remove.closest("[data-category-spec-row]")?.remove();
+    });
+
     const deleteCategoryBtn = modalCardEl.querySelector("[data-delete-category]");
     if (deleteCategoryBtn) {
       deleteCategoryBtn.addEventListener("click", () => {
@@ -6169,6 +6206,16 @@
 
   function openCategoryEditorModal(mode, row) {
     const isEdit = mode === "edit";
+    const specTemplate = cloneSpecTemplate(isEdit && row.specTemplate?.length ? row.specTemplate : getProductSpecTemplate(row?.name));
+    const renderSpecRows = (rows) => (rows.length ? rows : [{ name: "", options: [], required: true, sku: true }]).map((item) => `
+      <div class="category-spec-row" data-category-spec-row>
+        <input class="input" data-category-spec-name placeholder="规格名称，如颜色" value="${escapeAttribute(item.name)}" />
+        <input class="input" data-category-spec-options placeholder="规格值，使用逗号分隔" value="${escapeAttribute(item.options.join("、"))}" />
+        <label class="category-spec-check"><input type="checkbox" data-category-spec-required ${item.required !== false ? "checked" : ""} />必填</label>
+        <label class="category-spec-check"><input type="checkbox" data-category-spec-sku ${item.sku !== false ? "checked" : ""} />参与组合</label>
+        <button class="btn btn-danger btn-sm" type="button" data-category-spec-remove>删除</button>
+      </div>
+    `).join("");
     const parentOptions = ['<option value="">一级分类</option>']
       .concat(
         categories
@@ -6188,23 +6235,33 @@
         </div>
       </div>
       <div class="form-grid">
-        <div class="field-group">分类名称</div>
+        <div class="field-group">
+          <div class="field-label">分类名称</div>
           <input class="input" data-category-field="name" placeholder="请输入分类名称" value="${isEdit ? row.name : ""}" />
         </div>
-        <div class="field-group">排序</div>
+        <div class="field-group">
+          <div class="field-label">排序</div>
           <input class="input" data-category-field="sort" placeholder="请输入排序值" value="${isEdit ? row.sort : categories.length + 1}" />
         </div>
-        <div class="field-group">上级分类</div>
+        <div class="field-group">
+          <div class="field-label">上级分类</div>
           <select class="select" data-category-field="parent">
             ${parentOptions}
           </select>
         </div>
-        <div class="field-group">状态</div>
+        <div class="field-group">
+          <div class="field-label">状态</div>
           <select class="select" data-category-field="status">
             <option value="启用" ${(isEdit ? row.status : "启用") === "启用" ? "selected" : ""}>启用</option>
             <option value="停用" ${(isEdit ? row.status : "启用") === "停用" ? "selected" : ""}>停用</option>
           </select>
         </div>
+      </div>
+      <div class="field-group field-group-full" style="margin-top:16px;">
+        <div class="field-label">销售规格模板</div>
+        <div class="muted" style="margin:6px 0 10px;">定义用户购买时可选择、并参与库存组合的规格。其他属性继续放在商品详情字段中。</div>
+        <div class="category-spec-list" data-category-spec-list>${renderSpecRows(specTemplate)}</div>
+        <button class="btn btn-secondary btn-sm" type="button" data-category-spec-add style="margin-top:10px;">+ 添加规格</button>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-primary" type="button" data-save-category data-mode="${mode}" ${isEdit ? `data-name="${row.name}"` : ""}>${isEdit ? "保存修改" : "确认新增"}</button>
@@ -7340,6 +7397,23 @@
       .map((name) => `<option value="${name}" ${selectedCategory === name ? "selected" : ""}>${name}</option>`)
       .join("");
     const skuValue = isEdit ? row.sku : `PR-${String(products.length + 8801).padStart(4, "0")}`;
+    let selectedSpecs = cloneSpecTemplate(isEdit ? row.specs : getProductSpecTemplate(selectedCategory));
+    const existingVariants = Array.isArray(row?.variants) ? row.variants : [];
+    const renderVariantRows = (variants) => variants.length ? variants.map((variant, index) => `
+      <div class="product-variant-row" data-product-variant-row data-variant-index="${index}" data-values='${escapeAttribute(JSON.stringify(variant.values || {}))}'>
+        <div class="product-variant-values">${selectedSpecs.map((spec) => `<span>${escapeHtml(spec.name)}：${escapeHtml(variant.values?.[spec.name] || "-")}</span>`).join("")}</div>
+        <input class="input" data-variant-field="sku" value="${escapeAttribute(variant.sku || skuValue + "-V" + String(index + 1).padStart(2, "0"))}" />
+        <input class="input" data-variant-field="price" value="${escapeAttribute(variant.price || "¥ 0")}" />
+        <input class="input" data-variant-field="stock" type="number" min="0" value="${Number(variant.stock || 0)}" />
+        <div class="product-variant-image-cell">
+          <input type="hidden" data-variant-field="image" value="${escapeAttribute(variant.image || "")}" />
+          <input type="file" accept="image/*" data-variant-image-input />
+          <span data-variant-image-name>${escapeHtml(variant.image || "未上传")}</span>
+        </div>
+        <select class="select" data-variant-field="status"><option value="上架" ${(variant.status || "上架") === "上架" ? "selected" : ""}>上架</option><option value="缺货" ${variant.status === "缺货" ? "selected" : ""}>缺货</option><option value="下架" ${variant.status === "下架" ? "selected" : ""}>下架</option></select>
+        <button class="btn btn-danger btn-sm" type="button" data-product-variant-remove>删除</button>
+      </div>
+    `).join("") : `<div class="muted" data-product-variant-empty>还没有规格组合，请先填写规格值并生成组合。</div>`;
     const isImageField = (key) => /^productImage\d+$/.test(key) || /^installImage\d+$/.test(key);
     const standardFieldHtml = productStandardFields.map(({ key, label }) => {
       const value = isEdit ? row[key] || "" : "";
@@ -7414,6 +7488,20 @@
             <div class="product-fitment-dropdown" data-product-fitment-options></div>
           </div>
         </div>
+        <div class="field-group field-group-full product-spec-editor">
+          <div class="field-label">商品规格</div>
+          <div class="muted" style="margin:6px 0 10px;">当前类目规格模板，可补充本商品实际销售的规格值。</div>
+          <div class="product-spec-input-list" data-product-spec-list>
+            ${selectedSpecs.length ? selectedSpecs.map((spec) => `<div class="product-spec-input-row" data-product-spec-row><input class="input" data-product-spec-name value="${escapeAttribute(spec.name)}" readonly /><input class="input" data-product-spec-options value="${escapeAttribute(spec.options.join("、"))}" placeholder="规格值，使用逗号分隔" /><label class="category-spec-check"><input type="checkbox" data-product-spec-required ${spec.required !== false ? "checked" : ""} />必填</label><label class="category-spec-check"><input type="checkbox" data-product-spec-sku ${spec.sku !== false ? "checked" : ""} />参与组合</label></div>`).join("") : `<div class="muted">当前类目暂无规格模板，商品将按单规格销售。</div>`}
+          </div>
+          <button class="btn btn-secondary btn-sm" type="button" data-generate-variants style="margin-top:10px;">生成规格组合</button>
+        </div>
+        <div class="field-group field-group-full product-variant-editor">
+          <div class="field-label">规格组合</div>
+          <div class="product-variant-table" data-product-variant-list>
+            ${renderVariantRows(existingVariants)}
+          </div>
+        </div>
         <div class="field-group">
           <div class="field-label">状态</div>
           <select class="select" data-product-field="status">
@@ -7466,6 +7554,18 @@
     brandSelect?.addEventListener("change", () => {
       const options = getBrandCategories(brandSelect.value);
       categorySelect.innerHTML = options.map((name) => `<option value="${name}">${name}</option>`).join("");
+      categorySelect.dispatchEvent(new Event("change"));
+    });
+    categorySelect?.addEventListener("change", () => {
+      if (isEdit && categorySelect.value === row.category) return;
+      selectedSpecs = getProductSpecTemplate(categorySelect.value);
+      const specList = modalCardEl.querySelector("[data-product-spec-list]");
+      if (!specList) return;
+      specList.innerHTML = selectedSpecs.length
+        ? selectedSpecs.map((spec) => `<div class="product-spec-input-row" data-product-spec-row><input class="input" data-product-spec-name value="${escapeAttribute(spec.name)}" readonly /><input class="input" data-product-spec-options value="${escapeAttribute(spec.options.join("、"))}" placeholder="规格值，使用逗号分隔" /><label class="category-spec-check"><input type="checkbox" data-product-spec-required ${spec.required !== false ? "checked" : ""} />必填</label><label class="category-spec-check"><input type="checkbox" data-product-spec-sku ${spec.sku !== false ? "checked" : ""} />参与组合</label></div>`).join("")
+        : `<div class="muted">当前类目暂无规格模板，商品将按单规格销售。</div>`;
+      const variantList = modalCardEl.querySelector("[data-product-variant-list]");
+      if (variantList) variantList.innerHTML = `<div class="muted" data-product-variant-empty>类目规格已变化，请重新生成规格组合。</div>`;
     });
     const imageInput = modalCardEl.querySelector('[data-product-image-input]');
     const imageTrigger = modalCardEl.querySelector('[data-product-image-trigger]');
@@ -7502,6 +7602,70 @@
         };
         reader.readAsDataURL(file);
       });
+    });
+
+    const variantList = modalCardEl.querySelector("[data-product-variant-list]");
+    const collectProductSpecs = () => Array.from(modalCardEl.querySelectorAll("[data-product-spec-row]")).map((specRow) => ({
+      name: specRow.querySelector("[data-product-spec-name]")?.value.trim() || "",
+      options: parseSpecOptions(specRow.querySelector("[data-product-spec-options]")?.value || ""),
+      required: Boolean(specRow.querySelector("[data-product-spec-required]")?.checked),
+      sku: Boolean(specRow.querySelector("[data-product-spec-sku]")?.checked),
+    })).filter((spec) => spec.name && spec.options.length && spec.sku);
+    const readVariantRows = () => Array.from(modalCardEl.querySelectorAll("[data-product-variant-row]")).map((variantRow) => ({
+      sku: variantRow.querySelector('[data-variant-field="sku"]')?.value.trim() || "",
+      price: variantRow.querySelector('[data-variant-field="price"]')?.value.trim() || "",
+      stock: Number(variantRow.querySelector('[data-variant-field="stock"]')?.value || 0),
+      image: variantRow.querySelector('[data-variant-field="image"]')?.value || "",
+      status: variantRow.querySelector('[data-variant-field="status"]')?.value || "上架",
+      values: JSON.parse(variantRow.dataset.values || "{}"),
+    }));
+    const writeVariantRows = (variants) => {
+      if (variantList) variantList.innerHTML = renderVariantRows(variants);
+      bindVariantImageInputs();
+    };
+    const bindVariantImageInputs = () => {
+      modalCardEl.querySelectorAll("[data-variant-image-input]").forEach((input) => {
+        input.addEventListener("change", (event) => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          const rowEl = input.closest("[data-product-variant-row]");
+          const reader = new FileReader();
+          reader.onload = () => {
+            const field = rowEl?.querySelector('[data-variant-field="image"]');
+            const label = rowEl?.querySelector("[data-variant-image-name]");
+            if (field) field.value = String(reader.result || "");
+            if (label) label.textContent = file.name;
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+    };
+    bindVariantImageInputs();
+    modalCardEl.querySelector("[data-generate-variants]")?.addEventListener("click", () => {
+      const specs = collectProductSpecs();
+      if (!specs.length) {
+        openFeedbackModal("规格不完整", "请先填写至少一个参与组合的规格及规格值。");
+        return;
+      }
+      const combinations = cartesianProduct(specs);
+      const previous = readVariantRows();
+      const readBaseField = (field) => modalCardEl.querySelector(`[data-product-field="${field}"]`)?.value.trim() || "";
+      const variants = combinations.map((values, index) => {
+        const old = previous.find((item) => Object.entries(values).every(([key, value]) => item.values?.[key] === value));
+        return old || {
+          sku: `${skuValue}-V${String(index + 1).padStart(2, "0")}`,
+          values,
+          price: readBaseField("price") || "¥ 0",
+          stock: Number(readBaseField("stock")) || 0,
+          image: readBaseField("image"),
+          status: readBaseField("status") || "上架",
+        };
+      });
+      writeVariantRows(variants);
+    });
+    variantList?.addEventListener("click", (event) => {
+      const remove = event.target.closest("[data-product-variant-remove]");
+      if (remove) remove.closest("[data-product-variant-row]")?.remove();
     });
   }
 
@@ -8366,6 +8530,20 @@
       return el ? el.value.trim() : "";
     };
     const fitment = getProductFitmentSelection(modalCardEl.querySelector("[data-product-fitment-picker]")).join(" / ");
+    const specs = Array.from(modalCardEl.querySelectorAll("[data-product-spec-row]")).map((row) => ({
+      name: row.querySelector("[data-product-spec-name]")?.value.trim() || "",
+      options: parseSpecOptions(row.querySelector("[data-product-spec-options]")?.value || ""),
+      required: Boolean(row.querySelector("[data-product-spec-required]")?.checked),
+      sku: Boolean(row.querySelector("[data-product-spec-sku]")?.checked),
+    })).filter((item) => item.name && item.options.length);
+    const variants = Array.from(modalCardEl.querySelectorAll("[data-product-variant-row]")).map((row) => ({
+      sku: row.querySelector('[data-variant-field="sku"]')?.value.trim() || "",
+      values: JSON.parse(row.dataset.values || "{}"),
+      price: row.querySelector('[data-variant-field="price"]')?.value.trim() || "",
+      stock: Number(row.querySelector('[data-variant-field="stock"]')?.value || 0),
+      image: row.querySelector('[data-variant-field="image"]')?.value || "",
+      status: row.querySelector('[data-variant-field="status"]')?.value || "上架",
+    }));
 
     const promoType = getValue("promoType");
     const payload = {
@@ -8387,7 +8565,14 @@
         discount: getValue("promoDiscount"),
         desc: getValue("promoDesc"),
       } : null,
+      specs,
+      variants,
     };
+    if (variants.length) {
+      payload.price = variants.find((item) => item.status !== "下架")?.price || payload.price;
+      payload.stock = variants.reduce((sum, item) => sum + Number(item.stock || 0), 0);
+      payload.image = variants.find((item) => item.image)?.image || payload.image;
+    }
     productStandardFields.forEach(({ key }) => {
       payload[key] = getValue(key);
     });
@@ -8399,6 +8584,11 @@
 
     if (!(window.MockData.brands || []).some((item) => item.name === payload.brand)) {
       openFeedbackModal("品牌无效", "请选择品牌列表中已维护的品牌。");
+      return;
+    }
+
+    if (specs.length && !variants.length) {
+      openFeedbackModal("规格组合未生成", "请点击“生成规格组合”，并至少保留一个可销售组合。");
       return;
     }
 
@@ -8545,12 +8735,19 @@
       return el ? el.value.trim() : "";
     };
 
+    const specTemplate = Array.from(modalCardEl.querySelectorAll("[data-category-spec-row]")).map((row) => ({
+      name: row.querySelector("[data-category-spec-name]")?.value.trim() || "",
+      options: parseSpecOptions(row.querySelector("[data-category-spec-options]")?.value || ""),
+      required: Boolean(row.querySelector("[data-category-spec-required]")?.checked),
+      sku: Boolean(row.querySelector("[data-category-spec-sku]")?.checked),
+    })).filter((item) => item.name && item.options.length);
     const payload = {
       name: getValue("name"),
       sort: Number(getValue("sort")) || 0,
       parent: getValue("parent"),
       level: getValue("parent") ? 1 : 0,
       status: getValue("status"),
+      specTemplate,
     };
 
     if (!payload.name) {

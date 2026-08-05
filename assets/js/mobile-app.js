@@ -2397,7 +2397,7 @@
   }
 
   function buildUserGoodsOrderLink(item, quantity = 1) {
-    return `user-order-create.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(item.category) || "exterior")}&quantity=${encodeURIComponent(String(quantity || 1))}`;
+    return `user-order-create.html?sku=${encodeURIComponent(item.sku || "")}&variantSku=${encodeURIComponent(item.variantSku || "")}&specSummary=${encodeURIComponent(item.specSummary || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(item.category) || "exterior")}&quantity=${encodeURIComponent(String(quantity || 1))}`;
   }
 
   function renderUserProfile() {
@@ -2410,7 +2410,7 @@
     if (!rows.length) {
       return `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Cart</div><h3>我的购物车</h3><div class="admin-timeline"><div>当前购物车为空</div><div>去商城挑选商品后，可以把心仪商品先加入购物车。</div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-tab="mall">去商城</button></div></section></div>`;
     }
-    return `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Cart</div><h3>我的购物车</h3><div class="admin-kv-list"><div><span>商品数量</span><strong>${rows.length}</strong></div><div><span>商品总件数</span><strong>${rows.reduce((sum, item) => sum + Number(item.quantity || 0), 0)}</strong></div><div><span>合计金额</span><strong>${formatCurrency(totalAmount)}</strong></div><div><span>状态</span><strong>可继续下单</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-tab="mall">继续逛商城</button><button class="btn btn-danger" type="button" data-user-action="user-cart-clear">清空购物车</button></div></section><div class="mobile-list">${rows.map((item) => `<section class="admin-detail-card"><h3>${safe(item.name, "商品")}</h3><div class="admin-kv-list"><div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>适配车型</span><strong>${safe(item.fitment, "-")}</strong></div><div><span>单价</span><strong>${safe(item.price, "-")}</strong></div><div><span>数量</span><strong>${Number(item.quantity || 0)}</strong></div><div><span>小计</span><strong>${formatCurrency(priceToNumber(item.price) * Number(item.quantity || 0))}</strong></div><div><span>下单状态</span><strong>待提交</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-user-action="user-cart-remove" data-user-id="${safe(item.sku, "")}">移除</button><a class="btn btn-primary" href="user-order-create.html?sku=${encodeURIComponent(safe(item.sku, ""))}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment, "适配当前车型"))}&mallPage=${encodeURIComponent(safe(item.mallPage, "exterior"))}&quantity=${encodeURIComponent(String(Number(item.quantity || 1)))}&from=cart">去下单</a></div></section>`).join("")}</div></div>`;
+    return `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Cart</div><h3>我的购物车</h3><div class="admin-kv-list"><div><span>商品数量</span><strong>${rows.length}</strong></div><div><span>商品总件数</span><strong>${rows.reduce((sum, item) => sum + Number(item.quantity || 0), 0)}</strong></div><div><span>合计金额</span><strong>${formatCurrency(totalAmount)}</strong></div><div><span>状态</span><strong>可继续下单</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-tab="mall">继续逛商城</button><button class="btn btn-danger" type="button" data-user-action="user-cart-clear">清空购物车</button></div></section><div class="mobile-list">${rows.map((item) => `<section class="admin-detail-card"><h3>${safe(item.name, "商品")}</h3><div class="admin-kv-list"><div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div>${item.specSummary ? `<div><span>已选规格</span><strong>${safe(item.specSummary, "-")}</strong></div>` : ""}<div><span>适配车型</span><strong>${safe(item.fitment, "-")}</strong></div><div><span>单价</span><strong>${safe(item.price, "-")}</strong></div><div><span>数量</span><strong>${Number(item.quantity || 0)}</strong></div><div><span>小计</span><strong>${formatCurrency(priceToNumber(item.price) * Number(item.quantity || 0))}</strong></div><div><span>下单状态</span><strong>待提交</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-user-action="user-cart-remove" data-user-id="${safe(item.variantSku || item.sku, "")}">移除</button><a class="btn btn-primary" href="${buildUserGoodsOrderLink(item, Number(item.quantity || 1))}&from=cart">去下单</a></div></section>`).join("")}</div></div>`;
   }
 
   function renderUserHistoryOrders() {
@@ -2748,7 +2748,7 @@
       return;
     }
     if (action === "user-cart-remove") {
-      const nextRows = getUserCartItems().filter((item) => safe(item.sku, "") !== id);
+      const nextRows = getUserCartItems().filter((item) => safe(item.variantSku || item.sku, "") !== id);
       setUserCartItems(nextRows);
       state.userFeedback = "商品已从购物车移除。";
       render();
@@ -2761,9 +2761,9 @@
       return;
     }
     if (action === "user-cart-order") {
-      const target = getUserCartItems().find((item) => safe(item.sku, "") === id);
+      const target = getUserCartItems().find((item) => safe(item.variantSku || item.sku, "") === id);
       if (!target) return;
-      window.location.href = `user-order-create.html?sku=${encodeURIComponent(safe(target.sku, ""))}&name=${encodeURIComponent(safe(target.name, "商品"))}&price=${encodeURIComponent(safe(target.price, "¥0"))}&brand=${encodeURIComponent(safe(target.brand, "-"))}&fitment=${encodeURIComponent(safe(target.fitment, "适配当前车型"))}&mallPage=${encodeURIComponent(safe(target.mallPage, "exterior"))}&quantity=${encodeURIComponent(String(Number(target.quantity || 1)))}&from=cart`;
+      window.location.href = `${buildUserGoodsOrderLink(target, Number(target.quantity || 1))}&from=cart`;
       return;
     }
     if (action === "user-coupon-filter") {

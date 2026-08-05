@@ -35,10 +35,11 @@
                   <div class="order-create-visual">
                     <span class="product-detail-sku" id="orderSku">SKU</span>
                   </div>
-                  <div class="product-detail-head">
-                    <h3 id="orderName">改装商品</h3>
-                    <p id="orderFitment">适配车型信息</p>
-                    <div class="product-detail-price-line">
+                    <div class="product-detail-head">
+                      <h3 id="orderName">改装商品</h3>
+                      <p id="orderFitment">适配车型信息</p>
+                      <p id="orderVariant" style="display:none; color:var(--accent); font-size:12px;"></p>
+                      <div class="product-detail-price-line">
                       <strong id="orderPrice">¥0</strong>
                       <span id="orderBrand">-</span>
                     </div>
@@ -186,6 +187,8 @@
       const CART_STORAGE_KEY = "mockUserCart";
       const params = new URLSearchParams(location.search);
       const sku = params.get("sku") || "SKU";
+      const variantSku = params.get("variantSku") || "";
+      const specSummary = params.get("specSummary") || "";
       const name = params.get("name") || "改装商品";
       const price = params.get("price") || "¥0";
       const brand = params.get("brand") || "-";
@@ -197,6 +200,7 @@
       const orderSkuEl = document.getElementById("orderSku");
       const orderNameEl = document.getElementById("orderName");
       const orderFitmentEl = document.getElementById("orderFitment");
+      const orderVariantEl = document.getElementById("orderVariant");
       const orderBrandEl = document.getElementById("orderBrand");
       const orderPriceEl = document.getElementById("orderPrice");
       const orderQuantityTextEl = document.getElementById("orderQuantityText");
@@ -220,6 +224,7 @@
       orderSkuEl.textContent = sku;
       orderNameEl.textContent = name;
       orderFitmentEl.textContent = fitment;
+      if (specSummary) { orderVariantEl.textContent = `已选规格：${specSummary}`; orderVariantEl.style.display = "block"; }
       orderBrandEl.textContent = brand;
       orderPriceEl.textContent = price;
       orderQuantityInput.value = String(initialQuantity);
@@ -423,7 +428,10 @@
             displayType,
             user: "当前用户",
             vehicle,
-            service: `${name} x${quantity}`,
+            service: `${name}${specSummary ? `（${specSummary}）` : ""} x${quantity}`,
+            sku,
+            variantSku,
+            specSummary,
             provider: deliveryType === "provider" ? (provider || "待分配") : "平台仓",
             city: "上海",
             quote: totalPrice,
@@ -448,7 +456,7 @@
         writeOrders(nextOrders);
 
         if (sourceFrom === "cart") {
-          writeCart(readCart().filter((item) => String(item.sku || "") !== sku));
+          writeCart(readCart().filter((item) => String(item.variantSku || item.sku || "") !== String(variantSku || sku)));
         }
 
         const points = Math.floor(finalTotal / 100);
