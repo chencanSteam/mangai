@@ -262,12 +262,20 @@
     { key: "remark", label: "备注" },
   ];
   const defaultProductSpecTemplates = window.MockData.productSpecTemplates || {};
+  const productSpecFieldNames = [
+    "尺寸", "颜色", "材质", "宽度", "高度", "厚度", "长度", "直径", "盘径", "卡钳颜色", "活塞数量",
+    "ET值", "PCD", "中心孔", "轮胎规格", "软硬度", "功率", "声浪等级", "版本", "适配车型",
+  ];
+  const renderProductSpecFieldCheckboxes = (selected = []) => {
+    const names = [...new Set([...selected, ...productSpecFieldNames].filter(Boolean))];
+    return names.map((name) => `<label class="category-spec-option"><input type="checkbox" data-category-spec-checkbox value="${escapeAttribute(name)}" ${selected.includes(name) ? "checked" : ""} />${escapeHtml(name)}</label>`).join("");
+  };
   const cloneSpecTemplate = (rows) => (rows || []).map((row) => ({
     name: String(row.name || "").trim(),
     options: Array.isArray(row.options) ? row.options.filter(Boolean).map(String) : [],
     required: row.required !== false,
     sku: row.sku !== false,
-  })).filter((row) => row.name && row.options.length);
+  })).filter((row) => row.name);
   const getProductSpecTemplate = (category) => {
     const categoryRows = window.MockData.categories || [];
     const exact = categoryRows.find((item) => item.name === category)?.specTemplate;
@@ -278,7 +286,6 @@
     return cloneSpecTemplate(matchedKey ? defaultProductSpecTemplates[matchedKey] : []);
   };
   const parseSpecOptions = (value) => String(value || "").split(/[,，、\n]/).map((item) => item.trim()).filter(Boolean);
-  const cartesianProduct = (rows) => rows.reduce((result, row) => result.flatMap((prefix) => row.options.map((option) => ({ ...prefix, [row.name]: option }))), [{}]);
   const escapeAttribute = (value) => escapeHtml(String(value || "")).replace(/`/g, "&#96;");
   const getProductStandardFacts = (row) => productStandardFields.map(({ key, label }) => [label, row[key]]);
   const formatTag = (text) => {
@@ -1601,7 +1608,7 @@
       filters: ["全部", "上架", "缺货"],
       stats: [metric("商品总数", "156"), metric("高端品牌", "24"), metric("在售 SKU", "132"), metric("缺货提醒", "8")],
       columns: [
-        { key: "sku", label: "SKU" },
+        { key: "sku", label: "SPU编码" },
         { key: "name", label: "商品名称" },
         { key: "brand", label: "品牌" },
         { key: "price", label: "价格" },
@@ -5146,24 +5153,6 @@
       });
     }
 
-    const categorySpecList = modalCardEl.querySelector("[data-category-spec-list]");
-    const categorySpecRowHtml = () => `
-      <div class="category-spec-row" data-category-spec-row>
-        <input class="input" data-category-spec-name placeholder="规格名称，如颜色" />
-        <input class="input" data-category-spec-options placeholder="规格值，使用逗号分隔" />
-        <label class="category-spec-check"><input type="checkbox" data-category-spec-required checked />必填</label>
-        <label class="category-spec-check"><input type="checkbox" data-category-spec-sku checked />参与组合</label>
-        <button class="btn btn-danger btn-sm" type="button" data-category-spec-remove>删除</button>
-      </div>
-    `;
-    modalCardEl.querySelector("[data-category-spec-add]")?.addEventListener("click", () => {
-      categorySpecList?.insertAdjacentHTML("beforeend", categorySpecRowHtml());
-    });
-    categorySpecList?.addEventListener("click", (event) => {
-      const remove = event.target.closest("[data-category-spec-remove]");
-      if (remove) remove.closest("[data-category-spec-row]")?.remove();
-    });
-
     const deleteCategoryBtn = modalCardEl.querySelector("[data-delete-category]");
     if (deleteCategoryBtn) {
       deleteCategoryBtn.addEventListener("click", () => {
@@ -6207,15 +6196,7 @@
   function openCategoryEditorModal(mode, row) {
     const isEdit = mode === "edit";
     const specTemplate = cloneSpecTemplate(isEdit && row.specTemplate?.length ? row.specTemplate : getProductSpecTemplate(row?.name));
-    const renderSpecRows = (rows) => (rows.length ? rows : [{ name: "", options: [], required: true, sku: true }]).map((item) => `
-      <div class="category-spec-row" data-category-spec-row>
-        <input class="input" data-category-spec-name placeholder="规格名称，如颜色" value="${escapeAttribute(item.name)}" />
-        <input class="input" data-category-spec-options placeholder="规格值，使用逗号分隔" value="${escapeAttribute(item.options.join("、"))}" />
-        <label class="category-spec-check"><input type="checkbox" data-category-spec-required ${item.required !== false ? "checked" : ""} />必填</label>
-        <label class="category-spec-check"><input type="checkbox" data-category-spec-sku ${item.sku !== false ? "checked" : ""} />参与组合</label>
-        <button class="btn btn-danger btn-sm" type="button" data-category-spec-remove>删除</button>
-      </div>
-    `).join("");
+    const selectedSpecNames = specTemplate.map((item) => item.name).filter(Boolean);
     const parentOptions = ['<option value="">一级分类</option>']
       .concat(
         categories
@@ -6259,9 +6240,8 @@
       </div>
       <div class="field-group field-group-full" style="margin-top:16px;">
         <div class="field-label">销售规格模板</div>
-        <div class="muted" style="margin:6px 0 10px;">定义用户购买时可选择、并参与库存组合的规格。其他属性继续放在商品详情字段中。</div>
-        <div class="category-spec-list" data-category-spec-list>${renderSpecRows(specTemplate)}</div>
-        <button class="btn btn-secondary btn-sm" type="button" data-category-spec-add style="margin-top:10px;">+ 添加规格</button>
+        <div class="muted" style="margin:6px 0 10px;">只维护用户购买时需要选择的规格字段名，具体规格值在商品 SKU 中填写。</div>
+        <div class="category-spec-checkbox-list" data-category-spec-list>${renderProductSpecFieldCheckboxes(selectedSpecNames)}</div>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-primary" type="button" data-save-category data-mode="${mode}" ${isEdit ? `data-name="${row.name}"` : ""}>${isEdit ? "保存修改" : "确认新增"}</button>
@@ -7401,8 +7381,8 @@
     const existingVariants = Array.isArray(row?.variants) ? row.variants : [];
     const renderVariantRows = (variants) => variants.length ? variants.map((variant, index) => `
       <div class="product-variant-row" data-product-variant-row data-variant-index="${index}" data-values='${escapeAttribute(JSON.stringify(variant.values || {}))}'>
-        <div class="product-variant-values">${selectedSpecs.map((spec) => `<span>${escapeHtml(spec.name)}：${escapeHtml(variant.values?.[spec.name] || "-")}</span>`).join("")}</div>
-        <input class="input" data-variant-field="sku" value="${escapeAttribute(variant.sku || skuValue + "-V" + String(index + 1).padStart(2, "0"))}" />
+        <div class="product-variant-values">${selectedSpecs.map((spec) => `<label><span>${escapeHtml(spec.name)}</span><input class="input" data-variant-spec="${escapeAttribute(spec.name)}" value="${escapeAttribute(variant.values?.[spec.name] || "")}" placeholder="填写${escapeAttribute(spec.name)}" /></label>`).join("")}</div>
+        <input class="input" data-variant-field="sku" value="${escapeAttribute(variant.sku || "")}" placeholder="填写 SKU 编码" />
         <input class="input" data-variant-field="price" value="${escapeAttribute(variant.price || "¥ 0")}" />
         <input class="input" data-variant-field="stock" type="number" min="0" value="${Number(variant.stock || 0)}" />
         <div class="product-variant-image-cell">
@@ -7413,7 +7393,7 @@
         <select class="select" data-variant-field="status"><option value="上架" ${(variant.status || "上架") === "上架" ? "selected" : ""}>上架</option><option value="缺货" ${variant.status === "缺货" ? "selected" : ""}>缺货</option><option value="下架" ${variant.status === "下架" ? "selected" : ""}>下架</option></select>
         <button class="btn btn-danger btn-sm" type="button" data-product-variant-remove>删除</button>
       </div>
-    `).join("") : `<div class="muted" data-product-variant-empty>还没有规格组合，请先填写规格值并生成组合。</div>`;
+    `).join("") : `<div class="muted" data-product-variant-empty>还没有 SKU，请点击“添加 SKU”并手动填写规格值。</div>`;
     const isImageField = (key) => /^productImage\d+$/.test(key) || /^installImage\d+$/.test(key);
     const standardFieldHtml = productStandardFields.map(({ key, label }) => {
       const value = isEdit ? row[key] || "" : "";
@@ -7453,8 +7433,9 @@
       </div>
       <div class="form-grid">
         <div class="field-group">
-          <div class="field-label">SKU</div>
+          <div class="field-label">SPU编码</div>
           <input class="input" data-product-field="sku" value="${skuValue}" ${isEdit ? "readonly" : ""} />
+          <div class="field-hint">商品主体编码；每个 SKU 对应一组具体规格值</div>
         </div>
         <div class="field-group">
           <div class="field-label">商品名称</div>
@@ -7490,14 +7471,15 @@
         </div>
         <div class="field-group field-group-full product-spec-editor">
           <div class="field-label">商品规格</div>
-          <div class="muted" style="margin:6px 0 10px;">当前类目规格模板，可补充本商品实际销售的规格值。</div>
+          <div class="muted" style="margin:6px 0 10px;">当前类目只提供规格字段名，具体规格值请在下方每个 SKU 中填写。</div>
           <div class="product-spec-input-list" data-product-spec-list>
-            ${selectedSpecs.length ? selectedSpecs.map((spec) => `<div class="product-spec-input-row" data-product-spec-row><input class="input" data-product-spec-name value="${escapeAttribute(spec.name)}" readonly /><input class="input" data-product-spec-options value="${escapeAttribute(spec.options.join("、"))}" placeholder="规格值，使用逗号分隔" /><label class="category-spec-check"><input type="checkbox" data-product-spec-required ${spec.required !== false ? "checked" : ""} />必填</label><label class="category-spec-check"><input type="checkbox" data-product-spec-sku ${spec.sku !== false ? "checked" : ""} />参与组合</label></div>`).join("") : `<div class="muted">当前类目暂无规格模板，商品将按单规格销售。</div>`}
+            ${selectedSpecs.length ? selectedSpecs.map((spec) => `<div class="product-spec-input-row" data-product-spec-row><input class="input" data-product-spec-name value="${escapeAttribute(spec.name)}" readonly /></div>`).join("") : `<div class="muted">当前类目暂无规格模板，商品将按单规格销售。</div>`}
           </div>
-          <button class="btn btn-secondary btn-sm" type="button" data-generate-variants style="margin-top:10px;">生成规格组合</button>
         </div>
         <div class="field-group field-group-full product-variant-editor">
-          <div class="field-label">规格组合</div>
+          <div class="field-label">SKU 明细</div>
+          <div class="field-hint">每行手动维护一个 SKU，以及对应的规格值、价格、库存和图片</div>
+          <button class="btn btn-secondary btn-sm" type="button" data-product-variant-add style="margin-top:10px;">+ 添加 SKU</button>
           <div class="product-variant-table" data-product-variant-list>
             ${renderVariantRows(existingVariants)}
           </div>
@@ -7562,10 +7544,10 @@
       const specList = modalCardEl.querySelector("[data-product-spec-list]");
       if (!specList) return;
       specList.innerHTML = selectedSpecs.length
-        ? selectedSpecs.map((spec) => `<div class="product-spec-input-row" data-product-spec-row><input class="input" data-product-spec-name value="${escapeAttribute(spec.name)}" readonly /><input class="input" data-product-spec-options value="${escapeAttribute(spec.options.join("、"))}" placeholder="规格值，使用逗号分隔" /><label class="category-spec-check"><input type="checkbox" data-product-spec-required ${spec.required !== false ? "checked" : ""} />必填</label><label class="category-spec-check"><input type="checkbox" data-product-spec-sku ${spec.sku !== false ? "checked" : ""} />参与组合</label></div>`).join("")
+        ? selectedSpecs.map((spec) => `<div class="product-spec-input-row" data-product-spec-row><input class="input" data-product-spec-name value="${escapeAttribute(spec.name)}" readonly /></div>`).join("")
         : `<div class="muted">当前类目暂无规格模板，商品将按单规格销售。</div>`;
       const variantList = modalCardEl.querySelector("[data-product-variant-list]");
-      if (variantList) variantList.innerHTML = `<div class="muted" data-product-variant-empty>类目规格已变化，请重新生成规格组合。</div>`;
+      if (variantList) variantList.innerHTML = `<div class="muted" data-product-variant-empty>类目规格已变化，请点击“添加 SKU”并手动填写。</div>`;
     });
     const imageInput = modalCardEl.querySelector('[data-product-image-input]');
     const imageTrigger = modalCardEl.querySelector('[data-product-image-trigger]');
@@ -7605,19 +7587,13 @@
     });
 
     const variantList = modalCardEl.querySelector("[data-product-variant-list]");
-    const collectProductSpecs = () => Array.from(modalCardEl.querySelectorAll("[data-product-spec-row]")).map((specRow) => ({
-      name: specRow.querySelector("[data-product-spec-name]")?.value.trim() || "",
-      options: parseSpecOptions(specRow.querySelector("[data-product-spec-options]")?.value || ""),
-      required: Boolean(specRow.querySelector("[data-product-spec-required]")?.checked),
-      sku: Boolean(specRow.querySelector("[data-product-spec-sku]")?.checked),
-    })).filter((spec) => spec.name && spec.options.length && spec.sku);
     const readVariantRows = () => Array.from(modalCardEl.querySelectorAll("[data-product-variant-row]")).map((variantRow) => ({
       sku: variantRow.querySelector('[data-variant-field="sku"]')?.value.trim() || "",
       price: variantRow.querySelector('[data-variant-field="price"]')?.value.trim() || "",
       stock: Number(variantRow.querySelector('[data-variant-field="stock"]')?.value || 0),
       image: variantRow.querySelector('[data-variant-field="image"]')?.value || "",
       status: variantRow.querySelector('[data-variant-field="status"]')?.value || "上架",
-      values: JSON.parse(variantRow.dataset.values || "{}"),
+      values: Object.fromEntries(Array.from(variantRow.querySelectorAll("[data-variant-spec]")).map((field) => [field.dataset.variantSpec, field.value.trim()])),
     }));
     const writeVariantRows = (variants) => {
       if (variantList) variantList.innerHTML = renderVariantRows(variants);
@@ -7641,26 +7617,8 @@
       });
     };
     bindVariantImageInputs();
-    modalCardEl.querySelector("[data-generate-variants]")?.addEventListener("click", () => {
-      const specs = collectProductSpecs();
-      if (!specs.length) {
-        openFeedbackModal("规格不完整", "请先填写至少一个参与组合的规格及规格值。");
-        return;
-      }
-      const combinations = cartesianProduct(specs);
-      const previous = readVariantRows();
-      const readBaseField = (field) => modalCardEl.querySelector(`[data-product-field="${field}"]`)?.value.trim() || "";
-      const variants = combinations.map((values, index) => {
-        const old = previous.find((item) => Object.entries(values).every(([key, value]) => item.values?.[key] === value));
-        return old || {
-          sku: `${skuValue}-V${String(index + 1).padStart(2, "0")}`,
-          values,
-          price: readBaseField("price") || "¥ 0",
-          stock: Number(readBaseField("stock")) || 0,
-          image: readBaseField("image"),
-          status: readBaseField("status") || "上架",
-        };
-      });
+    modalCardEl.querySelector("[data-product-variant-add]")?.addEventListener("click", () => {
+      const variants = [...readVariantRows(), { sku: "", values: {}, price: "", stock: 0, image: "", status: "上架" }];
       writeVariantRows(variants);
     });
     variantList?.addEventListener("click", (event) => {
@@ -8530,19 +8488,22 @@
       return el ? el.value.trim() : "";
     };
     const fitment = getProductFitmentSelection(modalCardEl.querySelector("[data-product-fitment-picker]")).join(" / ");
-    const specs = Array.from(modalCardEl.querySelectorAll("[data-product-spec-row]")).map((row) => ({
-      name: row.querySelector("[data-product-spec-name]")?.value.trim() || "",
-      options: parseSpecOptions(row.querySelector("[data-product-spec-options]")?.value || ""),
-      required: Boolean(row.querySelector("[data-product-spec-required]")?.checked),
-      sku: Boolean(row.querySelector("[data-product-spec-sku]")?.checked),
-    })).filter((item) => item.name && item.options.length);
+    const specNames = Array.from(modalCardEl.querySelectorAll("[data-product-spec-row]"))
+      .map((row) => row.querySelector("[data-product-spec-name]")?.value.trim() || "")
+      .filter(Boolean);
     const variants = Array.from(modalCardEl.querySelectorAll("[data-product-variant-row]")).map((row) => ({
       sku: row.querySelector('[data-variant-field="sku"]')?.value.trim() || "",
-      values: JSON.parse(row.dataset.values || "{}"),
+      values: Object.fromEntries(Array.from(row.querySelectorAll("[data-variant-spec]")).map((field) => [field.dataset.variantSpec, field.value.trim()])),
       price: row.querySelector('[data-variant-field="price"]')?.value.trim() || "",
       stock: Number(row.querySelector('[data-variant-field="stock"]')?.value || 0),
       image: row.querySelector('[data-variant-field="image"]')?.value || "",
       status: row.querySelector('[data-variant-field="status"]')?.value || "上架",
+    }));
+    const specs = specNames.map((name) => ({
+      name,
+      options: [...new Set(variants.map((variant) => variant.values?.[name]).filter(Boolean))],
+      required: true,
+      sku: true,
     }));
 
     const promoType = getValue("promoType");
@@ -8578,7 +8539,7 @@
     });
 
     if (!payload.sku || !payload.name || !payload.brand || !payload.category || !payload.fitment) {
-      openFeedbackModal("信息不完整", "请至少填写 SKU、商品名称、品牌、类目，并选择一个适配车型后再提交。");
+      openFeedbackModal("信息不完整", "请至少填写 SPU 编码、商品名称、品牌、类目，并选择一个适配车型后再提交。");
       return;
     }
 
@@ -8588,7 +8549,22 @@
     }
 
     if (specs.length && !variants.length) {
-      openFeedbackModal("规格组合未生成", "请点击“生成规格组合”，并至少保留一个可销售组合。");
+      openFeedbackModal("SKU 明细为空", "请点击“添加 SKU”，并至少填写一个 SKU 明细。");
+      return;
+    }
+
+    if (variants.some((item) => !item.sku || !item.price)) {
+      openFeedbackModal("SKU 信息不完整", "请为每个 SKU 填写 SKU 编码和价格。");
+      return;
+    }
+
+    if (specs.length && variants.some((item) => specs.some((spec) => !item.values?.[spec.name]))) {
+      openFeedbackModal("规格值不完整", "请为每个 SKU 填写全部规格值。");
+      return;
+    }
+
+    if (new Set(variants.map((item) => item.sku)).size !== variants.length) {
+      openFeedbackModal("SKU 编码重复", "每个 SKU 编码必须唯一，请检查后再保存。");
       return;
     }
 
@@ -8735,12 +8711,12 @@
       return el ? el.value.trim() : "";
     };
 
-    const specTemplate = Array.from(modalCardEl.querySelectorAll("[data-category-spec-row]")).map((row) => ({
-      name: row.querySelector("[data-category-spec-name]")?.value.trim() || "",
-      options: parseSpecOptions(row.querySelector("[data-category-spec-options]")?.value || ""),
-      required: Boolean(row.querySelector("[data-category-spec-required]")?.checked),
-      sku: Boolean(row.querySelector("[data-category-spec-sku]")?.checked),
-    })).filter((item) => item.name && item.options.length);
+    const specTemplate = Array.from(modalCardEl.querySelectorAll("[data-category-spec-checkbox]:checked")).map((checkbox) => ({
+      name: checkbox.value.trim(),
+      options: [],
+      required: true,
+      sku: true,
+    }));
     const payload = {
       name: getValue("name"),
       sort: Number(getValue("sort")) || 0,
@@ -9259,7 +9235,7 @@
         <div>
           <span class="eyebrow">Product Stock</span>
           <h2 class="section-title">修改库存</h2>
-          <p class="section-subtitle">${row.name}（SKU：${row.sku}）</p>
+          <p class="section-subtitle">${row.name}（SPU编码：${row.sku}）</p>
         </div>
       </div>
       <div style="margin-top:18px;">
