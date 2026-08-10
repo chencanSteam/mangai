@@ -4,15 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>帖子详情 - 满改平台</title>
-    <link rel="stylesheet" href="../assets/css/styles.css?v=topic-engage-fix-20260602" />
-    <style>
-      .topic-engage-btn span,
-      .topic-engage-btn strong {
-        white-space: nowrap !important;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-    </style>
+    <link rel="stylesheet" href="../assets/css/styles.css?v=topic-xhs-layout-20260810" />
   </head>
   <body>
     <main class="page-shell phone-stage">
@@ -20,9 +12,18 @@
         <div class="phone-frame">
           <div class="phone-screen" data-mobile-shell="user">
             <div class="android-status"><span>9:41</span><span>5G 92%</span></div>
-            <header class="android-topbar topic-detail-topbar">
-              <span class="eyebrow">帖子详情</span>
-              <h2>社区内容</h2>
+            <header class="topic-author-bar">
+              <button class="topic-back-btn" type="button" id="topicBackBtn" aria-label="返回">‹</button>
+              <div class="topic-author-avatar-wrap">
+                <div class="topic-author-avatar">M</div>
+                <button class="topic-avatar-badge" type="button" id="topicAvatarBadge" aria-label="关注">+</button>
+              </div>
+              <span class="topic-author-name">MAN GAI 社区编辑部</span>
+              <div class="topic-author-side">
+                <button class="topic-share-btn" type="button" id="topicShareBtn" aria-label="分享">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v7H4v-7"/><path d="M12 3v13"/><path d="M7 8l5-5 5 5"/></svg>
+                </button>
+              </div>
             </header>
             <section class="screen-content">
               <div class="stack topic-detail-page">
@@ -32,25 +33,9 @@
                     <h1>魔都午夜巡游改装盛典回顾</h1>
                     <p>从夜景街拍到姿态设定，这条热帖把轮毂、避震、包围和现场氛围都拍出了真正的社区质感。</p>
                     <div class="topic-meta-grid">
-                      <div><span>作者</span><strong>MAN GAI 社区编辑部</strong></div>
                       <div><span>发布时间</span><strong>2026-04-07 21:30</strong></div>
                       <div><span>分类</span><strong>热门话题 / 社区热帖</strong></div>
                       <div><span>浏览量</span><strong>8.6w</strong></div>
-                    </div>
-                    <div class="topic-engage-bar">
-                      <button class="topic-engage-btn" type="button" id="topicLikeBtn" aria-pressed="false">
-                        <i>赞</i>
-                        <strong><b id="topicLikeCount">98</b></strong>
-                      </button>
-                      <button class="topic-engage-btn" type="button" id="topicCollectBtn" aria-pressed="false">
-                        <i>藏</i>
-                        <strong><b id="topicCollectCount">26</b></strong>
-                      </button>
-                      <button class="topic-engage-btn" type="button" id="topicShareBtn">
-                        <i>享</i>
-                        <strong>分享</strong>
-                      </button>
-
                     </div>
                   </div>
                   <div class="topic-hero-visual" data-tone="night"></div>
@@ -170,12 +155,11 @@
 
               </div>
             </section>
-            <nav class="bottom-nav">
-              <button type="button" class="active" onclick="location.href='user-app.html?tab=forum'"><span>社区</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=mall'"><span>商城</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=garage'"><span>爱车</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=messages'"><span>消息</span></button>
-              <button type="button" onclick="location.href='user-app.html?tab=me'"><span>我的</span></button>
+            <nav class="topic-action-bar topic-action-bar-docked">
+              <button class="topic-action-input" type="button" id="topicActionInput">✎ 说点什么...</button>
+              <button class="topic-action-item" type="button" id="topicLikeBtn" aria-pressed="false"><span class="topic-action-icon" id="topicLikeIcon">♡</span><b id="topicLikeCount">98</b></button>
+              <button class="topic-action-item" type="button" id="topicCollectBtn" aria-pressed="false"><span class="topic-action-icon" id="topicCollectIcon">☆</span><b id="topicCollectCount">26</b></button>
+              <button class="topic-action-item" type="button" id="topicCommentBtn"><span class="topic-action-icon">💬</span><b id="topicCommentTotal">24</b></button>
             </nav>
           </div>
         </div>
@@ -189,10 +173,15 @@
         const feedback = document.getElementById("topicReplyFeedback");
         const likeBtn = document.getElementById("topicLikeBtn");
         const collectBtn = document.getElementById("topicCollectBtn");
-        const likeLabelEl = document.getElementById("topicLikeLabel");
-        const collectLabelEl = document.getElementById("topicCollectLabel");
+        const avatarBadge = document.getElementById("topicAvatarBadge");
+        const backBtn = document.getElementById("topicBackBtn");
+        const actionInput = document.getElementById("topicActionInput");
+        const commentBtn = document.getElementById("topicCommentBtn");
+        const likeIconEl = document.getElementById("topicLikeIcon");
+        const collectIconEl = document.getElementById("topicCollectIcon");
         const likeCountEl = document.getElementById("topicLikeCount");
         const collectCountEl = document.getElementById("topicCollectCount");
+        const commentTotalEl = document.getElementById("topicCommentTotal");
         const topicKey = new URLSearchParams(window.location.search).get("topic") || "night-cruise-review";
         const engageKey = `mockTopicEngage:${topicKey}`;
         const replyKey = `mockTopicReplies:${topicKey}`;
@@ -237,21 +226,28 @@
             commentList.prepend(article);
           });
           if (commentCount) commentCount.textContent = `${24 + rows.length} 条讨论`;
+          if (commentTotalEl) commentTotalEl.textContent = String(24 + rows.length);
         }
 
         function syncEngageState() {
-          if (!likeBtn || !collectBtn || !likeLabelEl || !collectLabelEl || !likeCountEl || !collectCountEl) return;
+          if (!likeBtn || !collectBtn || !likeCountEl || !collectCountEl) return;
           const state = readEngageState();
           const liked = !!state.liked;
           const collected = !!state.collected;
+          const followed = !!state.followed;
           likeBtn.classList.toggle("active", liked);
           collectBtn.classList.toggle("active", collected);
           likeBtn.setAttribute("aria-pressed", liked ? "true" : "false");
           collectBtn.setAttribute("aria-pressed", collected ? "true" : "false");
-          likeLabelEl.textContent = liked ? "已点赞" : "点赞";
-          collectLabelEl.textContent = collected ? "已收藏" : "收藏";
+          if (likeIconEl) likeIconEl.textContent = liked ? "❤" : "♡";
+          if (collectIconEl) collectIconEl.textContent = collected ? "★" : "☆";
           likeCountEl.textContent = String(98 + (liked ? 1 : 0));
           collectCountEl.textContent = String(26 + (collected ? 1 : 0));
+          if (avatarBadge) {
+            avatarBadge.classList.toggle("followed", followed);
+            avatarBadge.textContent = followed ? "✓" : "+";
+            avatarBadge.setAttribute("aria-label", followed ? "取消关注" : "关注");
+          }
         }
 
         if (likeBtn) {
@@ -269,6 +265,35 @@
             state.collected = !state.collected;
             writeEngageState(state);
             syncEngageState();
+          });
+        }
+
+        if (avatarBadge) {
+          avatarBadge.addEventListener("click", function () {
+            const state = readEngageState();
+            state.followed = !state.followed;
+            writeEngageState(state);
+            syncEngageState();
+          });
+        }
+
+        if (backBtn) {
+          backBtn.addEventListener("click", function () {
+            if (history.length > 1) { history.back(); } else { location.href = "user-app.html?tab=forum"; }
+          });
+        }
+
+        if (actionInput && input) {
+          actionInput.addEventListener("click", function () {
+            input.scrollIntoView({ behavior: "smooth", block: "center" });
+            input.focus();
+          });
+        }
+
+        if (commentBtn) {
+          commentBtn.addEventListener("click", function () {
+            const commentsCard = document.querySelector(".topic-comments-card");
+            if (commentsCard) commentsCard.scrollIntoView({ behavior: "smooth", block: "start" });
           });
         }
 

@@ -8,6 +8,7 @@
     "build": "node scripts/build-static.cjs",
     "build:axhub": "node scripts/sync-vendor-if-present.mjs && node scripts/scan-entries.js && node scripts/build-all.js",
     "deploy": "npm run build && wrangler deploy",
+    "deploy:cloudbase": "npm run build && npx tcb hosting deploy dist /mangai -e cc2026-d0gtw9uu873b04cf0",
     "dev": "node scripts/sync-vendor-if-present.mjs && vite",
     "start": "npm run dev",
     "metadata:sync": "node scripts/sync-project-metadata.mjs",
@@ -51,6 +52,7 @@
     "vite": "^5.0.0",
     "vitest": "^4.0.16",
     "wrangler": "^4.95.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "@cloudbase/cli": "^2.0.0"
   }
 }

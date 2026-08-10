@@ -1,0 +1,14 @@
+{
+  "vehicleName": "演示车型 A",
+  "frontWheel": {
+    "horizontal": 22,
+    "vertical": 64,
+    "width": 18
+  },
+  "rearWheel": {
+    "horizontal": 79,
+    "vertical": 64,
+    "width": 18
+  },
+  "description": "轮毂配置页面的本地 mock 参数，数值参考截图。页面运行时使用 script.js 内的同名 mock 常量，避免 file 协议下 fetch JSON 失败。"
+}

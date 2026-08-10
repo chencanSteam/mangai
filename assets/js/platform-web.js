@@ -6,6 +6,7 @@
     providers,
     users,
     vehicleModels,
+    vehicleModelBrands,
     vehicles,
     products,
     categories,
@@ -13,6 +14,7 @@
     orders,
     orderChats,
     serviceChats,
+    customerService,
     shipping,
     signing,
     settlements,
@@ -82,7 +84,15 @@
         { id: "orderAssign", label: "订单分配", badge: orders.filter((item) => item.status === "待分配").length },
         { id: "afterSaleList", label: "售后订单", badge: orders.filter((item) => item.afterSaleStatus === "待平台审核").length },
         { id: "chatRecords", label: "聊天记录", badge: orderChats.length },
-        { id: "serviceChat", label: "客服对话", badge: (serviceChats || []).filter((c) => c.unread > 0).length },
+      ],
+    },
+    {
+      id: "customerService",
+      label: "客服中心",
+      children: [
+        { id: "csConversations", label: "会话管理" },
+        { id: "csKnowledge", label: "知识库" },
+        { id: "csPerformance", label: "绩效考核" },
       ],
     },
     { id: "logisticsManage", label: "物流管理" },
@@ -148,6 +158,7 @@
     selectedIndex: 0,
     search: "",
     serviceChatSelected: null,
+    customerServiceTab: {},
     wheelConfig: null,
     expandedGroups: Object.fromEntries(menu.filter((item) => item.children).map((item) => [item.id, true])),
   };
@@ -1323,12 +1334,20 @@
       metric("车型档案数", String(vehicleModels.length)),
       metric("已启用车型", String(vehicleModels.filter((item) => item.status === "启用").length)),
       metric("待补充车型", String(vehicleModels.filter((item) => item.status === "停用").length)),
-      metric("覆盖品牌", String(new Set(vehicleModels.map((item) => item.brand)).size)),
+      metric("覆盖汽车品牌", String(new Set(vehicleModels.map((item) => item.brand)).size)),
     ];
   }
 
   function getVehicleModelCode(item) {
     return item?.id || [item?.brand, item?.series, item?.model].filter(Boolean).join("-");
+  }
+
+  function formatVehicleYearRange(value) {
+    const years = String(value || "").match(/\d{4}/g) || [];
+    if (!years.length) return "未设置";
+    const start = years[0];
+    const end = years[years.length - 1] || start;
+    return start === end ? `${start} 年` : `${start} - ${end} 年`;
   }
 
   function parseProductFitmentValue(value) {
@@ -1644,37 +1663,28 @@
     productCategories: simpleListDef("商品分类", "商品分类与层级维护。", categories, ["name", "sort", "status"], ["分类名称", "排序", "状态"]),
     vehicleModelManage: makeTableDef({
       title: "车型管理",
-      description: "维护商品适配车型档案，补充底盘型号、年份与动力等汽车属性。",
+      description: "维护商品适配车型档案，管理汽车品牌、车系、车型与年份。",
       filters: ["全部", "启用", "停用"],
       stats: getVehicleModelStats(),
       columns: [
         { key: "id", label: "车型编码" },
-        { key: "brand", label: "品牌" },
+        { key: "brand", label: "汽车品牌" },
         { key: "series", label: "车系" },
         { key: "model", label: "车型" },
-        { key: "chassis", label: "底盘型号" },
-        { key: "year", label: "年份" },
+        { key: "year", label: "年份范围" },
         { key: "status", label: "适配状态", tag: true },
       ],
       rows: vehicleModels,
       filterBy: "status",
       detail: (row) => ({
         title: `${row.brand} ${row.series} ${row.model}`,
-        badges: [row.status, row.energyType, row.driveType].filter(Boolean),
+        badges: [row.status].filter(Boolean),
         facts: [
           ["车型编码", row.id],
-          ["品牌", row.brand],
+          ["汽车品牌", row.brand],
           ["车系", row.series],
           ["车型", row.model],
-          ["底盘型号", row.chassis],
-          ["年份", row.year],
-          ["款型/版本", row.trim || "-"],
-          ["能源类型", row.energyType],
-          ["驱动形式", row.driveType],
-          ["发动机/电机参数", row.powerSpec || "-"],
-          ["变速箱", row.transmission || "-"],
-          ["车身形式", row.bodyStyle || "-"],
-          ["轴距", row.wheelbase || "-"],
+          ["年份范围", formatVehicleYearRange(row.year)],
         ],
         timeline: row.timeline || ["暂无处理轨迹"],
         actions: "vehicleModelManage",
@@ -1854,6 +1864,9 @@
       title: "客服对话",
       description: "处理用户与服务商向平台客服发起的在线咨询，支持实时回复与状态标记。",
     },
+    csConversations: { type: "customerService", title: "会话管理" },
+    csKnowledge: { type: "customerService", title: "知识库" },
+    csPerformance: { type: "customerService", title: "绩效考核" },
     logisticsManage: simpleListDef(
       "物流管理",
       "统一处理商品订单发货、物流单维护、签收确认和异常签收留证。",
@@ -2372,6 +2385,10 @@
     sidebarEl.querySelectorAll("[data-group]").forEach((button) => {
       button.addEventListener("click", () => {
         const groupId = button.dataset.group;
+        if (groupId === "customerService") {
+          jumpToPage("csConversations");
+          return;
+        }
         state.expandedGroups[groupId] = !state.expandedGroups[groupId];
         renderSidebar();
       });
@@ -2379,6 +2396,10 @@
   }
 
   function jumpToPage(pageId) {
+    if (pageId === "serviceChat") {
+      state.customerServiceTab.csConversations = "reception";
+      pageId = "csConversations";
+    }
     state.activePage = pageId;
     state.activeFilter = "全部";
     state.selectedIndex = 0;
@@ -2401,6 +2422,11 @@
 
     if (def.type === "chat") {
       renderServiceChatPage();
+      return;
+    }
+
+    if (def.type === "customerService") {
+      renderCustomerServicePage(state.activePage);
       return;
     }
 
@@ -2825,6 +2851,116 @@
         jumpToPage(button.dataset.shortcutPage);
       });
     });
+  }
+
+  const customerServiceTabs = {
+    csConversations: [
+      ["monitor", "实时监控"],
+      ["reception", "会话接待"],
+      ["history", "记录查询"],
+      ["quality", "会话质检"],
+      ["customer", "客户消费"],
+    ],
+    csKnowledge: [["quick", "快捷回复"], ["faq", "FAQ 管理"]],
+    csPerformance: [["config", "指标配置"], ["ranking", "排行与明细"]],
+  };
+
+  function customerServiceShell(pageId, title, content) {
+    const tabs = customerServiceTabs[pageId] || [];
+    const activeTab = state.customerServiceTab[pageId] || tabs[0]?.[0];
+    return `
+      <section class="page-heading platform-page-heading cs-page-heading">
+        <div><span class="eyebrow">Customer Service Center</span><h1>${title}</h1></div>
+        <span class="cs-live-status"><i></i>数据实时更新</span>
+      </section>
+      ${tabs.length ? `<nav class="cs-tabs" aria-label="${title}子页面">${tabs.map(([id, label]) => `<button class="${activeTab === id ? "active" : ""}" type="button" data-cs-tab="${id}">${label}</button>`).join("")}</nav>` : ""}
+      <section class="cs-content">${content}</section>
+    `;
+  }
+
+  function csMetric(label, value, note, tone = "accent") {
+    return `<article class="cs-metric" data-tone="${tone}"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`;
+  }
+
+  function renderCustomerServicePage(pageId) {
+    const data = customerService || {};
+    if (pageId === "csDashboard") {
+      const period = state.customerServicePeriod || "日";
+      const trend = data.trend?.[period] || data.trend?.["日"] || [];
+      contentEl.innerHTML = `
+        <section class="page-heading platform-page-heading cs-page-heading"><div><span class="eyebrow">Customer Service Center</span><h1>客服工作台</h1><p class="muted">统一查看服务质量、实时会话和客服团队运行状态</p></div><span class="cs-live-status"><i></i>数据实时更新</span></section>
+        <section class="cs-metric-grid">
+          ${csMetric("今日会话", data.metrics?.todaySessions || "326", "较昨日 +12.8%", "accent")}
+          ${csMetric("排队会话", data.metrics?.queue || "12", "3 条已超过 5 分钟", "warning")}
+          ${csMetric("平均响应时长", data.metrics?.response || "42s", "目标 ≤ 60s", "info")}
+          ${csMetric("解决率", data.metrics?.resolution || "94.6%", "较上周 +2.4%", "success")}
+          ${csMetric("满意度", data.metrics?.satisfaction || "96.2%", "有效评价 218 条", "success")}
+          ${csMetric("询单转化率", data.metrics?.conversion || "18.4%", "较上月 +3.1%", "accent")}
+        </section>
+        <section class="cs-dashboard-grid">
+          <article class="panel cs-panel cs-trend-panel"><div class="panel-header"><div><h2 class="section-title">服务指标趋势</h2><p class="section-subtitle">按时间范围查看会话量和解决率变化</p></div><div class="cs-periods">${["日", "周", "月"].map((item) => `<button class="${period === item ? "active" : ""}" type="button" data-cs-period="${item}">${item}</button>`).join("")}</div></div><div class="cs-chart">${trend.map((item) => `<div class="cs-chart-col"><div class="cs-bars"><span style="height:${item.sessions / 3}px"></span><span style="height:${item.resolution * 1.3}px"></span></div><small>${item.label}</small><b>${item.sessions}</b></div>`).join("")}</div><div class="cs-chart-legend"><span><i class="sessions"></i>会话量</span><span><i class="resolution"></i>解决率</span></div></article>
+          <article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">待处理事项</h2><p class="section-subtitle">需要客服主管及时关注的事项</p></div></div><div class="cs-todo-list">${(data.todos || []).map((item) => `<button type="button" data-cs-jump="${item.page}"><span>${item.title}</span><strong>${item.value}</strong><small>${item.note}</small></button>`).join("")}</div></article>
+        </section>
+        <section class="cs-dashboard-grid"><article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">客服团队状态</h2></div><span class="tag success">${data.agents?.filter((item) => item.status === "在线").length || 8} 人在线</span></div><div class="cs-agent-list">${(data.agents || []).slice(0, 6).map((item) => `<div><span class="cs-avatar">${item.avatar}</span><strong>${item.name}</strong><small>${item.group}</small><em class="${item.status === "在线" ? "online" : "away"}">${item.status}</em><b>${item.sessions} 会话</b></div>`).join("")}</div></article><article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">实时告警</h2></div></div><div class="cs-alert-list">${(data.alerts || []).map((item) => `<div><span class="tag ${item.level === "高" ? "danger" : "warning"}">${item.level}</span><p>${item.text}</p><small>${item.time}</small></div>`).join("")}</div></article></section>
+      `;
+      bindCustomerServiceEvents(pageId);
+      return;
+    }
+
+    const activeTab = state.customerServiceTab[pageId] || customerServiceTabs[pageId]?.[0]?.[0];
+    let body = "";
+    if (pageId === "csConversations") body = renderConversationTab(activeTab, data);
+    if (pageId === "csKnowledge") body = renderKnowledgeTab(activeTab, data);
+    if (pageId === "csPerformance") body = renderPerformanceTab(activeTab, data);
+    contentEl.innerHTML = customerServiceShell(pageId, defs[pageId].title, body);
+    bindCustomerServiceEvents(pageId);
+  }
+
+  function renderConversationTab(tab, data) {
+    if (tab === "monitor") return `<div class="cs-metric-grid">${csMetric("在线客服", "8", "总客服 12 人", "success")}${csMetric("进行中会话", "38", "平均每人 4.8 条", "info")}${csMetric("排队会话", String((data.queue || []).length), "最长等待 8 分钟", "warning")}${csMetric("超时会话", "3", "需要主管介入", "danger")}</div><div class="cs-two-column"><article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">实时会话</h2><p class="section-subtitle">查看客服在线状态和当前会话负载</p></div><button class="btn btn-secondary" type="button" data-cs-action="transfer-all">批量转接</button></div><div class="cs-table">${(data.agents || []).map((item) => `<div class="cs-table-row"><span class="cs-avatar">${item.avatar}</span><strong>${item.name}</strong><span>${item.group}</span><span>${item.sessions} 条会话</span><em class="${item.status === "在线" ? "online" : "away"}">${item.status}</em><button class="btn btn-ghost" type="button" data-cs-action="transfer" data-cs-agent="${item.name}">转接</button></div>`).join("")}</div></article><article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">状态说明</h2></div></div><div class="cs-status-copy"><p><i class="online"></i> 在线：可接待新会话</p><p><i class="away"></i> 离开：暂不分配新会话</p><p><i class="busy"></i> 忙碌：达到同时接待上限</p></div></article></div>`;
+    if (tab === "queue") return `<div class="cs-filter-bar"><input class="input" type="search" placeholder="搜索用户 / 订单号 / 会话内容" data-cs-search><select class="input" data-cs-filter="group"><option value="全部">全部技能组</option>${(data.groups || []).map((item) => `<option>${item}</option>`).join("")}</select><select class="input" data-cs-filter="level"><option value="全部">全部用户等级</option><option>高价值</option><option>普通</option></select></div><article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">会话分配与排队</h2><p class="section-subtitle">共 ${data.queue?.length || 0} 条待分配会话，支持自动分配和人工转接</p></div><button class="btn btn-primary" type="button" data-cs-action="auto-assign">自动分配</button></div><div class="cs-table">${(data.queue || []).map((item) => `<div class="cs-table-row" data-cs-row data-search="${item.user} ${item.orderId} ${item.preview}" data-group="${item.group}" data-level="${item.level}"><strong>${item.user}</strong><span>${item.orderId}</span><span>${item.group}</span><span>${item.level}</span><span>${item.wait}</span><em class="${item.waitMinutes > 5 ? "danger" : "warning"}">${item.status}</em><button class="btn btn-secondary" type="button" data-cs-action="assign" data-cs-id="${item.id}">分配</button></div>`).join("")}</div></article>`;
+    if (tab === "reception") return renderReceptionTab(data);
+    if (tab === "history") return `<div class="cs-filter-bar"><input class="input" type="search" placeholder="按用户、客服、订单号、关键词查询" data-cs-history-search><select class="input"><option>全部状态</option><option>已解决</option><option>处理中</option><option>已关闭</option></select><button class="btn btn-secondary" type="button" data-cs-action="export">导出记录</button></div><article class="panel cs-panel"><div class="cs-table cs-history-table">${(data.history || []).map((item) => `<div class="cs-table-row" data-cs-history-row data-search="${item.user} ${item.agent} ${item.orderId} ${item.preview}"><strong>${item.user}</strong><span>${item.agent}</span><span>${item.orderId}</span><span>${item.preview}</span><span>${item.time}</span>${formatTag(item.status)}<button class="btn btn-ghost" type="button" data-cs-action="view-history" data-cs-id="${item.id}">查看</button></div>`).join("")}</div></article>`;
+    if (tab === "quality") return `<article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">会话质检</h2><p class="section-subtitle">基于敏感词、服务规范和风险表达生成质检记录</p></div><button class="btn btn-primary" type="button" data-cs-action="run-quality">开始质检</button></div><div class="cs-table">${(data.quality || []).map((item) => `<div class="cs-table-row"><strong>${item.id}</strong><span>${item.agent}</span><span>${item.rule}</span><span>${item.score} 分</span>${formatTag(item.status)}<button class="btn btn-ghost" type="button" data-cs-action="quality-note" data-cs-id="${item.id}">处理记录</button></div>`).join("")}</div></article>`;
+    return `<div class="cs-metric-grid">${csMetric("累计消费用户", "2,486", "近 30 日", "accent")}${csMetric("历史订单", "6,218", "已完成订单", "info")}${csMetric("平均客单价", "¥ 3,860", "较上月 +8.2%", "success")}${csMetric("退款率", "2.6%", "低于平台均值", "warning")}</div><div class="cs-two-column"><article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">客户消费明细</h2></div><input class="input cs-inline-search" type="search" placeholder="搜索客户" data-cs-customer-search></div><div class="cs-table">${(data.customers || []).map((item) => `<div class="cs-table-row" data-cs-customer-row data-search="${item.name} ${item.phone}"><strong>${item.name}</strong><span>${item.phone}</span><span>${item.orders} 单</span><span>¥ ${item.amount}</span><span>转化 ${item.conversion}</span><button class="btn btn-ghost" type="button" data-cs-action="view-customer" data-cs-id="${item.id}">详情</button></div>`).join("")}</div></article><article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">消费结构</h2></div></div><div class="cs-consumption-bars">${(data.consumption || []).map((item) => `<div><span>${item.label}</span><div><i style="width:${item.value}%"></i></div><b>${item.value}%</b></div>`).join("")}</div></article></div>`;
+  }
+
+  function renderReceptionTab(data) {
+    const chats = serviceChats || [];
+    const selected = chats.find((item) => item.id === (state.serviceChatSelected || chats[0]?.id));
+    return `<div class="cs-reception-layout"><aside class="panel cs-panel cs-reception-list"><div class="panel-header"><div><h2 class="section-title">会话列表</h2><p class="section-subtitle">${chats.length} 条会话 · ${chats.filter((item) => item.unread).length} 条未读</p></div></div>${chats.map((item) => `<button class="cs-reception-item ${selected?.id === item.id ? "active" : ""}" type="button" data-cs-chat="${item.id}"><span class="cs-avatar">${item.avatar}</span><span><strong>${item.fromName}</strong><small>${item.preview}</small></span>${item.unread ? `<b>${item.unread}</b>` : ""}</button>`).join("")}</aside><article class="panel cs-panel cs-reception-main">${selected ? `<div class="cs-reception-head"><div><span class="eyebrow">${String(selected.fromId).startsWith("SP-") ? "服务商咨询" : "用户咨询"}</span><h2 class="section-title">${selected.fromName}</h2><p class="section-subtitle">关联订单 ${selected.orderId || "-"}</p></div><div>${formatTag(selected.status)}<button class="btn btn-secondary" type="button" data-cs-action="transfer-chat" data-cs-id="${selected.id}">转接</button></div></div><div class="cs-chat-record">${(selected.messages || []).map((message) => `<div class="chat-bubble ${message.from === "platform" ? "platform-bubble" : message.from === "user" ? "user-bubble" : "provider-bubble"}"><div class="chat-bubble-meta"><span class="chat-role">${message.from === "platform" ? "平台客服" : message.from === "user" ? "用户" : "服务商"}</span><span class="chat-time">${message.time}</span></div><div class="chat-text">${message.text}</div></div>`).join("")}</div><div class="cs-reply-tools"><select class="input" data-cs-quick-reply><option value="">选择快捷回复</option>${(data.quickReplies || []).map((item) => `<option value="${item.content}">${item.title}</option>`).join("")}</select><button class="btn btn-ghost" type="button" data-cs-action="close-chat" data-cs-id="${selected.id}">结束会话</button></div><div class="service-chat-composer"><input class="input" type="text" placeholder="输入回复内容，按 Enter 发送" data-cs-chat-input data-cs-id="${selected.id}"><button class="btn btn-primary" type="button" data-cs-action="send-chat" data-cs-id="${selected.id}">发送</button></div>` : `<div class="muted">暂无会话</div>`}</article></div>`;
+  }
+
+  function renderKnowledgeTab(tab, data) {
+    const rows = tab === "quick" ? (data.quickReplies || []) : (data.faqs || []);
+    return `<div class="cs-filter-bar"><input class="input" type="search" placeholder="搜索标题、内容或分类" data-cs-knowledge-search><select class="input"><option>全部分类</option>${(data.knowledgeCategories || []).map((item) => `<option>${item}</option>`).join("")}</select><button class="btn btn-primary" type="button" data-cs-action="add-knowledge">新增${tab === "quick" ? "快捷回复" : "FAQ"}</button></div><article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">${tab === "quick" ? "快捷回复" : "FAQ 管理"}</h2><p class="section-subtitle">${rows.length} 条内容，当前使用本地 mock 状态</p></div></div><div class="cs-table">${rows.map((item) => `<div class="cs-table-row" data-cs-knowledge-row data-search="${item.title} ${item.content} ${item.category}"><strong>${item.title}</strong><span>${item.category}</span><span class="cs-knowledge-content">${item.content}</span>${formatTag(item.status)}<small>使用 ${item.usage} 次</small><button class="btn btn-ghost" type="button" data-cs-action="edit-knowledge" data-cs-id="${item.id}">编辑</button><button class="btn btn-ghost" type="button" data-cs-action="toggle-knowledge" data-cs-id="${item.id}">${item.status === "启用" ? "停用" : "启用"}</button></div>`).join("")}</div></article>`;
+  }
+
+  function renderPerformanceTab(tab, data) {
+    if (tab === "config") return `<article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">考核指标配置</h2><p class="section-subtitle">配置客服团队考核权重，保存前权重合计必须为 100%</p></div><button class="btn btn-primary" type="button" data-cs-action="save-metrics">保存配置</button></div><div class="cs-weight-list">${(data.metricsConfig || []).map((item) => `<label><span><strong>${item.label}</strong><small>${item.description}</small></span><input class="input" type="number" min="0" max="100" value="${item.weight}" data-cs-weight="${item.id}"><b>%</b></label>`).join("")}</div><div class="cs-weight-total">当前权重合计：<strong data-cs-weight-total>100%</strong></div></article>`;
+    return `<div class="cs-metric-grid">${csMetric("团队平均分", "92.6", "较上月 +1.8", "success")}${csMetric("达标人数", "9 / 12", "达标率 75%", "info")}${csMetric("平均响应", "38s", "目标 60s", "accent")}${csMetric("平均满意度", "96.2%", "有效评价 218 条", "success")}</div><article class="panel cs-panel"><div class="panel-header"><div><h2 class="section-title">绩效排行与明细</h2><p class="section-subtitle">按客服小组展示排名、明细和扣分原因</p></div><button class="btn btn-secondary" type="button" data-cs-action="export-performance">导出明细</button></div><div class="cs-ranking-list">${(data.rankings || []).map((item, index) => `<div><span class="cs-rank">${String(index + 1).padStart(2, "0")}</span><span class="cs-avatar">${item.avatar}</span><strong>${item.name}</strong><span>${item.group}</span><span>响应 ${item.response}</span><span>满意度 ${item.satisfaction}</span><b>${item.score}</b><button class="btn btn-ghost" type="button" data-cs-action="view-performance" data-cs-id="${item.id}">查看明细</button></div>`).join("")}</div></article>`;
+  }
+
+  function bindCustomerServiceEvents(pageId) {
+    contentEl.querySelectorAll("[data-cs-tab]").forEach((button) => button.addEventListener("click", () => { state.customerServiceTab[pageId] = button.dataset.csTab; renderCustomerServicePage(pageId); }));
+    contentEl.querySelectorAll("[data-cs-period]").forEach((button) => button.addEventListener("click", () => { state.customerServicePeriod = button.dataset.csPeriod; renderCustomerServicePage("csDashboard"); }));
+    contentEl.querySelectorAll("[data-cs-jump]").forEach((button) => button.addEventListener("click", () => { jumpToPage(button.dataset.csJump); }));
+    contentEl.querySelectorAll("[data-cs-chat]").forEach((button) => button.addEventListener("click", () => { state.serviceChatSelected = button.dataset.csChat; state.customerServiceTab.csConversations = "reception"; renderCustomerServicePage("csConversations"); }));
+    const searchPairs = [["[data-cs-search]", "[data-cs-row]"], ["[data-cs-history-search]", "[data-cs-history-row]"], ["[data-cs-customer-search]", "[data-cs-customer-row]"], ["[data-cs-knowledge-search]", "[data-cs-knowledge-row]"]];
+    searchPairs.forEach(([inputSelector, rowSelector]) => { const input = contentEl.querySelector(inputSelector); if (!input) return; input.addEventListener("input", () => { const keyword = input.value.trim().toLowerCase(); contentEl.querySelectorAll(rowSelector).forEach((row) => { row.hidden = keyword && !row.dataset.search.toLowerCase().includes(keyword); }); }); });
+    contentEl.querySelectorAll("[data-cs-quick-reply]").forEach((select) => select.addEventListener("change", () => { const input = contentEl.querySelector("[data-cs-chat-input]"); if (input && select.value) input.value = select.value; }));
+    contentEl.querySelectorAll("[data-cs-weight]").forEach((input) => input.addEventListener("input", () => { const total = [...contentEl.querySelectorAll("[data-cs-weight]")].reduce((sum, item) => sum + Number(item.value || 0), 0); const output = contentEl.querySelector("[data-cs-weight-total]"); if (output) { output.textContent = `${total}%`; output.className = total === 100 ? "is-valid" : "is-invalid"; } }));
+    contentEl.querySelectorAll("[data-cs-action]").forEach((button) => button.addEventListener("click", () => handleCustomerServiceAction(button.dataset.csAction, button.dataset.csId, pageId)));
+    contentEl.querySelectorAll("[data-cs-chat-input]").forEach((input) => input.addEventListener("keydown", (event) => { if (event.key === "Enter") contentEl.querySelector(`[data-cs-action="send-chat"]`)?.click(); }));
+  }
+
+  function handleCustomerServiceAction(action, id, pageId) {
+    const data = customerService || {};
+    if (["transfer", "transfer-all", "assign", "auto-assign", "run-quality", "quality-note", "export", "add-knowledge", "edit-knowledge", "export-performance", "view-performance", "view-history", "view-customer", "transfer-chat"].includes(action)) { openFeedbackModal("操作已完成", "当前为前端 mock 交互，操作结果已在本次演示状态中生效。"); return; }
+    if (action === "toggle-knowledge") { const item = [...(data.quickReplies || []), ...(data.faqs || [])].find((row) => row.id === id); if (item) item.status = item.status === "启用" ? "停用" : "启用"; renderCustomerServicePage(pageId); return; }
+    if (action === "save-metrics") { const total = [...contentEl.querySelectorAll("[data-cs-weight]")].reduce((sum, item) => sum + Number(item.value || 0), 0); openFeedbackModal(total === 100 ? "指标配置已保存" : "权重合计不正确", total === 100 ? "考核指标权重已保存，本次为前端 mock 状态。" : `当前权重合计为 ${total}%，请调整为 100%。`); return; }
+    if (action === "send-chat") { const input = contentEl.querySelector(`[data-cs-chat-input][data-cs-id="${id}"]`); const chat = serviceChats.find((item) => item.id === id); const text = input?.value.trim(); if (!chat || !text) return; chat.messages = chat.messages || []; chat.messages.push({ from: "platform", text, time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }) }); chat.preview = text; chat.status = "处理中"; renderCustomerServicePage("csConversations"); }
+    if (action === "close-chat") { const chat = serviceChats.find((item) => item.id === id); if (chat) chat.status = "已解决"; renderCustomerServicePage("csConversations"); }
   }
 
   function renderServiceChatPage() {
@@ -3494,6 +3630,10 @@
   }
 
   function renderTablePage(def) {
+    if (state.activePage === "vehicleModelManage") {
+      renderVehicleModelTreePage(def);
+      return;
+    }
     if (state.activePage === "invoiceManage") {
       def.stats = [
         metric("待开票", String(def.rows.filter((i) => i.status === "待开票").length)),
@@ -3516,6 +3656,7 @@
           `
         : state.activePage === "vehicleModelManage"
           ? `
+            <button class="btn btn-secondary" type="button" data-vehicle-model-toolbar="create-brand">新增汽车品牌</button>
             <button class="btn btn-secondary" type="button" data-vehicle-model-toolbar="create">新增车型</button>
           `
         : state.activePage === "caseManage"
@@ -3623,6 +3764,113 @@
     `;
 
     bindTableEvents(def, selected);
+  }
+
+  function renderVehicleModelTreePage(def) {
+    const rows = filterRows(def.rows, def.filterBy);
+    const groups = [];
+    rows.forEach((row, index) => {
+      let brandGroup = groups.find((item) => item.name === row.brand);
+      if (!brandGroup) {
+        brandGroup = { name: row.brand, models: [] };
+        groups.push(brandGroup);
+      }
+      const modelName = [row.series, row.model].filter(Boolean).join(" ") || row.model || "未命名车型";
+      let modelGroup = brandGroup.models.find((item) => item.name === modelName);
+      if (!modelGroup) {
+        modelGroup = { name: modelName, rows: [] };
+        brandGroup.models.push(modelGroup);
+      }
+      modelGroup.rows.push({ row, index });
+    });
+
+    const toolbarActions = `
+      <button class="btn btn-secondary" type="button" data-vehicle-model-toolbar="create-brand">新增汽车品牌</button>
+      <button class="btn btn-secondary" type="button" data-vehicle-model-toolbar="create">新增车型</button>
+    `;
+    contentEl.innerHTML = `
+      <section class="page-heading">
+        <h1>${def.title}</h1>
+      </section>
+      <section class="stats-grid">
+        ${def.stats.map((item) => `<article class="panel stat-card"><span class="label">${item.label}</span><strong>${item.value}</strong></article>`).join("")}
+      </section>
+      <section style="margin-top:22px;">
+        <article class="panel table-card vehicle-tree-card">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              ${(def.filters || ["全部"]).map((item) => `<button class="filter-chip ${state.activeFilter === item ? "active" : ""}" type="button" data-filter="${item}">${item}</button>`).join("")}
+            </div>
+            <div class="toolbar-right">${toolbarActions}</div>
+          </div>
+          <div class="vehicle-tree" aria-label="汽车品牌车型年份列表">
+            ${groups.length ? groups.map((brandGroup) => `
+              <section class="vehicle-tree-brand">
+                <button class="vehicle-tree-brand-row" type="button" data-vehicle-tree-toggle>
+                  <span class="vehicle-tree-caret">⌄</span>
+                  <strong>${escapeHtml(brandGroup.name)}</strong>
+                  <small>${brandGroup.models.length} 个车型</small>
+                </button>
+                <div class="vehicle-tree-models">
+                  ${brandGroup.models.map((modelGroup) => `
+                    <section class="vehicle-tree-model">
+                      <button class="vehicle-tree-model-row" type="button" data-vehicle-tree-toggle>
+                        <span class="vehicle-tree-caret">⌄</span>
+                        <strong>${escapeHtml(modelGroup.name)}</strong>
+                        <small>${modelGroup.rows.length} 个年份范围</small>
+                      </button>
+                      <div class="vehicle-tree-years">
+                        ${modelGroup.rows.map(({ row, index }) => `
+                          <button class="vehicle-tree-year-row ${index === state.selectedIndex ? "selected" : ""}" type="button" data-vehicle-tree-index="${index}">
+                            <span class="vehicle-tree-year-line"><i></i><strong>${escapeHtml(formatVehicleYearRange(row.year))}</strong></span>
+                            ${formatTag(row.status)}
+                          </button>
+                        `).join("")}
+                      </div>
+                    </section>
+                  `).join("")}
+                </div>
+              </section>
+            `).join("") : `<div class="muted vehicle-tree-empty">没有符合当前筛选条件的车型。</div>`}
+          </div>
+        </article>
+      </section>
+    `;
+
+    contentEl.querySelectorAll("[data-vehicle-tree-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const child = button.nextElementSibling;
+        if (!child) return;
+        const collapsed = child.hidden;
+        child.hidden = !collapsed;
+        button.classList.toggle("collapsed", !collapsed);
+      });
+    });
+    contentEl.querySelectorAll("[data-vehicle-tree-index]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number(button.dataset.vehicleTreeIndex);
+        const selectedRow = rows[index];
+        if (!selectedRow) return;
+        state.selectedIndex = index;
+        openGenericDetailModal(def.detail(selectedRow));
+      });
+    });
+    contentEl.querySelectorAll("[data-vehicle-model-toolbar]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.vehicleModelToolbar === "create-brand") {
+          openVehicleBrandEditorModal();
+          return;
+        }
+        openVehicleModelEditorModal("create");
+      });
+    });
+    contentEl.querySelectorAll("[data-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.activeFilter = button.dataset.filter || "全部";
+        state.selectedIndex = 0;
+        renderPage();
+      });
+    });
   }
 
   function renderPromotionRowActions(row, index) {
@@ -4572,6 +4820,10 @@
       contentEl.querySelectorAll("[data-vehicle-model-toolbar]").forEach((button) => {
         button.addEventListener("click", () => {
           const action = button.dataset.vehicleModelToolbar;
+          if (action === "create-brand") {
+            openVehicleBrandEditorModal();
+            return;
+          }
           if (action === "create") {
             openVehicleModelEditorModal("create");
             return;
@@ -7627,6 +7879,58 @@
     });
   }
 
+  function openVehicleBrandEditorModal() {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Vehicle Brand Editor</span>
+          <h2 class="section-title">新增汽车品牌</h2>
+          <p class="section-subtitle">品牌 logo 保存在当前前端 mock 状态。</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <div class="field-label">品牌名称</div>
+          <input class="input" data-vehicle-brand-field="name" placeholder="例如：保时捷" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">品牌 logo</div>
+          <input class="input" type="file" accept="image/*" data-vehicle-brand-logo />
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-save-vehicle-brand>确认新增</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+
+    let logoUrl = "";
+    const logoInput = modalCardEl.querySelector("[data-vehicle-brand-logo]");
+    logoInput?.addEventListener("change", () => {
+      const file = logoInput.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        logoUrl = String(reader.result || "");
+      };
+      reader.readAsDataURL(file);
+    });
+    modalCardEl.querySelector("[data-save-vehicle-brand]")?.addEventListener("click", () => {
+      const name = modalCardEl.querySelector('[data-vehicle-brand-field="name"]')?.value.trim() || "";
+      if (!name) {
+        openFeedbackModal("信息不完整", "请填写品牌名称。" );
+        return;
+      }
+      const brand = { id: `VBR-${Date.now()}`, name, logoUrl: logoUrl || `https://placehold.co/96x48/111827/f8fafc?text=${encodeURIComponent(name)}`, status: "启用", series: [] };
+      vehicleModelBrands.unshift(brand);
+      defs.vehicleModelManage.stats = getVehicleModelStats();
+      state.selectedIndex = 0;
+      closeModal();
+      renderPage();
+      openFeedbackModal("车型品牌已新增", `${name} 已创建。`);
+    });
+  }
+
   function openVehicleModelEditorModal(mode, row) {
     const isEdit = mode === "edit";
     const source = isEdit
@@ -7636,17 +7940,13 @@
           brand: "宝马",
           series: "3系",
           model: "330i",
-          chassis: "G20",
           year: "2024",
-          trim: "M运动曜夜套装",
-          energyType: "燃油",
-          driveType: "后驱",
-          powerSpec: "2.0T / B48 / 245Ps",
-          transmission: "8AT",
-          bodyStyle: "四门轿车",
-          wheelbase: "2851mm",
           status: "启用",
         };
+    const sourceYears = String(source.year || "").match(/\d{4}/g) || [];
+    const sourceYearStart = sourceYears[0] || "";
+    const sourceYearEnd = sourceYears[1] || sourceYearStart;
+    const yearOptions = Array.from({ length: 27 }, (_, index) => String(2026 - index));
     openModal(`
       <div class="panel-header">
         <div>
@@ -7661,8 +7961,8 @@
           <input class="input" data-vehicle-model-field="id" value="${source.id}" />
         </div>
         <div class="field-group">
-          <div class="field-label">品牌</div>
-          <input class="input" data-vehicle-model-field="brand" value="${source.brand}" />
+          <div class="field-label">汽车品牌</div>
+          <select class="select" data-vehicle-model-field="brand">${(vehicleModelBrands || []).map((brand) => `<option value="${escapeHtml(brand.name)}" ${brand.name === source.brand ? "selected" : ""}>${escapeHtml(brand.name)}</option>`).join("")}</select>
         </div>
         <div class="field-group">
           <div class="field-label">车系</div>
@@ -7673,40 +7973,18 @@
           <input class="input" data-vehicle-model-field="model" value="${source.model}" />
         </div>
         <div class="field-group">
-          <div class="field-label">底盘型号</div>
-          <input class="input" data-vehicle-model-field="chassis" value="${source.chassis}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">年份</div>
-          <input class="input" data-vehicle-model-field="year" value="${source.year}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">款型/版本</div>
-          <input class="input" data-vehicle-model-field="trim" value="${source.trim || ""}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">能源类型</div>
-          <input class="input" data-vehicle-model-field="energyType" value="${source.energyType}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">驱动形式</div>
-          <input class="input" data-vehicle-model-field="driveType" value="${source.driveType}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">发动机/电机参数</div>
-          <input class="input" data-vehicle-model-field="powerSpec" value="${source.powerSpec || ""}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">变速箱</div>
-          <input class="input" data-vehicle-model-field="transmission" value="${source.transmission || ""}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">车身形式</div>
-          <input class="input" data-vehicle-model-field="bodyStyle" value="${source.bodyStyle || ""}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">轴距</div>
-          <input class="input" data-vehicle-model-field="wheelbase" value="${source.wheelbase || ""}" />
+          <div class="field-label">年份范围</div>
+          <div class="vehicle-year-range-fields">
+            <select class="select" data-vehicle-model-field="yearStart" aria-label="起始年份">
+              <option value="">起始年份</option>
+              ${yearOptions.map((year) => `<option value="${year}" ${sourceYearStart === year ? "selected" : ""}>${year} 年</option>`).join("")}
+            </select>
+            <span>至</span>
+            <select class="select" data-vehicle-model-field="yearEnd" aria-label="结束年份">
+              <option value="">结束年份</option>
+              ${yearOptions.map((year) => `<option value="${year}" ${sourceYearEnd === year ? "selected" : ""}>${year} 年</option>`).join("")}
+            </select>
+          </div>
         </div>
         <div class="field-group">
           <div class="field-label">适配状态</div>
@@ -8653,25 +8931,23 @@
 
   function saveVehicleModel(mode, sourceId) {
     const getValue = (field) => modalCardEl.querySelector(`[data-vehicle-model-field="${field}"]`)?.value.trim() || "";
+    const yearStart = getValue("yearStart");
+    const yearEnd = getValue("yearEnd");
     const payload = {
       id: getValue("id"),
       brand: getValue("brand"),
       series: getValue("series"),
       model: getValue("model"),
-      chassis: getValue("chassis"),
-      year: getValue("year"),
-      trim: getValue("trim"),
-      energyType: getValue("energyType"),
-      driveType: getValue("driveType"),
-      powerSpec: getValue("powerSpec"),
-      transmission: getValue("transmission"),
-      bodyStyle: getValue("bodyStyle"),
-      wheelbase: getValue("wheelbase"),
+      year: yearStart && yearEnd ? (yearStart === yearEnd ? yearStart : `${yearStart}-${yearEnd}`) : "",
       status: getValue("status"),
     };
 
-    if (!payload.id || !payload.brand || !payload.series || !payload.model || !payload.chassis || !payload.year || !payload.energyType || !payload.driveType || !payload.status) {
-      openFeedbackModal("信息不完整", "请填写车型编码、品牌、车系、车型、底盘型号、年份、能源类型、驱动形式和适配状态。");
+    if (!payload.id || !payload.brand || !payload.series || !payload.model || !payload.year || !payload.status) {
+      openFeedbackModal("信息不完整", "请填写车型编码、品牌、车系、车型、年份范围和适配状态。");
+      return;
+    }
+    if (Number(yearEnd) < Number(yearStart)) {
+      openFeedbackModal("年份范围有误", "结束年份不能早于起始年份。");
       return;
     }
 

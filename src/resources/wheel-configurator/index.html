@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>轮毂配置</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="wheel-page" data-page="wheel-configurator">
+    <header class="top-bar">
+      <button class="icon-button" type="button" aria-label="返回">
+        <span aria-hidden="true"></span>
+      </button>
+      <h1>轮毂配置</h1>
+      <button class="text-button" type="button" id="resetButton">重置</button>
+    </header>
+
+    <section class="preview-panel" aria-label="车辆轮毂预览">
+      <div class="vehicle-stage" id="vehicleStage">
+        <div class="grid-lines" aria-hidden="true"></div>
+        <svg class="car-body" viewBox="0 0 780 270" role="img" aria-label="车辆侧面轮廓">
+          <defs>
+            <linearGradient id="bodyPaint" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stop-color="#f7f9fb"/>
+              <stop offset="42%" stop-color="#cfd6dc"/>
+              <stop offset="78%" stop-color="#eef2f5"/>
+              <stop offset="100%" stop-color="#aeb7bf"/>
+            </linearGradient>
+            <linearGradient id="glass" x1="0" x2="1">
+              <stop offset="0%" stop-color="#101821"/>
+              <stop offset="55%" stop-color="#263340"/>
+              <stop offset="100%" stop-color="#0b1118"/>
+            </linearGradient>
+          </defs>
+          <path class="shadow" d="M87 211 C167 234 559 234 686 214 C664 248 115 252 87 211Z"/>
+          <path class="body-main" d="M76 175 C78 141 107 128 151 124 C183 92 236 67 321 62 C408 56 472 78 523 119 C590 121 654 134 694 160 C716 173 727 189 723 205 C717 230 669 234 610 230 C604 176 565 145 510 146 C455 148 421 184 414 229 L260 229 C252 181 217 149 163 148 C109 148 72 179 67 226 C42 226 31 218 38 199 C44 187 56 180 76 175Z"/>
+          <path class="belt" d="M116 140 C256 126 473 126 634 141" />
+          <path class="window-front" d="M385 78 C437 84 478 101 512 126 L388 126 Z"/>
+          <path class="window-mid" d="M268 77 C307 68 351 67 383 77 L382 126 L260 126 Z"/>
+          <path class="window-rear" d="M166 121 C187 98 220 84 258 78 L253 126 L151 128 Z"/>
+          <path class="door-line" d="M382 78 L382 217"/>
+          <path class="door-line" d="M257 86 L260 217"/>
+          <path class="handle" d="M424 143 L460 143"/>
+          <path class="handle" d="M282 143 L318 143"/>
+          <path class="lamp-front" d="M678 165 C704 169 714 178 714 187 C693 185 679 180 668 171Z"/>
+          <path class="lamp-rear" d="M55 167 C82 162 102 165 111 176 C86 181 64 179 49 174Z"/>
+          <path class="lower-line" d="M126 197 C257 215 441 214 629 196"/>
+        </svg>
+        <div class="wheel-marker front" data-wheel="front">
+          <div class="rim"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+        <div class="wheel-marker rear" data-wheel="rear">
+          <div class="rim"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="control-group" aria-labelledby="frontTitle">
+      <h2 id="frontTitle">前轮位置调整</h2>
+      <div class="control-list" data-group="front"></div>
+    </section>
+
+    <section class="control-group" aria-labelledby="rearTitle">
+      <h2 id="rearTitle">后轮位置调整</h2>
+      <div class="control-list" data-group="rear"></div>
+    </section>
+
+    <footer class="action-bar">
+      <button class="ghost-button" type="button" id="previewButton">预览效果</button>
+      <button class="primary-button" type="button" id="saveButton">保存配置</button>
+    </footer>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="./script.js"></script>
+</body>
+</html>
