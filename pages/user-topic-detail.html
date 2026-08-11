@@ -20,6 +20,7 @@
               </div>
               <span class="topic-author-name">MAN GAI 社区编辑部</span>
               <div class="topic-author-side">
+                <button class="topic-report-btn" type="button" id="topicReportBtn">举报</button>
                 <button class="topic-share-btn" type="button" id="topicShareBtn" aria-label="分享">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v7H4v-7"/><path d="M12 3v13"/><path d="M7 8l5-5 5 5"/></svg>
                 </button>
@@ -107,6 +108,7 @@
                         <div class="topic-comment-head">
                           <strong>RWB_Akira</strong>
                           <span>5 分钟前</span>
+                          <button class="topic-comment-report" type="button">举报</button>
                         </div>
                         <p>这批现场车的轮毂和姿态搭配是真的顺，尤其那台宽体车，轮拱和胎壁比例控制得很舒服。</p>
                       </div>
@@ -117,6 +119,7 @@
                         <div class="topic-comment-head">
                           <strong>BoostLife</strong>
                           <span>12 分钟前</span>
+                          <button class="topic-comment-report" type="button">举报</button>
                         </div>
                         <p>最想看施工清单，尤其是前后包围、轮毂 ET 和避震设定，感觉这台车街道和出片都兼顾到了。</p>
                       </div>
@@ -127,6 +130,7 @@
                         <div class="topic-comment-head">
                           <strong>NightRunner</strong>
                           <span>18 分钟前</span>
+                          <button class="topic-comment-report" type="button">举报</button>
                         </div>
                         <p>夜景拍摄氛围太顶了，湿地反光把车身线条全部带出来了，这种现场活动就该多办。</p>
                       </div>
@@ -280,6 +284,34 @@
         if (backBtn) {
           backBtn.addEventListener("click", function () {
             if (history.length > 1) { history.back(); } else { location.href = "user-app.html?tab=forum"; }
+          });
+        }
+
+        function showReportToast(text) {
+          const toast = document.createElement("div");
+          toast.style.cssText = "position:fixed; bottom:120px; left:50%; transform:translateX(-50%); z-index:60; padding:10px 18px; border-radius:12px; background:rgba(20,24,31,0.95); border:1px solid rgba(255,255,255,0.08); font-size:13px; color:#fff; text-align:center; white-space:nowrap;";
+          toast.textContent = text;
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 2500);
+        }
+
+        const reportBtn = document.getElementById("topicReportBtn");
+        if (reportBtn) {
+          reportBtn.addEventListener("click", function () {
+            if (reportBtn.disabled) return;
+            reportBtn.disabled = true;
+            reportBtn.textContent = "已举报";
+            showReportToast("已举报该帖子，平台会尽快审核处理。");
+          });
+        }
+
+        if (commentList) {
+          commentList.addEventListener("click", function (event) {
+            const reportTarget = event.target.closest(".topic-comment-report");
+            if (!reportTarget || reportTarget.disabled) return;
+            reportTarget.disabled = true;
+            reportTarget.textContent = "已举报";
+            showReportToast("已举报该评论，平台会尽快审核处理。");
           });
         }
 

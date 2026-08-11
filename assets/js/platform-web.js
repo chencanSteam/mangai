@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   if (document.body.dataset.page !== "platform-web") return;
 
   const {
@@ -33,6 +33,20 @@
   const modalCardEl = document.getElementById("platformModalCard");
   const INVOICE_STORAGE_KEY = "mockUserInvoices";
   const MALL_RECOMMENDATION_STORAGE_KEY = "mockMallRecommendations";
+  const CUSTOMER_SERVICE_RATING_KEY = "mockCustomerServiceRatingRequest";
+  const userReturnRateDefaults = {
+    "U-20311": "6.3%",
+    "U-18742": "0.0%",
+    "U-16428": "9.1%",
+    "U-22516": "16.7%",
+    "U-20895": "3.8%",
+  };
+  users.forEach((item) => {
+    item.returnRate = item.returnRate || userReturnRateDefaults[item.id] || "0.0%";
+  });
+  products.forEach((item) => {
+    item.isCustomProduct = item.isCustomProduct || "否";
+  });
 
   function pushNotification(target, title, content) {
     const list = window.MockData.notifications = window.MockData.notifications || [];
@@ -92,7 +106,6 @@
       children: [
         { id: "csConversations", label: "会话管理" },
         { id: "csKnowledge", label: "知识库" },
-        { id: "csPerformance", label: "绩效考核" },
       ],
     },
     { id: "logisticsManage", label: "物流管理" },
@@ -115,6 +128,9 @@
         { id: "forumBoards", label: "版面维护" },
         { id: "forumModerators", label: "版主申请" },
         { id: "forumManage", label: "内容管理" },
+        { id: "forumPostReview", label: "帖子审核" },
+        { id: "forumCommentReview", label: "评论审核" },
+        { id: "sensitiveWords", label: "敏感词管理" },
       ],
     },
     {
@@ -158,6 +174,7 @@
     selectedIndex: 0,
     search: "",
     serviceChatSelected: null,
+    csFloatLimit: 500,
     customerServiceTab: {},
     wheelConfig: null,
     expandedGroups: Object.fromEntries(menu.filter((item) => item.children).map((item) => [item.id, true])),
@@ -734,6 +751,26 @@
           ],
       };
     })
+  );
+
+  // 内容审核 mock：待审核（被举报/命中风控）与已审核留痕数据
+  posts.push(
+    { id: "POST-1201", title: "低价代购原厂刹车套件，私聊加微信", author: "Parts_Dealer_88", replies: 3, likes: 5, views: 860, status: "正常", reportStatus: "待审核", time: "今天 08:12", content: "原厂渠道刹车套件低价代购，支持私下交易，需要的私聊加微信。", deleteReason: "" },
+    { id: "POST-1202", title: "吐槽某门店施工翻车，附现场图", author: "Turbo_Tom", replies: 45, likes: 210, views: 15200, status: "正常", reportStatus: "待审核", time: "昨天 22:40", content: "在这家店做的包围喷漆严重色差，现场图都放了，大家避坑。", deleteReason: "" },
+    { id: "POST-1203", title: "出一套自用锻造轮毂，私下交易勿扰", author: "Wheel_Pro", replies: 8, likes: 19, views: 2300, status: "待处理", reportStatus: "", time: "昨天 15:26", content: "自用 BBS 锻造轮毂出一套，帖内含站外联系方式，命中敏感词待审核。", deleteReason: "" },
+    { id: "POST-1205", title: "周末跑山组队，虹桥出发", author: "Night_Owl", replies: 0, likes: 0, views: 0, status: "待处理", reportStatus: "", time: "今天 10:02", content: "周六早上虹桥集合跑山，新发布的帖子，等待首次审核后展示。", deleteReason: "" },
+    { id: "POST-1206", title: "提车一个月，先来社区报个到", author: "EV_Addict", replies: 0, likes: 0, views: 0, status: "待处理", reportStatus: "", time: "今天 09:47", content: "新提 Model 3P，先报个到，后续更新改装清单。", deleteReason: "" },
+    { id: "POST-1198", title: "新手求助：改短簧会影响质保吗？", author: "顾铭", replies: 17, likes: 36, views: 5400, status: "正常", reportStatus: "", reviewResult: "已通过", reviewTime: "今天 09:02", time: "前天 20:15", content: "想降一点车身高度，担心影响整车质保，求有经验的车友解答。", deleteReason: "" },
+    { id: "POST-1195", title: "深夜炸街视频合集", author: "Night_Owl", replies: 52, likes: 188, views: 21400, status: "已删除", reportStatus: "", reviewResult: "已删除", reviewTime: "昨天 11:30", time: "三天前", content: "多段深夜炸街与危险驾驶视频拼接，违反社区公约。", deleteReason: "内容违反社区安全公约，已删除。" }
+  );
+
+  comments.push(
+    { id: "CM-9001", post: "POST-1201", author: "Carbon_King", content: "这种私下交易的帖子也敢发？已举报。", status: "正常", reportStatus: "待审核", time: "今天 08:40", deleteReason: "" },
+    { id: "CM-9002", post: "POST-1182", author: "Wheel_Pro", content: "要便宜渠道的可以私我，加微信细聊。", status: "正常", reportStatus: "待审核", time: "今天 07:55", deleteReason: "" },
+    { id: "CM-9003", post: "POST-1179", author: "EV_Addict", content: "楼上推荐的那家店就是托，别信。", status: "待处理", reportStatus: "", time: "昨天 23:10", deleteReason: "" },
+    { id: "CM-9005", post: "POST-1205", author: "陆川", content: "组队带我一个，我也虹桥出发。", status: "待处理", reportStatus: "", time: "今天 10:15", deleteReason: "" },
+    { id: "CM-8996", post: "POST-1179", author: "陆川", content: "补充一下，舒适优先可以看看带塔顶的套装。", status: "正常", reportStatus: "", reviewResult: "已通过", reviewTime: "今天 09:20", time: "昨天 21:40", deleteReason: "" },
+    { id: "CM-8990", post: "POST-1202", author: "Night_Owl", content: "已私发你另一家店的联系方式，加微信。", status: "已删除", reportStatus: "", reviewResult: "已删除", reviewTime: "昨天 12:05", time: "昨天 22:58", deleteReason: "评论包含站外联系方式，已删除。" }
   );
 
   const normalizedVehicleMaterialDefaults = [
@@ -1446,7 +1483,7 @@
             ["联系人", row.contact],
             ["位置", row.providerRegion],
             ["详细地址", row.locationAddress],
-            ["门店数量", `${stores.length} 家`],
+            ["门店", stores[0]?.name || "-"],
             ["门店状态", statusSummary || "-"],
             ["工位数量", `${row.bays} 个`],
             ["营业执照", row.license],
@@ -1480,7 +1517,7 @@
           ["门店编号", row.id],
           ["地区", row.providerRegion],
           ["门店地址", row.locationAddress],
-          ["门店数量", `${getProviderStores(row).length} 家`],
+          ["门店", getProviderStores(row)[0]?.name || "-"],
           ["联系人", row.contact],
           ["合同编号", row.contractNo],
           ["合同状态", row.contractStatus],
@@ -1545,9 +1582,11 @@
         { key: "name", label: "姓名" },
         { key: "city", label: "城市" },
         { key: "orders", label: "累计订单" },
+        { key: "returnRate", label: "退单率" },
         { key: "totalSpent", label: "累计消费" },
         { key: "status", label: "账号状态", tag: true },
         { key: "punish", label: "处置状态", tag: true },
+        { key: "punishExpire", label: "处置时效" },
         { key: "canLinkProduct", label: "挂链权限", tag: true },
       ],
       rows: users,
@@ -1561,12 +1600,13 @@
           ["城市", row.city],
           ["绑定车辆", `${row.vehicles} 辆`],
           ["累计订单", `${row.orders} 单`],
+          ["退单率", row.returnRate || "0.0%"],
           ["累计消费", row.totalSpent || "-"],
           ["高频车型", row.favorite],
           ["账号状态", row.status],
           ["处置状态", row.punish || "无"],
           ["挂链权限", row.canLinkProduct || "未授权"],
-          ["禁言原因", row.punishReason || "-"],
+          ["处置原因", row.punishReason || "-"],
           ["处置到期", row.punishExpire || "-"],
         ],
         timeline: [
@@ -1630,6 +1670,7 @@
         { key: "sku", label: "SPU编码" },
         { key: "name", label: "商品名称" },
         { key: "brand", label: "品牌" },
+        { key: "isCustomProduct", label: "定制商品", tag: true },
         { key: "price", label: "价格" },
         { key: "status", label: "状态", tag: true },
       ],
@@ -1642,6 +1683,7 @@
         facts: [
           ["类目", row.category],
           ["品牌", row.brand],
+          ["定制商品", row.isCustomProduct || "否"],
           ["原价", row.originalPrice || "-"],
           ["现价", row.price],
           ["库存", `${row.stock}`],
@@ -1707,6 +1749,7 @@
         { key: "user", label: "用户" },
         { key: "originalAmount", label: "订单原价" },
         { key: "discountAmount", label: "优惠" },
+        { key: "couponName", label: "使用优惠券" },
         { key: "userPaidAmount", label: "用户实付" },
         { key: "paymentStatus", label: "支付", tag: true },
         { key: "receiptStatus", label: "到账", tag: true },
@@ -1729,6 +1772,7 @@
           ["预约安装时间", row.appointment],
           ["订单原价", row.originalAmount],
           ["优惠金额", row.discountAmount],
+          ["使用优惠券", row.couponName || "未使用"],
           ["用户实付", row.userPaidAmount],
           ["支付状态", row.paymentStatus],
           ["到账状态", row.receiptStatus],
@@ -2200,6 +2244,9 @@
         actions: "forumManage",
       }),
     }),
+    forumPostReview: { type: "review", reviewKind: "post", title: "帖子审核" },
+    forumCommentReview: { type: "review", reviewKind: "comment", title: "评论审核" },
+    sensitiveWords: { type: "sensitive", title: "敏感词管理" },
     vehicleMaterials: makeTableDef({
       title: "车型素材",
       description: "维护车型渲染图、颜色素材和适配关系。",
@@ -2410,6 +2457,490 @@
     renderPage();
   }
 
+  const sensitiveWordDefaults = [
+    { word: "恐怖主义", pinyin: "kbzy", category: "暴恐违禁", level: "高危", matchType: "精准匹配", enabled: true, updatedAt: "2024-05-20 14:30:22" },
+    { word: "枪支", pinyin: "qz", category: "暴恐违禁", level: "高危", matchType: "精准匹配", enabled: false, updatedAt: "2024-05-18 09:15:33" },
+    { word: "暴恐视频", pinyin: "bksp", category: "暴恐违禁", level: "高危", matchType: "精准匹配", enabled: true, updatedAt: "2024-05-16 10:30:45" },
+    { word: "黄色", pinyin: "hs", category: "色情低俗", level: "中危", matchType: "包含匹配", enabled: true, updatedAt: "2024-05-20 14:30:22" },
+    { word: "赌博", pinyin: "db", category: "违法违规", level: "中危", matchType: "包含匹配", enabled: true, updatedAt: "2024-05-19 11:20:15" },
+    { word: "毒品", pinyin: "dp", category: "违法违规", level: "高危", matchType: "精准匹配", enabled: true, updatedAt: "2024-05-19 11:20:15" },
+    { word: "代考", pinyin: "dk", category: "违法违规", level: "中危", matchType: "精准匹配", enabled: true, updatedAt: "2024-05-16 10:30:45" },
+    { word: "账号交易", pinyin: "zhjy", category: "垃圾营销", level: "低危", matchType: "包含匹配", enabled: true, updatedAt: "2024-05-18 09:15:33" },
+    { word: "加微信", pinyin: "jw", category: "垃圾营销", level: "低危", matchType: "包含匹配", enabled: true, updatedAt: "2024-05-17 16:45:10" },
+    { word: "兼职刷单", pinyin: "jzsd", category: "垃圾营销", level: "低危", matchType: "包含匹配", enabled: false, updatedAt: "2024-05-17 16:45:10" },
+    { word: "私下交易", pinyin: "sxjy", category: "垃圾营销", level: "低危", matchType: "包含匹配", enabled: true, updatedAt: "2024-05-16 09:12:08" },
+    { word: "低价代购", pinyin: "djdg", category: "垃圾营销", level: "低危", matchType: "包含匹配", enabled: true, updatedAt: "2024-05-15 18:22:41" },
+  ];;
+  const sensitiveWordRows = (() => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem("mockSensitiveWords") || "null");
+      if (Array.isArray(stored) && stored.length) return stored;
+    } catch (error) {}
+    return sensitiveWordDefaults.map((item) => ({ ...item }));
+  })();
+  function saveSensitiveWords() {
+    try { window.localStorage.setItem("mockSensitiveWords", JSON.stringify(sensitiveWordRows)); } catch (error) {}
+  }
+  const sensitivePageState = {
+    filters: { keyword: "", category: "", level: "", status: "" },
+    page: 1,
+    pageSize: 10,
+    selected: new Set(),
+  };
+  const SENSITIVE_CATEGORIES = ["政治敏感", "暴恐违禁", "色情低俗", "违法违规", "垃圾营销"];
+  const SENSITIVE_LEVELS = ["高危", "中危", "低危"];
+  const SENSITIVE_MATCH_TYPES = ["精准匹配", "包含匹配"];
+  const sensitiveSelectOptions = (options, current, placeholder) => `<option value="" ${current ? "" : "selected"}>${placeholder}</option>${options.map((option) => `<option value="${option}" ${current === option ? "selected" : ""}>${option}</option>`).join("")}`;
+  const reviewTabState = { post: "pending", comment: "pending" };
+  const reviewSearchState = { post: "", comment: "" };
+  const reviewSelectedState = { post: "", comment: "" };
+
+  function getReviewRows(kind) {
+    const list = kind === "post" ? posts : comments;
+    const fresh = list.filter((item) => !item.reviewResult && item.status === "待处理");
+    const reported = list.filter((item) => !item.reviewResult && item.reportStatus === "待审核");
+    const reviewed = list.filter((item) => item.reviewResult);
+    return { fresh, reported, reviewed };
+  }
+
+  function renderContentReviewPage(kind) {
+    const isPost = kind === "post";
+    const label = isPost ? "帖子" : "评论";
+    const { fresh, reported, reviewed } = getReviewRows(kind);
+    const tabs = [
+      { id: "fresh", label: `${isPost ? "发帖" : "评论"}审核`, count: fresh.length },
+      { id: "report", label: "举报审核", count: reported.length },
+      { id: "reviewed", label: "已审核", count: reviewed.length },
+    ];
+    const activeTab = reviewTabState[kind] || "fresh";
+    const keyword = (reviewSearchState[kind] || "").trim();
+    const matchKeyword = (item) => {
+      if (!keyword) return true;
+      const haystack = isPost ? `${item.title || ""} ${item.author || ""}` : `${item.content || ""} ${item.author || ""}`;
+      return haystack.toLowerCase().includes(keyword.toLowerCase());
+    };
+    const bucketRows = activeTab === "fresh" ? fresh : activeTab === "report" ? reported : reviewed;
+    const rows = bucketRows.filter(matchKeyword);
+    const selectedId = reviewSelectedState[kind] || "";
+    const selected = (kind === "post" ? posts : comments).find((item) => item.id === selectedId);
+
+    if (selected) {
+      const post = isPost ? selected : posts.find((p) => p.id === selected.post);
+      const isPending = !selected.reviewResult;
+      const bucketLabel = isPending ? (selected.status === "待处理" ? `${isPost ? "发帖" : "评论"}审核` : "举报审核") : "已审核";
+      const facts = isPost
+        ? [
+            ["帖子编号", selected.id],
+            ["帖子名称", selected.title],
+            ["发帖人", selected.author],
+            ["发帖时间", selected.time],
+            ["当前状态", selected.status],
+            ["展示状态", selected.status === "待处理" ? "未展示（审核通过后展示）" : selected.status === "已删除" ? "已删除" : "展示中"],
+            ["举报状态", selected.reportStatus === "待审核" ? "被举报，待复审" : "无举报"],
+            ["互动数据", `回复 ${selected.replies || 0} / 点赞 ${selected.likes || 0} / 浏览 ${(selected.views || 0).toLocaleString("zh-CN")}`],
+            ["正文内容", selected.content || "-", true],
+            ...(selected.reviewResult ? [["审核结果", selected.reviewResult], ["审核时间", selected.reviewTime || "-"]] : []),
+          ]
+        : [
+            ["评论编号", selected.id],
+            ["评论人", selected.author],
+            ["评论时间", selected.time],
+            ["评论内容", selected.content],
+            ["所属帖子", post?.title || selected.post],
+            ["当前状态", selected.status],
+            ["展示状态", selected.status === "待处理" ? "未展示（审核通过后展示）" : selected.status === "已删除" ? "已删除" : "展示中"],
+            ["举报状态", selected.reportStatus === "待审核" ? "被举报，待复审" : "无举报"],
+            ...(selected.reviewResult ? [["审核结果", selected.reviewResult], ["审核时间", selected.reviewTime || "-"]] : []),
+          ];
+      contentEl.innerHTML = `
+        <section class="page-heading">
+          <h1>${label}详情</h1>
+          <p class="muted">${label}审核 / ${bucketLabel} / ${escapeHtml(selected.id || "")}</p>
+        </section>
+        <section class="panel table-card" style="padding:16px;">
+          <div style="margin-bottom:14px;"><button class="btn btn-secondary btn-sm" type="button" data-review-back>‹ 返回列表</button></div>
+          <div class="kv-list">
+            ${facts.map(([key, value, isHtml]) => `<div class="kv-row"><span class="muted">${escapeHtml(key)}</span><strong style="font-weight:600; ${isHtml ? "display:block; line-height:1.8;" : ""}">${isHtml ? value : escapeHtml(String(value ?? "-"))}</strong></div>`).join("")}
+          </div>
+          <div style="display:flex; gap:8px; margin-top:16px;">
+            ${isPending ? `
+              <button class="btn btn-primary" type="button" data-review-action="approve" data-review-kind="${kind}" data-review-id="${selected.id}">通过</button>
+              <button class="btn btn-danger" type="button" data-review-action="remove" data-review-kind="${kind}" data-review-id="${selected.id}">删除</button>
+              ${selected.reportStatus === "待审核" ? `<button class="btn btn-secondary" type="button" data-review-action="dismiss" data-review-kind="${kind}" data-review-id="${selected.id}">驳回举报</button>` : ""}
+            ` : `
+              <button class="btn btn-secondary" type="button" data-review-action="revoke" data-review-kind="${kind}" data-review-id="${selected.id}">撤销审核</button>
+            `}
+          </div>
+        </section>`;
+      contentEl.querySelector("[data-review-back]").addEventListener("click", () => {
+        reviewSelectedState[kind] = "";
+        renderPage();
+      });
+      bindReviewActions(kind);
+      return;
+    }
+
+    contentEl.innerHTML = `
+      <section class="page-heading">
+        <h1>${label}审核</h1>
+        <p class="muted">新发布的${label}审核通过后才对外展示；已展示的${label}被用户举报后进入举报审核队列复审。</p>
+      </section>
+      <section class="panel table-card">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            ${tabs.map((tab) => `<button class="filter-chip ${activeTab === tab.id ? "active" : ""}" type="button" data-review-tab="${tab.id}" style="border:0; cursor:pointer;">${tab.label} ${tab.count}</button>`).join("")}
+          </div>
+          <form data-review-search style="display:flex; gap:8px; margin-left:auto;">
+            <input class="input" name="keyword" type="text" value="${escapeHtml(keyword)}" placeholder="搜索${isPost ? "帖子名称、发帖人" : "评论内容、评论人"}" style="width:260px;">
+            <button class="btn btn-secondary" type="submit">搜索</button>
+          </form>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              ${isPost ? `<th>帖子名称</th><th>发帖人</th><th>发帖时间</th>` : `<th>评论内容</th><th>评论人</th><th>评论时间</th><th>所属帖子</th>`}
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.length ? rows.map((item) => {
+              const post = isPost ? item : posts.find((p) => p.id === item.post);
+              const statusText = activeTab === "fresh" ? "待审核（未展示）" : activeTab === "report" ? `被举报 / ${item.status || "-"}` : item.reviewResult || "-";
+              return `<tr>
+                ${isPost
+                  ? `<td>${escapeHtml(item.title || "-")}</td><td>${escapeHtml(item.author || "-")}</td><td>${escapeHtml(item.time || "-")}</td>`
+                  : `<td>${escapeHtml(String(item.content || "-").slice(0, 40))}</td><td>${escapeHtml(item.author || "-")}</td><td>${escapeHtml(item.time || "-")}</td><td>${escapeHtml(post?.title || item.post || "-")}</td>`}
+                <td>${escapeHtml(statusText)}</td>
+                <td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" type="button" data-review-detail="${item.id}">查看详情</button>${activeTab !== "reviewed" ? ` <button class="btn btn-primary btn-sm" type="button" data-review-action="approve" data-review-kind="${kind}" data-review-id="${item.id}">通过</button> <button class="btn btn-danger btn-sm" type="button" data-review-action="remove" data-review-kind="${kind}" data-review-id="${item.id}">删除</button>` : ""}</td>
+              </tr>`;
+            }).join("") : `<tr><td colspan="${isPost ? 5 : 6}" class="muted">${keyword ? "没有匹配的搜索结果。" : activeTab === "reviewed" ? "暂无已审核记录。" : "暂无待审核内容。"}</td></tr>`}
+          </tbody>
+        </table>
+      </section>`;
+    contentEl.querySelectorAll("[data-review-tab]").forEach((button) => button.addEventListener("click", () => {
+      reviewTabState[kind] = button.dataset.reviewTab;
+      renderPage();
+    }));
+    contentEl.querySelector("[data-review-search]").addEventListener("submit", (event) => {
+      event.preventDefault();
+      reviewSearchState[kind] = String(new FormData(event.currentTarget).get("keyword") || "");
+      renderPage();
+    });
+    contentEl.querySelectorAll("[data-review-detail]").forEach((button) => button.addEventListener("click", () => {
+      reviewSelectedState[kind] = button.dataset.reviewDetail;
+      renderPage();
+    }));
+    bindReviewActions(kind);
+  }
+
+  function bindReviewActions(kind) {
+    contentEl.querySelectorAll("[data-review-action]").forEach((button) => button.addEventListener("click", () => {
+      const list = button.dataset.reviewKind === "post" ? posts : comments;
+      const target = list.find((item) => item.id === button.dataset.reviewId);
+      if (!target) return;
+      const action = button.dataset.reviewAction;
+      const origin = target.status === "待处理" ? "fresh" : "report";
+      if (action === "approve") {
+        target.status = "正常";
+        target.reportStatus = "";
+        target.reviewResult = "已通过";
+        target.reviewTime = "刚刚";
+        target.reviewOrigin = origin;
+      }
+      if (action === "remove") {
+        target.status = "已删除";
+        target.reportStatus = "";
+        target.reviewResult = "已删除";
+        target.reviewTime = "刚刚";
+        target.reviewOrigin = origin;
+      }
+      if (action === "dismiss") {
+        target.reportStatus = "";
+        target.reviewResult = "已驳回举报";
+        target.reviewTime = "刚刚";
+        target.reviewOrigin = "report";
+      }
+      if (action === "revoke") {
+        const from = target.reviewOrigin || "fresh";
+        delete target.reviewResult;
+        delete target.reviewTime;
+        delete target.reviewOrigin;
+        if (from === "report") {
+          target.reportStatus = "待审核";
+          if (target.status === "已删除") target.status = "正常";
+        } else {
+          target.status = "待处理";
+        }
+      }
+      reviewSelectedState[kind] = "";
+      renderPage();
+    }));
+  }
+
+  function openSensitiveWordModal(word) {
+    const existing = sensitiveWordRows.find((item) => item.word === word) || null;
+    const selectOptions = sensitiveSelectOptions;
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Sensitive Words</span>
+          <h2 class="section-title">${existing ? "编辑敏感词" : "新增敏感词"}</h2>
+          <p class="section-subtitle">命中的帖子和评论会进入内容审核队列</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <div class="field-label">敏感词</div>
+          <input class="input" data-sw-field="word" type="text" value="${escapeHtml(existing?.word || "")}" placeholder="请输入敏感词" ${existing ? "readonly" : ""}>
+        </div>
+        <div class="field-group">
+          <div class="field-label">拼音/首字母</div>
+          <input class="input" data-sw-field="pinyin" type="text" value="${escapeHtml(existing?.pinyin || "")}" placeholder="如：jw">
+        </div>
+        <div class="field-group">
+          <div class="field-label">分类</div>
+          <select class="input" data-sw-field="category">${selectOptions(SENSITIVE_CATEGORIES, existing?.category || "", "请选择分类")}</select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">等级</div>
+          <select class="input" data-sw-field="level">${selectOptions(SENSITIVE_LEVELS, existing?.level || "", "请选择等级")}</select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">匹配方式</div>
+          <select class="input" data-sw-field="matchType">${selectOptions(SENSITIVE_MATCH_TYPES, existing?.matchType || "", "请选择匹配方式")}</select>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-sw-modal-save>保存</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+    modalCardEl.querySelector("[data-sw-modal-save]").addEventListener("click", () => {
+      const getField = (key) => modalCardEl.querySelector(`[data-sw-field="${key}"]`)?.value.trim() || "";
+      const wordValue = getField("word");
+      if (!wordValue) return;
+      const payload = {
+        word: wordValue,
+        pinyin: getField("pinyin"),
+        category: getField("category") || "垃圾营销",
+        level: getField("level") || "低危",
+        matchType: getField("matchType") || "包含匹配",
+      };
+      if (existing) {
+        Object.assign(existing, payload);
+        existing.updatedAt = "刚刚";
+      } else if (!sensitiveWordRows.some((item) => item.word === wordValue)) {
+        sensitiveWordRows.unshift({ ...payload, enabled: true, updatedAt: "刚刚" });
+      }
+      closeModal();
+      saveSensitiveWords();
+      renderPage();
+    });
+  }
+
+  function openSensitiveImportModal() {
+    openModal(`
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Sensitive Words</span>
+          <h2 class="section-title">批量导入</h2>
+          <p class="section-subtitle">每行一个敏感词，导入后默认为：垃圾营销 / 低危 / 包含匹配 / 启用</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group field-group-full">
+          <div class="field-label">敏感词列表</div>
+          <textarea class="textarea" data-sw-field="words" rows="5" placeholder="加微信&#10;私下交易&#10;低价代购"></textarea>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-sw-import-save>导入</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+    modalCardEl.querySelector("[data-sw-import-save]").addEventListener("click", () => {
+      const words = (modalCardEl.querySelector('[data-sw-field="words"]')?.value || "").split(/\n+/).map((line) => line.trim()).filter(Boolean);
+      words.forEach((item) => {
+        if (!sensitiveWordRows.some((row) => row.word === item)) {
+          sensitiveWordRows.unshift({ word: item, pinyin: "", category: "垃圾营销", level: "低危", matchType: "包含匹配", enabled: true, updatedAt: "刚刚" });
+        }
+      });
+      sensitivePageState.page = 1;
+      closeModal();
+      saveSensitiveWords();
+      renderPage();
+    });
+  }
+
+  function renderSensitiveWordsPage() {
+    const st = sensitivePageState;
+    const levelClass = (level) => (level === "高危" ? "high" : level === "中危" ? "mid" : "low");
+    const filtered = sensitiveWordRows.filter((item) => {
+      if (st.filters.keyword && !item.word.toLowerCase().includes(st.filters.keyword.toLowerCase())) return false;
+      if (st.filters.category && item.category !== st.filters.category) return false;
+      if (st.filters.level && item.level !== st.filters.level) return false;
+      if (st.filters.status === "enabled" && !item.enabled) return false;
+      if (st.filters.status === "disabled" && item.enabled) return false;
+      return true;
+    });
+    const pageCount = Math.max(1, Math.ceil(filtered.length / st.pageSize));
+    if (st.page > pageCount) st.page = pageCount;
+    const pageRows = filtered.slice((st.page - 1) * st.pageSize, st.page * st.pageSize);
+    const pageWords = pageRows.map((item) => item.word);
+    const allPageSelected = pageWords.length > 0 && pageWords.every((word) => st.selected.has(word));
+
+    contentEl.innerHTML = `
+      <section class="page-heading">
+        <h1>敏感词管理</h1>
+        <p class="muted">管理系统内的敏感词库，支持添加、编辑、删除敏感词；命中的帖子和评论会进入内容审核队列。</p>
+      </section>
+      <section class="panel table-card">
+        <div class="toolbar" style="flex-wrap:wrap; gap:10px;">
+          <form data-sw-filter style="display:flex; gap:10px; flex-wrap:wrap; flex:1;">
+            <input class="input" name="keyword" type="text" value="${escapeHtml(st.filters.keyword)}" placeholder="请输入敏感词" style="width:180px;">
+            <select class="input" name="category" style="width:140px;">${sensitiveSelectOptions(SENSITIVE_CATEGORIES, st.filters.category, "请选择分类")}</select>
+            <select class="input" name="level" style="width:140px;">${sensitiveSelectOptions(SENSITIVE_LEVELS, st.filters.level, "请选择等级")}</select>
+            <select class="input" name="status" style="width:140px;">
+              <option value="" ${st.filters.status ? "" : "selected"}>启用状态</option>
+              <option value="enabled" ${st.filters.status === "enabled" ? "selected" : ""}>已启用</option>
+              <option value="disabled" ${st.filters.status === "disabled" ? "selected" : ""}>已停用</option>
+            </select>
+            <button class="btn btn-primary" type="submit">查询</button>
+            <button class="btn btn-secondary" type="button" data-sw-reset>重置</button>
+          </form>
+        </div>
+        <div class="toolbar" style="flex-wrap:wrap; gap:10px;">
+          <div class="toolbar-left" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-danger btn-sm" type="button" data-sw-batch="remove">批量删除</button>
+            <button class="btn btn-secondary btn-sm" type="button" data-sw-batch="enable">批量启用</button>
+            <button class="btn btn-secondary btn-sm" type="button" data-sw-batch="disable">批量停用</button>
+          </div>
+          <div style="margin-left:auto; display:flex; gap:8px;">
+            <button class="btn btn-primary btn-sm" type="button" data-sw-create>＋ 新增敏感词</button>
+            <button class="btn btn-secondary btn-sm" type="button" data-sw-import-open>批量导入</button>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:36px;"><input type="checkbox" data-sw-select-all ${allPageSelected ? "checked" : ""}></th>
+              <th>敏感词</th>
+              <th>拼音/首字母</th>
+              <th>分类</th>
+              <th>等级</th>
+              <th>匹配方式</th>
+              <th>启用状态</th>
+              <th>更新时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pageRows.length ? pageRows.map((item) => `
+              <tr>
+                <td><input type="checkbox" data-sw-select="${escapeHtml(item.word)}" ${st.selected.has(item.word) ? "checked" : ""}></td>
+                <td>${escapeHtml(item.word)}</td>
+                <td class="muted">${escapeHtml(item.pinyin || "-")}</td>
+                <td>${escapeHtml(item.category)}</td>
+                <td><span class="sw-level ${levelClass(item.level)}">${escapeHtml(item.level)}</span></td>
+                <td>${escapeHtml(item.matchType)}</td>
+                <td><button class="sw-switch ${item.enabled ? "on" : ""}" type="button" data-sw-toggle="${escapeHtml(item.word)}" aria-label="切换启用状态"></button></td>
+                <td class="muted">${escapeHtml(item.updatedAt)}</td>
+                <td style="white-space:nowrap;"><button class="sw-link-btn" type="button" data-sw-edit="${escapeHtml(item.word)}">编辑</button><button class="sw-link-btn danger" type="button" data-sw-remove="${escapeHtml(item.word)}">删除</button></td>
+              </tr>`).join("") : `<tr><td colspan="9" class="muted">暂无敏感词数据。</td></tr>`}
+          </tbody>
+        </table>
+        <div class="sw-pagination">
+          <span class="muted" style="margin-right:auto; font-size:12px;">共 ${filtered.length} 条 · ${st.pageSize} 条/页${st.selected.size ? ` · 已选 ${st.selected.size} 项` : ""}</span>
+          <button class="sw-page-btn" type="button" data-sw-page="${st.page - 1}" ${st.page <= 1 ? "disabled" : ""}>‹</button>
+          ${Array.from({ length: pageCount }, (_, index) => `<button class="sw-page-btn ${st.page === index + 1 ? "active" : ""}" type="button" data-sw-page="${index + 1}">${index + 1}</button>`).join("")}
+          <button class="sw-page-btn" type="button" data-sw-page="${st.page + 1}" ${st.page >= pageCount ? "disabled" : ""}>›</button>
+        </div>
+      </section>`;
+
+    contentEl.querySelector("[data-sw-filter]").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const formData = new FormData(event.currentTarget);
+      st.filters = {
+        keyword: String(formData.get("keyword") || "").trim(),
+        category: String(formData.get("category") || ""),
+        level: String(formData.get("level") || ""),
+        status: String(formData.get("status") || ""),
+      };
+      st.page = 1;
+      renderPage();
+    });
+    contentEl.querySelector("[data-sw-reset]").addEventListener("click", () => {
+      st.filters = { keyword: "", category: "", level: "", status: "" };
+      st.page = 1;
+      renderPage();
+    });
+    contentEl.querySelector("[data-sw-create]").addEventListener("click", () => {
+      openSensitiveWordModal("");
+    });
+    contentEl.querySelector("[data-sw-import-open]").addEventListener("click", () => {
+      openSensitiveImportModal();
+    });
+    contentEl.querySelectorAll("[data-sw-batch]").forEach((button) => button.addEventListener("click", () => {
+      if (!st.selected.size) return;
+      const action = button.dataset.swBatch;
+      if (action === "remove") {
+        for (let index = sensitiveWordRows.length - 1; index >= 0; index -= 1) {
+          if (st.selected.has(sensitiveWordRows[index].word)) sensitiveWordRows.splice(index, 1);
+        }
+      } else {
+        sensitiveWordRows.forEach((item) => {
+          if (st.selected.has(item.word)) {
+            item.enabled = action === "enable";
+            item.updatedAt = "刚刚";
+          }
+        });
+      }
+      st.selected.clear();
+      saveSensitiveWords();
+      renderPage();
+    }));
+    const selectAll = contentEl.querySelector("[data-sw-select-all]");
+    if (selectAll) {
+      selectAll.addEventListener("change", () => {
+        if (selectAll.checked) pageWords.forEach((word) => st.selected.add(word));
+        else pageWords.forEach((word) => st.selected.delete(word));
+        renderPage();
+      });
+    }
+    contentEl.querySelectorAll("[data-sw-select]").forEach((box) => box.addEventListener("change", () => {
+      if (box.checked) st.selected.add(box.dataset.swSelect);
+      else st.selected.delete(box.dataset.swSelect);
+      renderPage();
+    }));
+    contentEl.querySelectorAll("[data-sw-toggle]").forEach((button) => button.addEventListener("click", () => {
+      const target = sensitiveWordRows.find((item) => item.word === button.dataset.swToggle);
+      if (target) {
+        target.enabled = !target.enabled;
+        target.updatedAt = "刚刚";
+      }
+      saveSensitiveWords();
+      renderPage();
+    }));
+    contentEl.querySelectorAll("[data-sw-edit]").forEach((button) => button.addEventListener("click", () => {
+      openSensitiveWordModal(button.dataset.swEdit);
+    }));
+    contentEl.querySelectorAll("[data-sw-remove]").forEach((button) => button.addEventListener("click", () => {
+      const index = sensitiveWordRows.findIndex((item) => item.word === button.dataset.swRemove);
+      if (index >= 0) sensitiveWordRows.splice(index, 1);
+      st.selected.delete(button.dataset.swRemove);
+      saveSensitiveWords();
+      renderPage();
+    }));
+    contentEl.querySelectorAll("[data-sw-page]").forEach((button) => button.addEventListener("click", () => {
+      const next = Number(button.dataset.swPage);
+      if (next >= 1 && next <= pageCount) {
+        st.page = next;
+        renderPage();
+      }
+    }));
+  }
+
   function renderPage() {
     const def = defs[state.activePage];
     if (!def) return;
@@ -2436,6 +2967,16 @@
         return;
       }
       renderTablePage(def);
+      return;
+    }
+
+    if (def.type === "review") {
+      renderContentReviewPage(def.reviewKind);
+      return;
+    }
+
+    if (def.type === "sensitive") {
+      renderSensitiveWordsPage();
       return;
     }
 
@@ -2855,11 +3396,8 @@
 
   const customerServiceTabs = {
     csConversations: [
-      ["monitor", "实时监控"],
       ["reception", "会话接待"],
       ["history", "记录查询"],
-      ["quality", "会话质检"],
-      ["customer", "客户消费"],
     ],
     csKnowledge: [["quick", "快捷回复"], ["faq", "FAQ 管理"]],
     csPerformance: [["config", "指标配置"], ["ranking", "排行与明细"]],
@@ -2928,7 +3466,7 @@
   function renderReceptionTab(data) {
     const chats = serviceChats || [];
     const selected = chats.find((item) => item.id === (state.serviceChatSelected || chats[0]?.id));
-    return `<div class="cs-reception-layout"><aside class="panel cs-panel cs-reception-list"><div class="panel-header"><div><h2 class="section-title">会话列表</h2><p class="section-subtitle">${chats.length} 条会话 · ${chats.filter((item) => item.unread).length} 条未读</p></div></div>${chats.map((item) => `<button class="cs-reception-item ${selected?.id === item.id ? "active" : ""}" type="button" data-cs-chat="${item.id}"><span class="cs-avatar">${item.avatar}</span><span><strong>${item.fromName}</strong><small>${item.preview}</small></span>${item.unread ? `<b>${item.unread}</b>` : ""}</button>`).join("")}</aside><article class="panel cs-panel cs-reception-main">${selected ? `<div class="cs-reception-head"><div><span class="eyebrow">${String(selected.fromId).startsWith("SP-") ? "服务商咨询" : "用户咨询"}</span><h2 class="section-title">${selected.fromName}</h2><p class="section-subtitle">关联订单 ${selected.orderId || "-"}</p></div><div>${formatTag(selected.status)}<button class="btn btn-secondary" type="button" data-cs-action="transfer-chat" data-cs-id="${selected.id}">转接</button></div></div><div class="cs-chat-record">${(selected.messages || []).map((message) => `<div class="chat-bubble ${message.from === "platform" ? "platform-bubble" : message.from === "user" ? "user-bubble" : "provider-bubble"}"><div class="chat-bubble-meta"><span class="chat-role">${message.from === "platform" ? "平台客服" : message.from === "user" ? "用户" : "服务商"}</span><span class="chat-time">${message.time}</span></div><div class="chat-text">${message.text}</div></div>`).join("")}</div><div class="cs-reply-tools"><select class="input" data-cs-quick-reply><option value="">选择快捷回复</option>${(data.quickReplies || []).map((item) => `<option value="${item.content}">${item.title}</option>`).join("")}</select><button class="btn btn-ghost" type="button" data-cs-action="close-chat" data-cs-id="${selected.id}">结束会话</button></div><div class="service-chat-composer"><input class="input" type="text" placeholder="输入回复内容，按 Enter 发送" data-cs-chat-input data-cs-id="${selected.id}"><button class="btn btn-primary" type="button" data-cs-action="send-chat" data-cs-id="${selected.id}">发送</button></div>` : `<div class="muted">暂无会话</div>`}</article></div>`;
+    return `<div class="cs-reception-layout"><aside class="panel cs-panel cs-reception-list"><div class="panel-header"><div><h2 class="section-title">会话列表</h2><p class="section-subtitle">${chats.length} 条会话 · ${chats.filter((item) => item.unread).length} 条未读</p></div></div>${chats.map((item) => `<button class="cs-reception-item ${selected?.id === item.id ? "active" : ""}" type="button" data-cs-chat="${item.id}"><span class="cs-avatar">${item.avatar}</span><span><strong>${item.fromName}</strong><small>${item.preview}</small></span>${item.unread ? `<b>${item.unread}</b>` : ""}</button>`).join("")}</aside><article class="panel cs-panel cs-reception-main">${selected ? `<div class="cs-reception-head"><div><span class="eyebrow">${String(selected.fromId).startsWith("SP-") ? "服务商咨询" : "用户咨询"}</span><h2 class="section-title">${selected.fromName}</h2><p class="section-subtitle">关联订单 ${selected.orderId || "-"} · 当前接待：${selected.agent || "林晓"}</p></div><div>${formatTag(selected.status)}<button class="btn btn-secondary" type="button" data-cs-action="transfer-chat" data-cs-id="${selected.id}">转接</button></div></div><div class="cs-chat-record">${(selected.messages || []).map((message) => `<div class="chat-bubble ${message.from === "platform" ? "platform-bubble" : message.from === "user" ? "user-bubble" : "provider-bubble"}"><div class="chat-bubble-meta"><span class="chat-role">${message.from === "platform" ? "平台客服" : message.from === "user" ? "用户" : "服务商"}</span><span class="chat-time">${message.time}</span></div><div class="chat-text">${message.text}</div>${message.card ? renderCsMessageCard(message.card) : ""}</div>`).join("")}</div><div class="cs-reply-tools"><div class="cs-tool-group"><button class="btn btn-secondary" type="button" data-cs-action="send-product" data-cs-id="${selected.id}">发商品</button><button class="btn btn-secondary" type="button" data-cs-action="adjust-price" data-cs-id="${selected.id}">改价格</button><button class="btn btn-secondary" type="button" data-cs-action="send-coupon" data-cs-id="${selected.id}">发优惠券</button><span class="cs-float-note">浮动空间 ¥${state.csFloatLimit}<button type="button" data-cs-action="set-float" data-cs-id="${selected.id}">调整</button></span></div><select class="input" data-cs-quick-reply style="margin-left:auto;"><option value="">选择快捷回复</option>${(data.quickReplies || []).map((item) => `<option value="${item.content}">${item.title}</option>`).join("")}</select><button class="btn btn-ghost" type="button" data-cs-action="close-chat" data-cs-id="${selected.id}">结束会话</button></div><div class="service-chat-composer"><input class="input" type="text" placeholder="输入回复内容，按 Enter 发送" data-cs-chat-input data-cs-id="${selected.id}"><button class="btn btn-primary" type="button" data-cs-action="send-chat" data-cs-id="${selected.id}">发送</button></div>` : `<div class="muted">暂无会话</div>`}</article></div>`;
   }
 
   function renderKnowledgeTab(tab, data) {
@@ -2954,13 +3492,199 @@
     contentEl.querySelectorAll("[data-cs-chat-input]").forEach((input) => input.addEventListener("keydown", (event) => { if (event.key === "Enter") contentEl.querySelector(`[data-cs-action="send-chat"]`)?.click(); }));
   }
 
+  function renderCsMessageCard(card) {
+    if (!card) return "";
+    if (card.kind === "product") {
+      return `<div class="cs-chat-card"><span class="cs-chat-card-tag">商品链接</span><strong>${escapeHtml(card.name)}</strong><span class="cs-chat-card-price">${escapeHtml(card.price)}</span><em>用户点击可跳转商品详情</em></div>`;
+    }
+    if (card.kind === "coupon") {
+      return `<div class="cs-chat-card coupon"><span class="cs-chat-card-tag">优惠券</span><strong>${escapeHtml(card.name)}</strong><span class="cs-chat-card-price">${escapeHtml(card.discount)}</span><em>已发放到用户账户</em></div>`;
+    }
+    if (card.kind === "price") {
+      return `<div class="cs-chat-card price"><span class="cs-chat-card-tag">价格调整</span><strong>订单 ${escapeHtml(card.orderId)}</strong><span class="cs-chat-card-price">${escapeHtml(card.from)} → ${escapeHtml(card.to)}</span><em>已为该用户调整订单价格</em></div>`;
+    }
+    return "";
+  }
+
+  function csPushCard(chatId, card) {
+    const chat = serviceChats.find((item) => item.id === chatId);
+    if (!chat) return;
+    chat.messages = chat.messages || [];
+    chat.messages.push({ from: "platform", text: card.summary, card, time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }) });
+    chat.preview = card.summary;
+    closeModal();
+    renderCustomerServicePage("csConversations");
+  }
+
+  function csPriceToNumber(value) {
+    return Number(String(value || "").replace(/[^0-9.]/g, "")) || 0;
+  }
+
+  function openCsProductModal(chatId) {
+    openModal(`
+      <div class="panel-header"><div><span class="eyebrow">Customer Service</span><h2 class="section-title">发送商品链接</h2><p class="section-subtitle">选择商品后将作为卡片消息发送给当前用户</p></div></div>
+      <div style="display:grid; gap:8px; max-height:320px; overflow-y:auto;">
+        ${(products || []).slice(0, 8).map((item) => `<button class="btn btn-secondary" type="button" data-cs-product="${escapeHtml(item.sku)}" style="justify-content:space-between;"><span>${escapeHtml(item.name)}</span><span>${escapeHtml(item.price || "-")}</span></button>`).join("")}
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;"><button class="btn btn-secondary" type="button" data-close-modal>取消</button></div>
+    `);
+    modalCardEl.querySelectorAll("[data-cs-product]").forEach((button) => button.addEventListener("click", () => {
+      const product = (products || []).find((item) => item.sku === button.dataset.csProduct);
+      if (!product) return;
+      csPushCard(chatId, { kind: "product", sku: product.sku, name: product.name, price: product.price || "-", summary: `[商品链接] ${product.name}` });
+    }));
+  }
+
+  function openCsCouponModal(chatId) {
+    openModal(`
+      <div class="panel-header"><div><span class="eyebrow">Customer Service</span><h2 class="section-title">发送优惠券</h2><p class="section-subtitle">选择优惠券模板发放给当前用户</p></div></div>
+      <div style="display:grid; gap:8px;">
+        ${(window.MockData.promotions || []).map((promo) => `<button class="btn btn-secondary" type="button" data-cs-coupon="${promo.id}" style="justify-content:space-between;"><span>${escapeHtml(promo.name)}</span><span>${escapeHtml(promo.discount)}</span></button>`).join("")}
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;"><button class="btn btn-secondary" type="button" data-close-modal>取消</button></div>
+    `);
+    modalCardEl.querySelectorAll("[data-cs-coupon]").forEach((button) => button.addEventListener("click", () => {
+      const promo = (window.MockData.promotions || []).find((item) => item.id === button.dataset.csCoupon);
+      if (!promo) return;
+      csPushCard(chatId, { kind: "coupon", id: promo.id, name: promo.name, discount: promo.discount, summary: `[优惠券] ${promo.name}（${promo.discount}）` });
+    }));
+  }
+
+  function openCsPriceModal(chatId) {
+    const chat = serviceChats.find((item) => item.id === chatId);
+    const order = (orders || []).find((item) => item.id === chat?.orderId);
+    if (!order) {
+      openFeedbackModal("无法调整价格", "当前会话未关联有效订单，暂不支持改价。");
+      return;
+    }
+    openModal(`
+      <div class="panel-header"><div><span class="eyebrow">Customer Service</span><h2 class="section-title">修改用户价格</h2><p class="section-subtitle">订单 ${escapeHtml(order.id)} / 当前价格 ${escapeHtml(order.quote || "-")} / 你的浮动空间 ¥${state.csFloatLimit}</p></div></div>
+      <div class="form-grid">
+        <div class="field-group field-group-full">
+          <div class="field-label">调整后价格（元）</div>
+          <input class="input" data-cs-field="newPrice" type="number" min="0" step="1" placeholder="输入新的订单价格">
+        </div>
+      </div>
+      <div class="muted" data-cs-price-error style="color:#ff5b5b; font-size:12px; margin-top:8px;"></div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-cs-price-submit>确认调整</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+    modalCardEl.querySelector("[data-cs-price-submit]").addEventListener("click", () => {
+      const input = modalCardEl.querySelector('[data-cs-field="newPrice"]');
+      const errorEl = modalCardEl.querySelector("[data-cs-price-error]");
+      const next = Number(input?.value || 0);
+      const current = csPriceToNumber(order.quote);
+      if (!next || next <= 0) { errorEl.textContent = "请输入有效的价格。"; return; }
+      if (next >= current) { errorEl.textContent = "新价格必须低于当前价格。"; return; }
+      if (current - next > Number(state.csFloatLimit)) { errorEl.textContent = `超出你的浮动空间（最高可优惠 ¥${state.csFloatLimit}），请联系主管调整。`; return; }
+      const formatted = `¥ ${next.toLocaleString("zh-CN")}`;
+      const before = order.quote;
+      order.quote = formatted;
+      csPushCard(chatId, { kind: "price", orderId: order.id, from: before, to: formatted, summary: `[价格调整] 订单 ${order.id}：${before} → ${formatted}` });
+    });
+  }
+
+  function openCsFloatModal() {
+    openModal(`
+      <div class="panel-header"><div><span class="eyebrow">Customer Service</span><h2 class="section-title">客服账号浮动空间</h2><p class="section-subtitle">设置当前客服账号单笔订单可优惠的最大金额</p></div></div>
+      <div class="form-grid">
+        <div class="field-group field-group-full">
+          <div class="field-label">浮动空间（元）</div>
+          <input class="input" data-cs-field="floatLimit" type="number" min="0" step="50" value="${state.csFloatLimit}">
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button class="btn btn-primary" type="button" data-cs-float-submit>保存</button>
+        <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
+      </div>
+    `);
+    modalCardEl.querySelector("[data-cs-float-submit]").addEventListener("click", () => {
+      const value = Number(modalCardEl.querySelector('[data-cs-field="floatLimit"]')?.value || 0);
+      state.csFloatLimit = Math.max(0, value);
+      closeModal();
+      renderCustomerServicePage("csConversations");
+    });
+  }
+
+  function openCsHistoryModal(id) {
+    const record = ((customerService || {}).history || []).find((item) => item.id === id);
+    if (!record) return;
+    const messages = [
+      { from: "user", text: record.preview, time: record.time },
+      { from: "platform", text: `您好，已收到您的反馈，正在为您核实订单 ${record.orderId} 的情况。`, time: record.time },
+      { from: "user", text: "好的，麻烦尽快处理，谢谢。", time: record.time },
+      { from: "platform", text: `已为您处理完成，当前状态：${record.status}。如有其他问题欢迎随时联系。`, time: record.time },
+    ];
+    openModal(`
+      <div class="panel-header"><div><span class="eyebrow">Conversation History</span><h2 class="section-title">会话记录 ${escapeHtml(record.id)}</h2><p class="section-subtitle">完整历史会话内容</p></div></div>
+      <div class="kv-list" style="margin-bottom:14px;">
+        <div class="kv-row"><span class="muted">用户</span><strong style="font-weight:600;">${escapeHtml(record.user)}</strong></div>
+        <div class="kv-row"><span class="muted">接待客服</span><strong style="font-weight:600;">${escapeHtml(record.agent)}</strong></div>
+        <div class="kv-row"><span class="muted">关联订单</span><strong style="font-weight:600;">${escapeHtml(record.orderId)}</strong></div>
+        <div class="kv-row"><span class="muted">时间</span><strong style="font-weight:600;">${escapeHtml(record.time)}</strong></div>
+        <div class="kv-row"><span class="muted">状态</span><strong style="font-weight:600;">${escapeHtml(record.status)}</strong></div>
+      </div>
+      <div class="cs-chat-record" style="max-height:320px; overflow-y:auto;">
+        ${messages.map((message) => `<div class="chat-bubble ${message.from === "platform" ? "platform-bubble" : "user-bubble"}"><div class="chat-bubble-meta"><span class="chat-role">${message.from === "platform" ? "平台客服" : "用户"}</span><span class="chat-time">${escapeHtml(message.time)}</span></div><div class="chat-text">${escapeHtml(message.text)}</div></div>`).join("")}
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;"><button class="btn btn-secondary" type="button" data-close-modal>关闭</button></div>
+    `);
+  }
+
+  function openCsTransferModal(chatId) {
+    const agents = ((customerService || {}).agents || []);
+    openModal(`
+      <div class="panel-header"><div><span class="eyebrow">Transfer</span><h2 class="section-title">转接会话</h2><p class="section-subtitle">选择一位客服，由 TA 继续接待当前会话</p></div></div>
+      <div style="display:grid; gap:8px; max-height:340px; overflow-y:auto;">
+        ${agents.map((agent) => `<button class="btn btn-secondary" type="button" data-cs-transfer-agent="${escapeHtml(agent.name)}" ${agent.status !== "在线" ? "disabled" : ""} style="justify-content:space-between;"><span><span class="cs-avatar" style="display:inline-grid; margin-right:8px;">${escapeHtml(agent.avatar || agent.name.charAt(0))}</span>${escapeHtml(agent.name)} · ${escapeHtml(agent.group || "")}</span><span class="muted" style="font-size:12px;">${escapeHtml(agent.status)} · ${agent.sessions || 0} 会话</span></button>`).join("")}
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;"><button class="btn btn-secondary" type="button" data-close-modal>取消</button></div>
+    `);
+    modalCardEl.querySelectorAll("[data-cs-transfer-agent]").forEach((button) => button.addEventListener("click", () => {
+      const name = button.dataset.csTransferAgent;
+      const chat = serviceChats.find((item) => item.id === chatId);
+      if (!chat) return;
+      chat.agent = name;
+      chat.messages = chat.messages || [];
+      chat.messages.push({ from: "platform", text: `会话已转接给客服 ${name}，由 TA 继续接待。`, time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }) });
+      chat.preview = `已转接给客服 ${name}`;
+      chat.status = "处理中";
+      closeModal();
+      renderCustomerServicePage("csConversations");
+    }));
+  }
+
   function handleCustomerServiceAction(action, id, pageId) {
     const data = customerService || {};
-    if (["transfer", "transfer-all", "assign", "auto-assign", "run-quality", "quality-note", "export", "add-knowledge", "edit-knowledge", "export-performance", "view-performance", "view-history", "view-customer", "transfer-chat"].includes(action)) { openFeedbackModal("操作已完成", "当前为前端 mock 交互，操作结果已在本次演示状态中生效。"); return; }
+    if (["transfer", "transfer-all", "assign", "auto-assign", "run-quality", "quality-note", "export", "add-knowledge", "edit-knowledge", "export-performance", "view-performance", "view-customer"].includes(action)) { openFeedbackModal("操作已完成", "当前为前端 mock 交互，操作结果已在本次演示状态中生效。"); return; }
+    if (action === "transfer-chat") { openCsTransferModal(id); return; }
+    if (action === "view-history") { openCsHistoryModal(id); return; }
     if (action === "toggle-knowledge") { const item = [...(data.quickReplies || []), ...(data.faqs || [])].find((row) => row.id === id); if (item) item.status = item.status === "启用" ? "停用" : "启用"; renderCustomerServicePage(pageId); return; }
     if (action === "save-metrics") { const total = [...contentEl.querySelectorAll("[data-cs-weight]")].reduce((sum, item) => sum + Number(item.value || 0), 0); openFeedbackModal(total === 100 ? "指标配置已保存" : "权重合计不正确", total === 100 ? "考核指标权重已保存，本次为前端 mock 状态。" : `当前权重合计为 ${total}%，请调整为 100%。`); return; }
+    if (action === "send-product") { openCsProductModal(id); return; }
+    if (action === "adjust-price") { openCsPriceModal(id); return; }
+    if (action === "send-coupon") { openCsCouponModal(id); return; }
+    if (action === "set-float") { openCsFloatModal(); return; }
     if (action === "send-chat") { const input = contentEl.querySelector(`[data-cs-chat-input][data-cs-id="${id}"]`); const chat = serviceChats.find((item) => item.id === id); const text = input?.value.trim(); if (!chat || !text) return; chat.messages = chat.messages || []; chat.messages.push({ from: "platform", text, time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }) }); chat.preview = text; chat.status = "处理中"; renderCustomerServicePage("csConversations"); }
-    if (action === "close-chat") { const chat = serviceChats.find((item) => item.id === id); if (chat) chat.status = "已解决"; renderCustomerServicePage("csConversations"); }
+    if (action === "close-chat") {
+      const chat = serviceChats.find((item) => item.id === id);
+      if (chat) {
+        chat.status = "已解决";
+        if (String(chat.fromId || "").startsWith("USER")) {
+          window.localStorage.setItem(CUSTOMER_SERVICE_RATING_KEY, JSON.stringify({
+            sessionId: chat.id,
+            user: chat.fromName,
+            orderId: chat.orderId || "",
+            agent: "林晓",
+            endedAt: Date.now(),
+            rated: false,
+          }));
+        }
+      }
+      renderCustomerServicePage("csConversations");
+    }
   }
 
   function renderServiceChatPage() {
@@ -3654,6 +4378,10 @@
           ? `
             <button class="btn btn-secondary" type="button" data-provider-account-toolbar="create">新增账号</button>
           `
+        : state.activePage === "orderList"
+          ? `
+            <button class="btn btn-secondary" type="button" data-order-toolbar="export">导出</button>
+          `
         : state.activePage === "vehicleModelManage"
           ? `
             <button class="btn btn-secondary" type="button" data-vehicle-model-toolbar="create-brand">新增汽车品牌</button>
@@ -4252,7 +4980,7 @@
               `
               : state.activePage === "providerAudit"
                 ? `
-                  <button class="btn btn-primary" type="button" data-provider-action="process">按门店审核</button>
+                  <button class="btn btn-primary" type="button" data-provider-action="process">审核门店资质</button>
                   <button class="btn btn-secondary" type="button" data-provider-action="materials">查看详情</button>
                 `
                 : detail.actions === "providerList"
@@ -5912,7 +6640,7 @@
         (store, index) => `
         <article class="provider-material-card" style="display:grid; gap:10px;">
           <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
-            <strong style="color:#fff;">${index + 1}. ${store.name || row.name}${store.isPrimary ? ' <span class="pill">主门店</span>' : ""}</strong>
+            <strong style="color:#fff;">${store.name || row.name}</strong>
             ${store.auditStatus ? formatTag(store.auditStatus) : ""}
           </div>
           <div class="muted">${formatStoreAddress(store)}</div>
@@ -5926,8 +6654,8 @@
       <div class="panel-header">
         <div>
           <span class="eyebrow">Provider Audit</span>
-          <h2 class="section-title">按门店审核</h2>
-          <p class="section-subtitle">${row.name} / 共 ${stores.length} 家门店 / 可分别审核各门店资质</p>
+          <h2 class="section-title">门店资质审核</h2>
+          <p class="section-subtitle">${row.name} / 审核门店资质与门店信息</p>
         </div>
       </div>
       <div class="provider-store-list" style="display:grid; gap:12px; margin-bottom:18px;">
@@ -6138,7 +6866,7 @@
                 (store, index) => `
               <div class="provider-material-card" style="display:grid; gap:10px;" data-store-id="${store.id}">
                 <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
-                  <strong style="color:#fff;">${index + 1}. ${store.name || row.name}${store.isPrimary ? " <span class=\"pill\">主门店</span>" : ""}</strong>
+                  <strong style="color:#fff;">${store.name || row.name}</strong>
                   <div style="display:flex; gap:6px; flex-wrap:wrap;">
                     ${store.auditStatus ? formatTag(store.auditStatus) : ""}
                     ${store.status && store.status !== row.status ? formatTag(store.status) : ""}
@@ -7629,6 +8357,9 @@
       .map((name) => `<option value="${name}" ${selectedCategory === name ? "selected" : ""}>${name}</option>`)
       .join("");
     const skuValue = isEdit ? row.sku : `PR-${String(products.length + 8801).padStart(4, "0")}`;
+    const defaultDescription = isEdit
+      ? (row.descriptionHtml || `<p>${escapeHtml(row.description || "")}</p>`)
+      : "<p>主图突出商品核心卖点，补充细节图、安装位说明与实车效果展示。</p>";
     let selectedSpecs = cloneSpecTemplate(isEdit ? row.specs : getProductSpecTemplate(selectedCategory));
     const existingVariants = Array.isArray(row?.variants) ? row.variants : [];
     const renderVariantRows = (variants) => variants.length ? variants.map((variant, index) => `
@@ -7713,6 +8444,14 @@
           <div class="field-label">库存</div>
           <input class="input" data-product-field="stock" placeholder="请输入库存数量" value="${isEdit ? row.stock : "12"}" />
         </div>
+        <div class="field-group">
+          <div class="field-label">定制商品</div>
+          <select class="select" data-product-field="isCustomProduct">
+            <option value="否" ${(isEdit ? row.isCustomProduct || "否" : "否") === "否" ? "selected" : ""}>否</option>
+            <option value="是" ${(isEdit ? row.isCustomProduct || "否" : "否") === "是" ? "selected" : ""}>是</option>
+          </select>
+          <div class="field-hint">选择“是”后，用户下单前需要确认定制商品退款提示。</div>
+        </div>
         <div class="field-group field-group-full">
           <div class="field-label">适配车型</div>
           <div class="product-fitment-picker" data-product-fitment-picker data-selected="${selectedFitments.join("||")}">
@@ -7764,8 +8503,23 @@
           <input class="input" style="margin-top:10px;" data-product-field="promoDesc" placeholder="活动说明" value="${isEdit && row.promotion ? row.promotion.desc || "" : ""}" />
         </div>
         <div class="field-group field-group-full">
-          <div class="field-label">说明</div>
-          <textarea class="textarea" data-product-field="description" placeholder="请输入商品说明">${isEdit ? row.description || "" : "主图突出商品核心卖点，补充细节图、安装位说明与实车效果展示。"}</textarea>
+          <div class="field-label">商品详情</div>
+          <div class="product-rich-editor-shell">
+            <div class="product-rich-toolbar" role="toolbar" aria-label="商品详情编辑工具">
+              <button class="product-rich-tool" type="button" data-product-rich-action="bold" title="加粗"><strong>B</strong></button>
+              <button class="product-rich-tool" type="button" data-product-rich-action="italic" title="斜体"><em>I</em></button>
+              <button class="product-rich-tool" type="button" data-product-rich-action="underline" title="下划线"><u>U</u></button>
+              <button class="product-rich-tool" type="button" data-product-rich-action="formatBlock" data-product-rich-value="h3">标题</button>
+              <button class="product-rich-tool" type="button" data-product-rich-action="insertUnorderedList" title="项目列表">列表</button>
+              <button class="product-rich-tool" type="button" data-product-rich-action="image">插入图片</button>
+              <button class="product-rich-tool" type="button" data-product-rich-action="video">插入视频</button>
+              <button class="product-rich-tool" type="button" data-product-rich-action="removeFormat" title="清除格式">清除格式</button>
+            </div>
+            <div class="product-rich-editor" data-product-rich-editor contenteditable="true" data-placeholder="请输入商品图文详情，可插入图片或视频">${defaultDescription}</div>
+            <input type="file" accept="image/*" data-product-rich-media-input="image" hidden />
+            <input type="file" accept="video/*" data-product-rich-media-input="video" hidden />
+          </div>
+          <div class="field-hint">支持文字排版、图片和视频。当前原型将媒体以本地 Data URL 保存在前端内存中。</div>
         </div>
         <div class="field-group field-group-full">
           <div class="field-label">规格参数</div>
@@ -7800,6 +8554,56 @@
         : `<div class="muted">当前类目暂无规格模板，商品将按单规格销售。</div>`;
       const variantList = modalCardEl.querySelector("[data-product-variant-list]");
       if (variantList) variantList.innerHTML = `<div class="muted" data-product-variant-empty>类目规格已变化，请点击“添加 SKU”并手动填写。</div>`;
+    });
+
+    const richEditor = modalCardEl.querySelector("[data-product-rich-editor]");
+    const richMediaInputs = {
+      image: modalCardEl.querySelector('[data-product-rich-media-input="image"]'),
+      video: modalCardEl.querySelector('[data-product-rich-media-input="video"]'),
+    };
+    const insertRichHtml = (html) => {
+      if (!richEditor) return;
+      richEditor.focus();
+      if (document.execCommand) {
+        document.execCommand("insertHTML", false, html);
+      } else {
+        richEditor.insertAdjacentHTML("beforeend", html);
+      }
+    };
+    const bindRichMediaInput = (type) => {
+      const input = richMediaInputs[type];
+      input?.addEventListener("change", (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const source = String(reader.result || "");
+          const safeName = escapeAttribute(file.name);
+          const mediaHtml = type === "image"
+            ? `<p><img src="${source}" alt="${safeName}" /></p>`
+            : `<p><video controls preload="metadata" src="${source}"></video></p>`;
+          insertRichHtml(mediaHtml);
+          input.value = "";
+        };
+        reader.readAsDataURL(file);
+      });
+    };
+    bindRichMediaInput("image");
+    bindRichMediaInput("video");
+    modalCardEl.querySelectorAll("[data-product-rich-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.productRichAction;
+        if (action === "image" || action === "video") {
+          richMediaInputs[action]?.click();
+          return;
+        }
+        richEditor?.focus();
+        if (action === "formatBlock") {
+          document.execCommand("formatBlock", false, button.dataset.productRichValue || "p");
+          return;
+        }
+        document.execCommand(action, false);
+      });
     });
     const imageInput = modalCardEl.querySelector('[data-product-image-input]');
     const imageTrigger = modalCardEl.querySelector('[data-product-image-trigger]');
@@ -8440,11 +9244,22 @@
     openFeedbackModal("商品链接已更新", `${target.id} 已保存商品链接与授权状态。`);
   }
 
+  function resolveUserPunishDurationLabel(duration) {
+    if (!duration || duration === "永久") return "永久";
+    const days = Number(String(duration).replace(/[^\d]/g, ""));
+    if (!days) return duration;
+    const expire = new Date();
+    expire.setDate(expire.getDate() + days);
+    const expireText = expire.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-");
+    return `${duration}（至 ${expireText}）`;
+  }
+
   function submitUserPunish(userId, type) {
     const target = users.find((item) => item.id === userId);
     if (!target) return;
     const reason = modalCardEl.querySelector("[data-user-punish-reason]")?.value.trim() || "";
-    const duration = modalCardEl.querySelector("[data-user-punish-duration]")?.value || "";
+    const duration = modalCardEl.querySelector("[data-user-punish-duration]")?.value || "7 天";
+    const expireLabel = resolveUserPunishDurationLabel(duration);
     if (!reason) {
       openFeedbackModal("请填写处理原因", "禁言或封禁前需要填写原因，方便用户申诉与后台追溯。");
       return;
@@ -8452,7 +9267,7 @@
     if (type === "mute") {
       target.punish = "禁言";
       target.punishReason = reason;
-      target.punishExpire = duration === "永久" ? "永久" : duration;
+      target.punishExpire = expireLabel;
       target.timeline = target.timeline || [];
       target.timeline.unshift(`${getNowStamp()} 平台禁言用户，周期：${target.punishExpire}，原因：${reason}`);
       renderPage();
@@ -8462,11 +9277,11 @@
     target.punish = "封号";
     target.status = "停用";
     target.punishReason = reason;
-    target.punishExpire = "永久";
+    target.punishExpire = expireLabel;
     target.timeline = target.timeline || [];
-    target.timeline.unshift(`${getNowStamp()} 平台封禁用户。原因：${reason}`);
+    target.timeline.unshift(`${getNowStamp()} 平台封禁用户，周期：${target.punishExpire}，原因：${reason}`);
     renderPage();
-    openFeedbackModal("用户已封禁", `${target.name} 已封禁并停用账号。`);
+    openFeedbackModal("用户已封禁", `${target.name} 封禁周期：${target.punishExpire}，账号已停用。`);
   }
 
   function submitCommentManage(commentId, action, reason = "") {
@@ -8750,12 +9565,14 @@
         target.punish = "";
         target.punishReason = "";
         target.punishExpire = "";
+        target.status = "正常";
         openFeedbackModal("封号已解除", `${target.name} 账号已恢复正常。`);
       } else {
         target.punish = "封号";
         target.punishReason = target.punishReason || "严重违规";
-        target.punishExpire = target.punishExpire || "永久";
-        openFeedbackModal("用户已被封号", `${target.name} 封号原因：${target.punishReason}。`);
+        target.punishExpire = target.punishExpire || "7 天";
+        target.status = "停用";
+        openFeedbackModal("用户已被封号", `${target.name} 封号原因：${target.punishReason}，时效：${target.punishExpire}。`);
       }
     }
   }
@@ -8765,6 +9582,9 @@
       const el = modalCardEl.querySelector(`[data-product-field="${field}"]`);
       return el ? el.value.trim() : "";
     };
+    const descriptionEditor = modalCardEl.querySelector("[data-product-rich-editor]");
+    const descriptionHtml = descriptionEditor?.innerHTML.trim() || "";
+    const descriptionText = descriptionEditor?.innerText.trim() || "";
     const fitment = getProductFitmentSelection(modalCardEl.querySelector("[data-product-fitment-picker]")).join(" / ");
     const specNames = Array.from(modalCardEl.querySelectorAll("[data-product-spec-row]"))
       .map((row) => row.querySelector("[data-product-spec-name]")?.value.trim() || "")
@@ -8793,9 +9613,11 @@
       originalPrice: getValue("originalPrice"),
       price: getValue("price"),
       stock: Number(getValue("stock")) || 0,
+      isCustomProduct: getValue("isCustomProduct") || "否",
       fitment,
       image: getValue("image"),
-      description: getValue("description"),
+      description: descriptionText,
+      descriptionHtml,
       status: getValue("status"),
       spec: getValue("spec"),
       promotion: promoType ? {
@@ -9691,17 +10513,19 @@
       <div class="panel-header">
         <div>
           <span class="eyebrow">Forum Sanction</span>
-          <h2 class="section-title">${isMute ? "设置禁言周期" : "封禁用户"}</h2>
-          <p class="section-subtitle">${row.id} / ${row.name} / ${isMute ? "选择周期并填写原因" : "封禁后账号将停用"}</p>
+          <h2 class="section-title">${isMute ? "设置禁言时效" : "设置封号时效"}</h2>
+          <p class="section-subtitle">${row.id} / ${row.name} / 选择处置时效并填写原因，到期后可人工恢复或由后续系统处理</p>
         </div>
       </div>
       <div class="form-grid">
         <div class="field-group">
-          <label class="field-label" for="user-punish-duration">处理周期</label>
-          <select class="select" id="user-punish-duration" data-user-punish-duration ${isMute ? "" : "disabled"}>
+          <label class="field-label" for="user-punish-duration">处置时效</label>
+          <select class="select" id="user-punish-duration" data-user-punish-duration>
+            <option value="1 天">1 天</option>
             <option value="3 天">3 天</option>
             <option value="7 天" selected>7 天</option>
             <option value="30 天">30 天</option>
+            <option value="90 天">90 天</option>
             <option value="永久">永久</option>
           </select>
         </div>
@@ -9711,7 +10535,7 @@
         </div>
       </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
-        <button class="btn btn-primary" type="button" data-submit-user-punish data-user-id="${row.id}" data-punish-type="${type}">${isMute ? "确认禁言" : "确认封禁"}</button>
+        <button class="btn btn-primary" type="button" data-submit-user-punish data-user-id="${row.id}" data-punish-type="${type}">${isMute ? "确认禁言" : "确认封号"}</button>
         <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
       </div>
     `);

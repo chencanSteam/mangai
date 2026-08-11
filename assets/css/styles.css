@@ -5204,6 +5204,123 @@ body.provider-screen-mode {
   margin: 8px 0;
 }
 
+.product-rich-editor-shell {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.product-rich-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.product-rich-tool {
+  min-width: 34px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.product-rich-tool:hover,
+.product-rich-tool:focus-visible {
+  border-color: rgba(255, 106, 0, 0.55);
+  background: rgba(255, 106, 0, 0.12);
+  outline: none;
+}
+
+.product-rich-editor {
+  min-height: 220px;
+  padding: 14px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.75;
+  outline: none;
+}
+
+.product-rich-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.product-rich-editor h3 {
+  margin: 12px 0 8px;
+  color: var(--text);
+  font-size: 18px;
+}
+
+.product-rich-editor p {
+  margin: 8px 0;
+}
+
+.product-rich-editor ul,
+.product-rich-editor ol {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.product-rich-editor img,
+.product-rich-editor video {
+  display: block;
+  max-width: 100%;
+  margin: 10px 0;
+  border-radius: 9px;
+}
+
+.product-rich-editor video {
+  width: min(100%, 560px);
+  max-height: 320px;
+  background: #0d0f12;
+}
+
+.pd-rich-content {
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.pd-rich-content h3,
+.pd-rich-content h4 {
+  margin: 14px 0 8px;
+  color: #fff;
+  line-height: 1.35;
+}
+
+.pd-rich-content p {
+  margin: 8px 0;
+}
+
+.pd-rich-content ul,
+.pd-rich-content ol {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.pd-rich-content img,
+.pd-rich-content video {
+  display: block;
+  max-width: 100%;
+  margin: 12px 0;
+  border-radius: 10px;
+  background: #0d0f12;
+}
+
+.pd-rich-content video {
+  width: 100%;
+  max-height: 420px;
+}
+
 .topic-create-actions {
   display: flex;
   gap: 10px;
@@ -5364,6 +5481,75 @@ body.provider-screen-mode {
   border: 1px dashed rgba(255, 106, 0, 0.28);
   background: rgba(255, 106, 0, 0.06);
   cursor: pointer;
+}
+
+.after-sale-upload-panel {
+  min-height: 132px;
+}
+
+.after-sale-upload-panel + .after-sale-media-preview:empty {
+  display: none;
+}
+
+.form-help {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.after-sale-media-preview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.after-sale-media-item {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.after-sale-media-item img,
+.after-sale-media-item video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.after-sale-media-type {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.68);
+  color: #fff;
+  font-size: 10px;
+}
+
+.after-sale-media-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.68);
+  color: #fff;
+  cursor: pointer;
+  line-height: 20px;
+  text-align: center;
+}
+
+.after-sale-media-remove:hover {
+  background: #ff6a00;
 }
 
 .upload-input {
@@ -6443,10 +6629,118 @@ body[data-page="user-order-create"] .phone-screen {
   min-height: 48px;
 }
 
+.order-create-bottom-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px 0 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.order-create-bottom-summary div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.order-create-bottom-summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.order-create-bottom-summary strong {
+  color: #ff8b48;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
 .order-create-success p {
   margin: 0;
   color: rgba(255, 255, 255, 0.72);
   line-height: 1.7;
+}
+
+.order-payment-countdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 139, 72, 0.36);
+  border-radius: 12px;
+  background: rgba(255, 109, 35, 0.1);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.order-payment-countdown strong {
+  color: #ff8b48;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.order-payment-countdown.expired {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.order-payment-countdown.expired strong {
+  color: var(--muted);
+}
+
+.order-payment-countdown.paid {
+  border-color: rgba(65, 214, 164, 0.34);
+  background: rgba(65, 214, 164, 0.08);
+}
+
+.order-payment-countdown.paid strong {
+  color: #51d7a8;
+  font-size: 16px;
+}
+
+.order-payment-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+}
+
+.order-payment-panel[hidden] {
+  display: none !important;
+}
+
+.order-payment-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.order-payment-summary div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.order-payment-summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.order-payment-summary strong {
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.order-payment-confirm {
+  width: 100%;
 }
 
 .garage-preview {
@@ -9590,12 +9884,14 @@ body[data-mobile-app] .select option {
 }
 
 .forum-waterfall {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  column-count: 2;
+  column-gap: 10px;
 }
 
 .forum-waterfall-card {
+  display: inline-block;
+  break-inside: avoid;
+  margin: 0 0 10px;
   overflow: hidden;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.045);
@@ -9615,6 +9911,27 @@ body[data-mobile-app] .select option {
 
 .forum-waterfall-card.tall .forum-waterfall-art {
   aspect-ratio: 0.95 / 1;
+}
+
+.forum-waterfall-card.mid .forum-waterfall-art {
+  aspect-ratio: 1.35 / 1;
+}
+
+.forum-play-badge {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 10px;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  backdrop-filter: blur(4px);
 }
 
 .forum-waterfall-art span {
@@ -9948,6 +10265,28 @@ body[data-mobile-app] .select option {
   gap: 10px;
 }
 
+.user-mall-v3-cross-brand {
+  display: grid;
+  gap: 10px;
+  padding: 18px 12px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.user-mall-v3-cross-brand-kicker {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--brand);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.user-mall-v3-cross-brand > .user-mall-v3-section-head > span {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 11px;
+}
+
 .user-mall-v3-section-head {
   display: flex;
   justify-content: space-between;
@@ -10160,6 +10499,162 @@ body[data-mobile-app] .select option {
 .user-message-head small {
   color: rgba(255, 255, 255, 0.58);
   font-size: 12px;
+}
+
+.user-service-call-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 106, 0, 0.14), rgba(20, 27, 36, 0.92));
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.22);
+}
+
+.user-service-call-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.user-service-call-head div {
+  display: grid;
+  gap: 4px;
+}
+
+.user-service-call-head span {
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.user-service-call-head strong {
+  color: #fff;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.user-service-call-head em {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.user-service-call-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.user-service-call-meta div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.user-service-call-meta span {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+
+.user-service-call-meta strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-service-rating-form {
+  display: grid;
+  gap: 10px;
+}
+
+.user-service-chat-body {
+  display: grid;
+  gap: 10px;
+  max-height: 240px;
+  min-height: 120px;
+  padding: 12px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.user-service-chat-composer {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.user-service-ended-tip {
+  padding: 12px;
+  border: 1px solid rgba(255, 106, 0, 0.28);
+  border-radius: 12px;
+  background: rgba(255, 106, 0, 0.1);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.user-service-rating-modal {
+  max-width: 330px;
+}
+
+.user-service-rating-modal h3 {
+  color: #fff;
+  font-size: 22px;
+}
+
+.user-service-rating-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.user-service-rating-star {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.user-service-rating-star.active {
+  border-color: rgba(255, 106, 0, 0.9);
+  background: rgba(255, 106, 0, 0.18);
+  color: #ff8a3d;
+}
+
+.user-service-rating-result {
+  display: grid;
+  gap: 8px;
+}
+
+.user-service-rating-result strong {
+  color: #fff;
+  font-size: 16px;
+}
+
+.user-service-rating-result span {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .user-message-list-shell {
@@ -11762,3 +12257,51 @@ body[data-page="brand-web"] {
 .vehicle-tree-brand-row.collapsed .vehicle-tree-caret,
 .vehicle-tree-model-row.collapsed .vehicle-tree-caret { transform:rotate(-90deg); }
 .vehicle-tree-empty { padding:32px 8px; text-align:center; }
+
+/* 帖子详情评论区：作者标注 / 置顶标注 / 评论操作 */
+.comment-author-badge { margin-left:6px; padding:1px 6px; border-radius:6px; font-size:10px; font-weight:700; color:#2fbf71; border:1px solid rgba(47,191,113,0.45); }
+.comment-pinned-badge { margin-left:6px; padding:1px 6px; border-radius:6px; font-size:10px; font-weight:700; color:#ff8b48; border:1px solid rgba(255,106,0,0.45); }
+.comment-item-actions { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+.comment-reply-to { color:#ff8b48; font-weight:600; }
+
+/* 帖子详情：举报按钮 */
+.topic-report-btn { border:0; background:transparent; color:#8b93a1; font-size:12px; cursor:pointer; padding:4px 2px; }
+.topic-report-btn:disabled { opacity:0.6; cursor:default; }
+
+/* 帖子详情：评论举报按钮 */
+.topic-comment-report { margin-left:auto; border:0; background:transparent; color:#8b93a1; font-size:11px; cursor:pointer; padding:2px 0; }
+.topic-comment-report:disabled { opacity:0.6; cursor:default; }
+
+/* 平台端敏感词管理 */
+.sw-level { display:inline-block; padding:2px 8px; border-radius:6px; font-size:12px; white-space:nowrap; }
+.sw-level.high { color:#ff5b5b; background:rgba(255,91,91,0.12); }
+.sw-level.mid { color:#ff8b48; background:rgba(255,139,72,0.12); }
+.sw-level.low { color:#2fbf71; background:rgba(47,191,113,0.12); }
+.sw-switch { position:relative; width:36px; height:20px; border-radius:999px; border:0; background:rgba(255,255,255,0.14); cursor:pointer; padding:0; transition:background 0.2s; }
+.sw-switch::after { content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:999px; background:#fff; transition:left 0.2s; }
+.sw-switch.on { background:#ff6a00; }
+.sw-switch.on::after { left:18px; }
+.sw-pagination { display:flex; align-items:center; gap:6px; justify-content:flex-end; padding:14px 16px 6px; flex-wrap:wrap; }
+.sw-page-btn { min-width:28px; height:28px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:transparent; color:inherit; font-size:12px; cursor:pointer; padding:0 6px; }
+.sw-page-btn.active { background:#ff6a00; border-color:#ff6a00; color:#fff; }
+.sw-page-btn:disabled { opacity:0.4; cursor:default; }
+.sw-link-btn { border:0; background:transparent; color:#ff8b48; font-size:12px; cursor:pointer; padding:2px 4px; }
+.sw-link-btn.danger { color:#ff5b5b; }
+
+/* 客服会话：商品/优惠券/改价卡片 */
+.cs-chat-card { margin-top:8px; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,106,0,0.35); background:rgba(255,106,0,0.08); display:grid; gap:4px; min-width:200px; }
+.cs-chat-card .cs-chat-card-tag { font-size:11px; color:#ff8b48; font-weight:700; }
+.cs-chat-card strong { font-size:14px; color:#fff; }
+.cs-chat-card .cs-chat-card-price { font-size:15px; font-weight:700; color:#ffb37a; }
+.cs-chat-card em { font-style:normal; font-size:11px; color:#9ca5b2; }
+.cs-chat-card.coupon { border-color:rgba(47,191,113,0.4); background:rgba(47,191,113,0.08); }
+.cs-chat-card.coupon .cs-chat-card-tag { color:#2fbf71; }
+.cs-chat-card.coupon .cs-chat-card-price { color:#6fe3a5; }
+
+/* 客服会话工具栏：分组与防挤压 */
+.cs-reply-tools { align-items:center; flex-wrap:wrap; }
+.cs-reply-tools .cs-tool-group { display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.cs-reply-tools .btn { white-space:nowrap; min-height:36px; padding:0 14px; }
+.cs-reply-tools select.input { flex:0 1 220px; min-width:150px; }
+.cs-reply-tools .cs-float-note { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#8d98a5; white-space:nowrap; padding:0 4px; }
+.cs-reply-tools .cs-float-note button { border:0; background:transparent; color:#ff8b48; font-size:12px; cursor:pointer; padding:2px 4px; }

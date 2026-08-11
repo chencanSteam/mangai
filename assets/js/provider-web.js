@@ -262,8 +262,7 @@
     return `
       <div class="provider-join-store" data-join-store-index="${index}">
         <div class="provider-join-store-head">
-          <span class="pill">门店 ${index + 1}${item.isPrimary ? " · 主门店" : ""}</span>
-          ${state.joinStores.length > 1 ? `<button class="btn btn-danger btn-sm" type="button" data-join-store-remove="${index}">删除</button>` : ""}
+          <span class="pill">门店信息</span>
         </div>
         <div class="provider-join-form">
           <div class="field-group">
@@ -294,7 +293,6 @@
           <div>
             <h2 class="section-title">门店信息</h2>
           </div>
-          <button class="btn btn-secondary" type="button" data-join-store-add>新增门店</button>
         </div>
         <div class="provider-join-stores">
           ${state.joinStores.map((item, index) => renderJoinStoreRow(item, index)).join("")}
@@ -304,24 +302,7 @@
   }
 
   function bindJoinStoreEvents() {
-    contentEl.querySelector("[data-join-store-add]")?.addEventListener("click", () => {
-      state.joinStores.push({
-        id: `ST-NEW-${Date.now()}`,
-        name: "",
-        city: "",
-        district: "",
-        address: "",
-        isPrimary: false,
-      });
-      renderJoinPage();
-    });
-    contentEl.querySelectorAll("[data-join-store-remove]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const index = Number(button.dataset.joinStoreRemove);
-        state.joinStores.splice(index, 1);
-        renderJoinPage();
-      });
-    });
+    // 单门店模式：不支持新增/删除门店
   }
 
   function renderJoinPage() {
@@ -417,8 +398,8 @@
               <strong>6 项待提交</strong>
             </article>
             <article>
-              <span>门店数量</span>
-              <strong>${state.joinStores.length} 家</strong>
+              <span>门店</span>
+              <strong>${state.joinStores[0]?.name || "待填写"}</strong>
             </article>
             <article>
               <span>服务区域</span>

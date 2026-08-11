@@ -23,15 +23,6 @@
       .pd-title-row { margin-bottom: 12px; }
       .pd-title-row h1 { font-size: 18px; font-weight: 600; line-height: 1.5; margin: 0 0 8px; }
       .pd-fitment-tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; background: rgba(74,168,255,0.1); border: 1px solid rgba(74,168,255,0.25); color: #4aa8ff; font-size: 12px; }
-      .pd-variant-panel { margin: 14px 0; padding: 14px 0; border-top: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.08); }
-      .pd-variant-group { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-      .pd-variant-group:last-child { margin-bottom: 0; }
-      .pd-variant-label { width: 58px; flex: 0 0 auto; color: var(--text-muted); font-size: 13px; }
-      .pd-variant-options { display: flex; flex-wrap: wrap; gap: 8px; }
-      .pd-variant-option { padding: 7px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.86); font-size: 12px; cursor: pointer; }
-      .pd-variant-option.active { border-color: #ff6a00; color: #ff6a00; background: rgba(255,106,0,0.12); }
-      .pd-variant-option.disabled { opacity: 0.35; cursor: not-allowed; text-decoration: line-through; }
-      .pd-variant-summary { margin-top: 10px; color: var(--text-muted); font-size: 12px; }
       .pd-params-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 14px; scrollbar-width: none; }
       .pd-params-scroll::-webkit-scrollbar { display: none; }
       .pd-param-item { flex: 0 0 auto; min-width: 72px; text-align: center; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); }
@@ -51,6 +42,7 @@
       .pd-kv-row:last-child { border-bottom: none; }
       .pd-kv-row span { color: var(--text-muted); font-size: 13px; }
       .pd-kv-row strong { color: #fff; font-size: 13px; font-weight: 400; text-align: right; max-width: 60%; }
+      .pd-image-placeholder { display: inline-flex; align-items: center; justify-content: center; min-width: 92px; min-height: 42px; padding: 6px 10px; border: 1px dashed rgba(255,255,255,0.2); border-radius: 8px; background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)); color: var(--text-muted); font-size: 11px; line-height: 1.2; }
       .pd-effect-card { display: block; padding: 14px; border-radius: 14px; background: rgba(255,106,0,0.06); border: 1px solid rgba(255,106,0,0.12); text-decoration: none; cursor: pointer; margin-bottom: 10px; }
       .pd-effect-card:hover { background: rgba(255,106,0,0.1); border-color: rgba(255,106,0,0.2); }
       .pd-effect-card p { margin: 0; font-size: 14px; line-height: 1.7; color: rgba(255,255,255,0.85); }
@@ -137,11 +129,6 @@
                     <span class="pd-fitment-tag" id="pdFitment">适配车型信息</span>
                   </div>
 
-                  <div class="pd-variant-panel" id="pdVariantPanel" hidden>
-                    <div id="pdVariantPicker"></div>
-                    <div class="pd-variant-summary" id="pdVariantSummary"></div>
-                  </div>
-
                   <!-- 核心参数 -->
                   <div class="pd-params-scroll" id="pdParams">
                     <div class="pd-param-item"><span>品牌</span><strong id="pdParamBrand">-</strong></div>
@@ -164,15 +151,20 @@
                     <div class="pd-section-body">
                       <div class="pd-kv-row"><span>国际汽联认证</span><strong id="pdFiaCertified">-</strong></div>
                       <div class="pd-kv-row"><span>配件可选码数</span><strong id="pdOptionalSizes">-</strong></div>
-                      <div class="pd-kv-row"><span>产品图1</span><strong id="pdProductImage1">-</strong></div>
-                      <div class="pd-kv-row"><span>产品图2</span><strong id="pdProductImage2">-</strong></div>
-                      <div class="pd-kv-row"><span>产品图3</span><strong id="pdProductImage3">-</strong></div>
-                      <div class="pd-kv-row"><span>产品图4</span><strong id="pdProductImage4">-</strong></div>
-                      <div class="pd-kv-row"><span>产品图5</span><strong id="pdProductImage5">-</strong></div>
-                      <div class="pd-kv-row"><span>产品图6</span><strong id="pdProductImage6">-</strong></div>
-                      <div class="pd-kv-row"><span>安装图3</span><strong id="pdInstallImage3">-</strong></div>
-                      <div class="pd-kv-row"><span>安装图4</span><strong id="pdInstallImage4">-</strong></div>
+                      <div class="pd-kv-row"><span>产品图1</span><strong id="pdProductImage1"><span class="pd-image-placeholder">图片占位</span></strong></div>
+                      <div class="pd-kv-row"><span>产品图2</span><strong id="pdProductImage2"><span class="pd-image-placeholder">图片占位</span></strong></div>
+                      <div class="pd-kv-row"><span>产品图3</span><strong id="pdProductImage3"><span class="pd-image-placeholder">图片占位</span></strong></div>
+                      <div class="pd-kv-row"><span>产品图4</span><strong id="pdProductImage4"><span class="pd-image-placeholder">图片占位</span></strong></div>
+                      <div class="pd-kv-row"><span>产品图5</span><strong id="pdProductImage5"><span class="pd-image-placeholder">图片占位</span></strong></div>
+                      <div class="pd-kv-row"><span>产品图6</span><strong id="pdProductImage6"><span class="pd-image-placeholder">图片占位</span></strong></div>
+                      <div class="pd-kv-row"><span>安装图3</span><strong id="pdInstallImage3"><span class="pd-image-placeholder">图片占位</span></strong></div>
+                      <div class="pd-kv-row"><span>安装图4</span><strong id="pdInstallImage4"><span class="pd-image-placeholder">图片占位</span></strong></div>
                     </div>
+                  </div>
+
+                  <div class="pd-section" id="pdDescriptionSection">
+                    <div class="pd-section-head"><h3>商品详情</h3></div>
+                    <div class="pd-section-body pd-rich-content" id="pdDescription"></div>
                   </div>
 
                   <!-- 案例效果 / 相关案例 -->
@@ -233,8 +225,7 @@
       const product = matched || {};
       const p = product;
       const baseSku = p.sku || sku;
-      let currentSku = variantSkuParam || baseSku;
-      let currentVariant = p.variants?.find((variant) => variant.sku === currentSku) || null;
+      let currentSku = baseSku;
 
       // 填充数据
       const displayProductName = (p.name || name).replace(/\s+\d+寸$/, "");
@@ -258,68 +249,36 @@
       document.getElementById("pdModel").textContent = p.fitment || fitment;
       document.getElementById("pdFiaCertified").textContent = p.fiaCertified || "-";
       document.getElementById("pdOptionalSizes").textContent = p.optionalSizes || "-";
-      document.getElementById("pdProductImage1").textContent = p.productImage1 || "-";
-      document.getElementById("pdProductImage2").textContent = p.productImage2 || "-";
-      document.getElementById("pdProductImage3").textContent = p.productImage3 || "-";
-      document.getElementById("pdProductImage4").textContent = p.productImage4 || "-";
-      document.getElementById("pdProductImage5").textContent = p.productImage5 || "-";
-      document.getElementById("pdProductImage6").textContent = p.productImage6 || "-";
-      document.getElementById("pdInstallImage3").textContent = p.installImage3 || "-";
-      document.getElementById("pdInstallImage4").textContent = p.installImage4 || "-";
+      const renderImagePlaceholder = (id, fileName) => {
+        const imageEl = document.getElementById(id);
+        if (!imageEl) return;
+        imageEl.innerHTML = `<span class="pd-image-placeholder" title="${fileName || "图片占位"}">图片占位</span>`;
+      };
+      renderImagePlaceholder("pdProductImage1", p.productImage1);
+      renderImagePlaceholder("pdProductImage2", p.productImage2);
+      renderImagePlaceholder("pdProductImage3", p.productImage3);
+      renderImagePlaceholder("pdProductImage4", p.productImage4);
+      renderImagePlaceholder("pdProductImage5", p.productImage5);
+      renderImagePlaceholder("pdProductImage6", p.productImage6);
+      renderImagePlaceholder("pdInstallImage3", p.installImage3);
+      renderImagePlaceholder("pdInstallImage4", p.installImage4);
+      const descriptionEl = document.getElementById("pdDescription");
+      if (descriptionEl) {
+        if (p.descriptionHtml) {
+          // 商品详情来自当前 mock 编辑器，保留其中的图文和视频节点。
+          descriptionEl.innerHTML = p.descriptionHtml;
+        } else if (p.description) {
+          descriptionEl.textContent = p.description;
+        } else {
+          descriptionEl.textContent = "暂无商品详情";
+        }
+      }
 
-      const variantPanel = document.getElementById("pdVariantPanel");
-      const variantPicker = document.getElementById("pdVariantPicker");
-      const variantSummary = document.getElementById("pdVariantSummary");
       const variants = Array.isArray(p.variants) ? p.variants : [];
       const specs = Array.isArray(p.specs) ? p.specs.filter((spec) => spec?.name && Array.isArray(spec.options) && spec.options.length) : [];
-      const selectedValues = {};
-      if (currentVariant?.values) Object.assign(selectedValues, currentVariant.values);
-      function findVariant(values) {
-        return variants.find((variant) => specs.every((spec) => variant.values?.[spec.name] === values[spec.name])) || null;
-      }
-      function optionAvailable(specName, option) {
-        return variants.some((variant) => variant.status !== "下架" && Number(variant.stock || 0) > 0 && variant.values?.[specName] === option);
-      }
-      function renderVariantPicker() {
-        if (!variantPanel || !variantPicker || !variants.length || !specs.length) return;
-        variantPanel.hidden = false;
-        variantPicker.innerHTML = specs.map((spec) => `<div class="pd-variant-group"><span class="pd-variant-label">${spec.name}</span><div class="pd-variant-options">${spec.options.map((option) => {
-          const active = selectedValues[spec.name] === option;
-          const disabled = !optionAvailable(spec.name, option);
-          return `<button type="button" class="pd-variant-option ${active ? "active" : ""} ${disabled ? "disabled" : ""}" data-variant-spec="${spec.name}" data-variant-option="${option}" ${disabled ? "disabled" : ""}>${option}</button>`;
-        }).join("")}</div></div>`).join("");
-        variantSummary.textContent = currentVariant ? `已选：${specs.map((spec) => selectedValues[spec.name]).join(" / ")} · ${currentVariant.sku}` : "请选择完整规格";
-      }
-      function syncVariant() {
-        currentVariant = findVariant(selectedValues);
-        if (currentVariant) {
-          currentSku = currentVariant.sku;
-          document.getElementById("pdPrice").textContent = currentVariant.price || p.price || price;
-          document.getElementById("pdParamStock").textContent = `${Number(currentVariant.stock || 0)} 件`;
-          document.getElementById("pdParamStatus").textContent = currentVariant.status || "上架";
-          if (currentVariant.image) document.getElementById("pdMedia").style.backgroundImage = `url("${currentVariant.image}")`;
-        }
-        renderVariantPicker();
-        updateOrderLink();
-      }
       function updateOrderLink() {
-        const orderParams = new URLSearchParams({ sku: baseSku, variantSku: currentSku, name: p.name || name, price: currentVariant?.price || p.price || price, brand: p.brand || brand, fitment: p.fitment || fitment, mallPage, quantity: "1" });
-        if (currentVariant) orderParams.set("specSummary", specs.map((spec) => `${spec.name}：${selectedValues[spec.name]}`).join(" / "));
+        const orderParams = new URLSearchParams({ sku: baseSku, name: p.name || name, price: p.price || price, brand: p.brand || brand, fitment: p.fitment || fitment, mallPage, quantity: "1" });
         document.getElementById("pdOrderBtn").href = `user-order-create.html?${orderParams.toString()}`;
-      }
-      if (variants.length && specs.length) {
-        specs.forEach((spec) => { if (!selectedValues[spec.name]) selectedValues[spec.name] = spec.options.find((option) => optionAvailable(spec.name, option)) || spec.options[0]; });
-        variantPicker.addEventListener("click", (event) => {
-          const button = event.target.closest("[data-variant-spec]");
-          if (!button) return;
-          selectedValues[button.dataset.variantSpec] = button.dataset.variantOption;
-          if (!findVariant(selectedValues)) {
-            const fallback = variants.find((variant) => variant.status !== "下架" && Number(variant.stock || 0) > 0 && variant.values?.[button.dataset.variantSpec] === button.dataset.variantOption);
-            if (fallback) Object.assign(selectedValues, fallback.values);
-          }
-          syncVariant();
-        });
-        syncVariant();
       }
 
       // 查找并渲染关联案例
@@ -390,13 +349,8 @@
 
       document.getElementById("pdCartBtn").addEventListener("click", () => {
         const cart = readCart();
-        if (variants.length && !currentVariant) {
-          showFeedback("请选择完整且有库存的商品规格");
-          return;
-        }
-        const cartKey = currentVariant?.sku || baseSku;
-        const target = cart.find((item) => (item.variantSku || item.sku) === cartKey);
-        const cartItem = { sku: baseSku, variantSku: currentVariant?.sku || "", specSummary: currentVariant ? specs.map((spec) => `${spec.name}：${selectedValues[spec.name]}`).join(" / ") : "", name: p.name || name, price: currentVariant?.price || p.price || price, brand: p.brand || brand, fitment: p.fitment || fitment, mallPage, quantity: 1 };
+        const target = cart.find((item) => item.sku === baseSku && !item.variantSku);
+        const cartItem = { sku: baseSku, variantSku: "", specSummary: "", name: p.name || name, price: p.price || price, brand: p.brand || brand, fitment: p.fitment || fitment, mallPage, quantity: 1 };
         if (target) { target.quantity += 1; } else { cart.push(cartItem); }
         writeCart(cart);
         const total = cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);

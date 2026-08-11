@@ -83,20 +83,6 @@ window.MockData = {
           auditStatus: "待审核",
           isPrimary: true,
         },
-        {
-          id: "ST-1001-02",
-          name: "御驰 Performance Studio 浦东店",
-          city: "上海",
-          district: "浦东",
-          locationProvince: "上海市",
-          locationCity: "上海市",
-          locationCounty: "浦东新区",
-          locationAddress: "金桥路 999 号汽车创意园 B1-108",
-          address: "上海市浦东新区金桥路 999 号汽车创意园 B1-108",
-          status: "",
-          auditStatus: "待审核",
-          isPrimary: false,
-        },
       ],
       timeline: [
         "2026-04-02 09:18 提交入驻资料",
@@ -148,20 +134,6 @@ window.MockData = {
           auditStatus: "已通过",
           isPrimary: true,
         },
-        {
-          id: "ST-1002-02",
-          name: "擎速 Motorsport Lab 萧山店",
-          city: "杭州",
-          district: "萧山",
-          locationProvince: "浙江省",
-          locationCity: "杭州市",
-          locationCounty: "萧山区",
-          locationAddress: "建设一路 168 号改装工场 C3-205",
-          address: "杭州市萧山区建设一路 168 号改装工场 C3-205",
-          status: "正常营业",
-          auditStatus: "已通过",
-          isPrimary: false,
-        },
       ],
       timeline: [
         "2026-03-21 14:22 入驻申请提交",
@@ -212,20 +184,6 @@ window.MockData = {
           status: "暂停接单",
           auditStatus: "已驳回",
           isPrimary: true,
-        },
-        {
-          id: "ST-1003-02",
-          name: "曜黑 Auto Atelier 福田店",
-          city: "深圳",
-          district: "福田",
-          locationProvince: "广东省",
-          locationCity: "深圳市",
-          locationCounty: "福田区",
-          locationAddress: "香蜜湖路 88 号车改创意园 D1-301",
-          address: "深圳市福田区香蜜湖路 88 号车改创意园 D1-301",
-          status: "待审核",
-          auditStatus: "待审核",
-          isPrimary: false,
         },
       ],
       timeline: [
@@ -441,7 +399,7 @@ window.MockData = {
     { plate: "川A·2M60Q", owner: "时原", model: "极氪 001 FR", color: "猎装绿", history: "2025-10 更换半热熔赛道胎并设定双用胎压 / 2026-01 升级前六后四活塞卡钳与划线盘 / 2026-03 完成赛道日底盘数据标定与制动热衰减测试", compliance: "关注中" },
   ],
   products: [
-    { sku: "PR-8801", name: "BBS 锻造轮毂 19寸", category: "轮毂", brand: "BBS", price: "¥ 18,800", originalPrice: "¥ 22,000", stock: 16, fitment: "宝马 3系 / 奥迪 A4L", spec: "19×8.5J ET35 / 5×112 / 单只重量约 8.2kg", installService: "含动平衡、胎压监测移植、四轮定位", stores: ["御驰 Performance Studio", "擎速 Motorsport Lab"], duration: "1 天", warranty: "3 年结构质保 / 1 年漆面质保", caseEffect: "装车后姿态降低 15-20mm，轮拱饱满度提升显著", image: "bbs-wheel-19-matte-grey.jpg", description: "主图展示哑光枪灰轮毂正侧视角，辅图说明锻造工艺、J 值与安装完成效果。", status: "上架", relatedCases: ["CA-240402-007", "CA-240401-011"], promotion: { type: "折扣", label: "春季轮毂焕新季", discount: "85折", desc: "限时85折优惠，到手价更低" } },
+    { sku: "PR-8801", name: "BBS 锻造轮毂 19寸", category: "轮毂", brand: "BBS", price: "¥ 18,800", originalPrice: "¥ 22,000", stock: 16, fitment: "宝马 3系 / 奥迪 A4L", spec: "19×8.5J ET35 / 5×112 / 单只重量约 8.2kg", installService: "含动平衡、胎压监测移植、四轮定位", stores: ["御驰 Performance Studio", "擎速 Motorsport Lab"], duration: "1 天", warranty: "3 年结构质保 / 1 年漆面质保", caseEffect: "装车后姿态降低 15-20mm，轮拱饱满度提升显著", image: "bbs-wheel-19-matte-grey.jpg", description: "主图展示哑光枪灰轮毂正侧视角，辅图说明锻造工艺、J 值与安装完成效果。", status: "上架", isCustomProduct: "是", relatedCases: ["CA-240402-007", "CA-240401-011"], promotion: { type: "折扣", label: "春季轮毂焕新季", discount: "85折", desc: "限时85折优惠，到手价更低" } },
     { sku: "PR-8802", name: "Akrapovic 钛合金排气", category: "排气", brand: "Akrapovic", price: "¥ 32,500", stock: 6, fitment: "AMG C43 / M340i", spec: "钛合金中尾段 / 阀门控制 / 双出 90mm 尾嘴", installService: "含原厂排气拆卸、新排气走位、ECU 阀门协议匹配", stores: ["御驰 Performance Studio", "凌速 High Spec Garage"], duration: "1-2 天", warranty: "2 年质保 / 尾嘴氧化包换", caseEffect: "低转安静不扰民，高转声浪浑厚有层次，阀门开启后提升约 8% 排气效率", image: "akrapovic-titanium-exhaust.jpg", description: "首图突出钛蓝尾嘴细节，补充尾段走位、焊点特写与实车装车效果。", status: "上架", relatedCases: ["CA-240401-011"] },
     { sku: "PR-8803", name: "Brembo GT 六活塞套件", category: "制动", brand: "Brembo", price: "¥ 26,900", stock: 11, fitment: "高端性能轿车", spec: "GT6 六活塞卡钳 / 380mm 划线打孔盘 / 陶瓷刹车片", installService: "含桥位定制、刹车油更换、磨合期指导", stores: ["擎速 Motorsport Lab", "御驰 Performance Studio"], duration: "1 天", warranty: "1 年质保 / 刹车异响免费复查", caseEffect: "100-0km/h 制动距离缩短约 4-6 米，连续 10 次急刹无明显热衰减", image: "brembo-gt-6pot-kit.jpg", description: "主图为卡钳与划线盘组合图，辅图展示桥位、盘径参数与施工前后对比。", status: "上架", relatedCases: ["CA-240402-007", "CA-240401-011"] },
     { sku: "PR-8804", name: "XPEL LUX PLUS 车衣", category: "车衣", brand: "XPEL", price: "¥ 12,800", stock: 28, fitment: "全车型", spec: "TPU 基材 / 8.5mil 厚度 / 自修复涂层", installService: "含精洗、漆面矫正、全车包边包角施工", stores: ["御驰 Performance Studio", "凌速 High Spec Garage", "曜黑 Auto Atelier"], duration: "2-3 天", warranty: "10 年质保 / 黄变包换 / 膜面失光包换", caseEffect: "疏水性优异，小刮痕 30 秒内自修复，整车亮度提升约 30%", image: "xpel-lux-plus-ppf.jpg", description: "图片说明包含整车亮面效果、膜面通透度、防护测试与边角包覆细节。", status: "上架", relatedCases: ["CA-240330-022"] },
@@ -483,6 +441,7 @@ window.MockData = {
   orders: [
     {
       id: "OD-240402-011",
+      couponName: "服务升级优惠券",
       type: "服务订单",
       displayType: "改装服务",
       user: "顾铭",
@@ -500,6 +459,7 @@ window.MockData = {
     },
     {
       id: "OD-240402-008",
+      couponName: "春季改装券",
       type: "服务订单",
       displayType: "改装服务",
       user: "梁栩",
@@ -517,6 +477,7 @@ window.MockData = {
     },
     {
       id: "OD-240401-023",
+      couponName: "商城焕新券",
       type: "商品订单",
       displayType: "自提",
       user: "沈越",
@@ -538,6 +499,7 @@ window.MockData = {
     },
     {
       id: "OD-240331-017",
+      couponName: "未使用",
       type: "服务订单",
       displayType: "改装服务",
       user: "时原",
@@ -555,6 +517,7 @@ window.MockData = {
     },
     {
       id: "OD-240329-006",
+      couponName: "老客专享券",
       type: "服务订单",
       displayType: "改装服务",
       user: "陆川",
@@ -572,6 +535,7 @@ window.MockData = {
     },
     {
       id: "OD-240328-003",
+      couponName: "新客优惠券",
       type: "商品订单",
       displayType: "快递配送",
       user: "当前用户",
@@ -949,6 +913,7 @@ window.MockData = {
     { id: "POST-1102", title: "隐形车衣贴了三个月，来分享下真实体验", author: "当前用户", type: "discussion", board: "BOARD-02", tags: ["车衣"], meta: "姿态玩家 / 车衣", content: "<p>贴的是 XPEL LUX PLUS，目前三个月下来疏水性依旧很好，小刮痕自修复也肉眼可见。唯一需要注意的是洗车不要用太硬的刷子。</p>", replies: 32, likes: 87, views: 7420, status: "正常", time: "昨天 10:15", topStatus: "未置顶", featuredStatus: "未加精", linkAuthStatus: "未授权", linkedProducts: [], creatorPinned: "否", creatorHomeRank: 0, governanceNote: "" },
     { id: "POST-1103", title: "周末去御驰做了全段排气，声浪太顶了", author: "当前用户", type: "discussion", board: "BOARD-01", tags: ["排气"], meta: "性能改装 / 排气", content: "<p>选的是 Akrapovic 钛合金全段，低转安静不炸街，高转一开阀门整个停车场都在回响。施工一天搞定，师傅手艺很稳。</p>", replies: 24, likes: 63, views: 4560, status: "正常", time: "今天 08:30", topStatus: "未置顶", featuredStatus: "未加精", linkAuthStatus: "未授权", linkedProducts: [], creatorPinned: "否", creatorHomeRank: 0, governanceNote: "" },
   ],
+  sensitiveWords: ["恐怖主义", "枪支", "暴恐视频", "黄色", "赌博", "毒品", "代考", "账号交易", "加微信", "兼职刷单", "私下交易", "低价代购"],
   comments: [
     { id: "CM-8823", post: "POST-1179", author: "擎速 Motorsport Lab", content: "如果你更偏日常舒适，建议先避开过硬设定。", status: "正常", time: "今天 10:08" },
     { id: "CM-8821", post: "POST-1176", author: "运营审核", content: "属于违规展示，需遮挡并重新提交。", status: "保留留痕", time: "今天 09:36" },

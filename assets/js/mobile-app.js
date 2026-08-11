@@ -18,6 +18,8 @@
   const INVOICE_STORAGE_KEY = "mockUserInvoices";
   const POINTS_STORAGE_KEY = "mockUserPoints";
   const MALL_RECOMMENDATION_STORAGE_KEY = "mockMallRecommendations";
+  const CUSTOMER_SERVICE_RATING_KEY = "mockCustomerServiceRatingRequest";
+  const PLATFORM_SERVICE_MESSAGE_ID = "platform-service";
 
   function priceToNumber(value) {
     return Number(String(value || "").replace(/[^\d.]/g, "")) || 0;
@@ -80,6 +82,7 @@
       messageTpl: true,
       forumAlert: true,
     },
+    adminSensitiveWords: ["加微信", "私下交易", "低价代购"],
     adminProviderDetail: {
       open: false,
       tab: "basic",
@@ -95,7 +98,6 @@
     },
     providerSelected: {
       orders: orders[0]?.id || "",
-      products: products[0]?.sku || "",
       cases: cases[0]?.id || "",
       forum: posts[0]?.id || "",
       messages: "",
@@ -103,10 +105,6 @@
     providerFeedback: "",
     providerCompletion: {
       orderId: "",
-    },
-    providerPurchase: {
-      sku: "",
-      formOpen: false,
     },
     providerCaseForm: {
       mode: "",
@@ -147,6 +145,7 @@
     userFeedback: "",
     userAuthMode: "login",
     userAuthFeedback: "",
+    userAuthOpen: false,
     wechatBindInfo: null,
     userMe: {
       selectedOrder: "",
@@ -157,6 +156,17 @@
       couponFilter: "available",
       afterSaleOrderId: "",
       reviewOrderId: "",
+      noticesOpen: false,
+      noticesTab: "like",
+      noticesRead: false,
+    },
+    userServiceCall: {
+      status: "idle",
+      agent: "林晓",
+      duration: "00:00",
+      rating: 0,
+      comment: "",
+      rated: false,
     },
     userGarage: {
       selectedVehicle: vehicles[0]?.id || vehicles[0]?.plate || vehicles[0]?.model || "",
@@ -171,11 +181,26 @@
       selectedPost: "",
       createOpen: false,
       replyPostId: "",
+      replyTo: "",
       editingPostId: "",
       category: "all",
+      mineView: "",
+      profileAuthor: "",
+      drafts: [],
+      draftId: "",
+      privacy: {},
+      privacyOpen: false,
+      myPrivacy: { posts: true, comments: true, collections: true, likes: true },
+      myPrivacyOpen: false,
+      chats: {
+        Carbon_King: [{ from: "them", text: "大神，G20 那套轮毂的数据求分享一下", time: "昨天 21:30" }],
+        EV_Addict: [{ from: "them", text: "你好，看到你的车衣帖了，求个链接", time: "今天 08:12" }],
+      },
+      chatWith: "",
       liked: {},
       collected: {},
       followed: {},
+      disliked: {},
     },
     userDialog: {
       type: "",
@@ -397,19 +422,6 @@
     },
   ];
 
-  const providerPurchaseRecords = getProviderPurchasableProducts().slice(0, 3).map((item, index) => ({
-    id: `PO-24040${index + 1}`,
-    sku: item.sku,
-    name: item.name,
-    brand: item.brand,
-    model: item.model || item.spec || item.fitment || item.sku,
-    category: item.category,
-    quantity: index === 0 ? 4 : index === 1 ? 2 : 1,
-    amount: item.price,
-    status: index === 0 ? "待发货" : index === 1 ? "已发货" : "已签收",
-    note: index === 0 ? "采购已提交，等待仓库安排发货" : index === 1 ? "商品已从仓库发出，请留意物流并及时签收" : "商品已完成签收，可安排安装或入库",
-  }));
-
   const safe = (value, fallbackValue) => {
     if (value == null) return fallbackValue;
     if (typeof value !== "string") return value;
@@ -518,7 +530,6 @@
     if (text.includes("复核") || text.includes("确认") || text.includes("审核中")) return "待复核";
     return text || "待复核";
   };
-  const nPurchaseStatus = (v) => String(v || "").includes("签收") ? "已签收" : String(v || "").includes("发货") ? "已发货" : "待发货";
   const getSettlementGrossAmount = (item) => safe(item.grossAmount || item.amount, "¥ 0");
   const getOrderTimeline = (item) =>
     item.timeline || [
@@ -553,7 +564,8 @@
 
   function render() {
     const cfg = appConfigs[appType];
-    const userLoggedIn = appType !== "user" || !!getMockUserAuth();
+    const isGuestUser = appType === "user" && !getMockUserAuth();
+    const showAuthScreen = isGuestUser && state.userAuthOpen;
     const topbarMarkup = appType === "user"
       ? ""
       : `<header class="android-topbar"><span class="eyebrow">${cfg.title}</span><h2>${cfg.labels[state.tab]}</h2></header>`;
@@ -561,10 +573,16 @@
     screenEl.innerHTML = `
       <div class="android-status"><span>9:41</span><span>5G 92%</span></div>
       ${topbarMarkup}
-      <section class="screen-content">${!userLoggedIn ? renderUserAuth() : appType === "admin" ? renderAdmin() : appType === "provider" ? renderProvider() : renderUser()}</section>
-      ${userLoggedIn ? `<nav class="bottom-nav">${cfg.tabs.map((id) => { const unread = id === "messages" ? getUnreadNotificationCount(appType === "provider" ? "provider" : appType === "user" ? "user" : "admin") : 0; return `<button class="${state.tab === id ? "active" : ""}" type="button" data-tab="${id}">${unread > 0 ? `<i class="nav-badge">${unread}</i>` : ""}<span>${cfg.labels[id]}</span></button>`; }).join("")}</nav>` : ""}
-      ${userLoggedIn ? (appType === "provider" ? renderProviderDialog() : appType === "user" ? renderUserDialog() + renderUserShareSheet() : "") : ""}
+      <section class="screen-content">${showAuthScreen ? renderUserAuth() : appType === "admin" ? renderAdmin() : appType === "provider" ? renderProvider() : renderUser()}</section>
+      ${!showAuthScreen ? `<nav class="bottom-nav">${cfg.tabs.map((id) => { const unread = id === "messages" ? getUnreadNotificationCount(appType === "provider" ? "provider" : appType === "user" ? "user" : "admin") : 0; return `<button class="${state.tab === id ? "active" : ""}" type="button" data-tab="${id}">${unread > 0 ? `<i class="nav-badge">${unread}</i>` : ""}<span>${cfg.labels[id]}</span></button>`; }).join("")}</nav>` : ""}
+      ${!showAuthScreen ? (appType === "provider" ? renderProviderDialog() : appType === "user" ? renderUserDialog() + renderUserShareSheet() : "") : ""}
     `;
+    if (appType === "user" && state.tab === "mall" && !showAuthScreen) {
+      const productSection = screenEl.querySelector(".user-mall-v3-products");
+      if (productSection) {
+        productSection.insertAdjacentHTML("afterend", renderUserMallCrossBrandRecommendations(getMallFilterRows(), state.userMall.brand));
+      }
+    }
     const phoneFrame = screenEl.closest(".phone-frame");
     if (phoneFrame) {
       phoneFrame.style.position = "relative";
@@ -580,6 +598,52 @@
     bindEvents();
   }
 
+  function openForumDislikeSheet(key) {
+    closeForumDislikeSheet();
+    const sheet = document.createElement("div");
+    sheet.className = "share-sheet visible";
+    sheet.id = "forumDislikeSheet";
+    sheet.innerHTML = `<div class="share-sheet-panel"><div class="share-sheet-title">减少此类内容推荐</div><div class="admin-action-row" style="flex-direction:column; gap:10px;"><button class="btn btn-primary" type="button" data-dislike-confirm style="width:100%; justify-content:center;">不感兴趣</button></div></div>`;
+    screenEl.appendChild(sheet);
+    sheet.addEventListener("click", (event) => { if (event.target === sheet) closeForumDislikeSheet(); });
+    sheet.querySelector("[data-dislike-confirm]").addEventListener("click", () => {
+      state.userForum.disliked[key] = true;
+      state.userFeedback = "已标记为不感兴趣，将减少此类内容推荐。";
+      closeForumDislikeSheet();
+      render();
+    });
+  }
+
+  function closeForumDislikeSheet() {
+    document.getElementById("forumDislikeSheet")?.remove();
+  }
+
+  function bindForumCardLongPress() {
+    screenEl.querySelectorAll(".forum-waterfall-card[data-dislike-key]").forEach((card) => {
+      let timer = null;
+      const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+      const start = () => {
+        cancel();
+        timer = setTimeout(() => {
+          timer = null;
+          card.dataset.longPressed = "1";
+          openForumDislikeSheet(card.dataset.dislikeKey);
+        }, 500);
+      };
+      card.addEventListener("mousedown", start);
+      card.addEventListener("touchstart", start, { passive: true });
+      ["mouseup", "mouseleave", "touchend", "touchcancel", "touchmove"].forEach((name) => card.addEventListener(name, cancel, { passive: true }));
+      card.addEventListener("contextmenu", (event) => event.preventDefault());
+      card.addEventListener("click", (event) => {
+        if (card.dataset.longPressed === "1") {
+          event.preventDefault();
+          event.stopPropagation();
+          card.dataset.longPressed = "";
+        }
+      }, true);
+    });
+  }
+
   function bindEvents() {
     screenEl.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
       state.tab = b.dataset.tab;
@@ -588,10 +652,21 @@
         state.userForum.category = "all";
         state.userForum.selectedPost = "";
         state.userForum.createOpen = false;
+        state.userForum.mineView = "";
+        state.userForum.profileAuthor = "";
+        state.userForum.chatWith = "";
       }
       render();
     }));
-    screenEl.querySelectorAll("[data-sub-tab]").forEach((b) => b.addEventListener("click", () => { state.subTab[state.tab] = b.dataset.subTab; render(); }));
+    screenEl.querySelectorAll("[data-sub-tab]").forEach((b) => b.addEventListener("click", () => {
+      if (appType === "user" && state.tab === "me" && !getMockUserAuth()) {
+        state.userFeedback = "未登录，请先登录后再查看。";
+        render();
+        return;
+      }
+      state.subTab[state.tab] = b.dataset.subTab;
+      render();
+    }));
     screenEl.querySelectorAll("[data-admin-pick]").forEach((b) => b.addEventListener("click", () => { state.adminSelected[b.dataset.adminType] = b.dataset.adminId; render(); }));
     screenEl.querySelectorAll("[data-admin-provider-detail-tab]").forEach((b) => b.addEventListener("click", () => { state.adminProviderDetail.tab = b.dataset.adminProviderDetailTab; render(); }));
     screenEl.querySelectorAll("[data-admin-order-category]").forEach((b) => b.addEventListener("click", () => {
@@ -635,7 +710,6 @@
     }));
     screenEl.querySelectorAll("[data-provider-action]").forEach((b) => b.addEventListener("click", () => handleProviderAction(b)));
     screenEl.querySelectorAll("[data-provider-complete-form]").forEach((form) => form.addEventListener("submit", handleProviderCompleteSubmit));
-    screenEl.querySelectorAll("[data-provider-purchase-form]").forEach((form) => form.addEventListener("submit", handleProviderPurchaseSubmit));
     screenEl.querySelectorAll("[data-provider-case-form]").forEach((form) => form.addEventListener("submit", handleProviderCaseSubmit));
     screenEl.querySelectorAll("[data-provider-accept-form]").forEach((form) => form.addEventListener("submit", handleProviderAcceptSubmit));
     screenEl.querySelectorAll("[data-provider-profile-form]").forEach((form) => {
@@ -677,6 +751,8 @@
     screenEl.querySelectorAll("[data-user-invoice-form]").forEach((form) => form.addEventListener("submit", handleUserInvoiceSubmit));
     screenEl.querySelectorAll("[data-user-vehicle-form]").forEach((form) => form.addEventListener("submit", handleUserVehicleSubmit));
     screenEl.querySelectorAll("[data-user-forum-form]").forEach((form) => form.addEventListener("submit", handleUserForumSubmit));
+    screenEl.querySelectorAll("[data-admin-sensitive-form]").forEach((form) => form.addEventListener("submit", handleAdminSensitiveSubmit));
+    screenEl.querySelectorAll("[data-forum-chat-form]").forEach((form) => form.addEventListener("submit", handleForumChatSubmit));
     screenEl.querySelectorAll("[data-rich-cmd]").forEach((btn) => btn.addEventListener("click", () => {
       const cmd = btn.dataset.richCmd;
       const val = btn.dataset.richVal || null;
@@ -695,12 +771,20 @@
     screenEl.querySelectorAll("[data-user-address-form]").forEach((form) => form.addEventListener("submit", handleUserAddressSubmit));
     screenEl.querySelectorAll("[data-user-credit-form]").forEach((form) => form.addEventListener("submit", handleUserCreditSubmit));
     screenEl.querySelectorAll("[data-user-profile-form]").forEach((form) => form.addEventListener("submit", handleUserProfileSubmit));
+    ensureUserProfileInviteField();
     screenEl.querySelectorAll("[data-user-avatar-input]").forEach((input) => input.addEventListener("change", handleUserAvatarChange));
     screenEl.querySelectorAll("[data-user-after-sale-form]").forEach((form) => form.addEventListener("submit", handleUserAfterSaleSubmit));
+    screenEl.querySelectorAll("[data-user-after-sale-media]").forEach((input) => input.addEventListener("change", handleUserAfterSaleMediaChange));
     screenEl.querySelectorAll("[data-user-after-sale-return-form]").forEach((form) => form.addEventListener("submit", handleUserAfterSaleReturnSubmit));
     screenEl.querySelectorAll("[data-user-after-sale-action]").forEach((button) => button.addEventListener("click", () => handleUserAfterSaleAction(button)));
     screenEl.querySelectorAll("[data-user-review-form]").forEach((form) => form.addEventListener("submit", handleUserReviewSubmit));
     screenEl.querySelectorAll("[data-user-review-media]").forEach((input) => input.addEventListener("change", handleUserReviewMediaChange));
+    screenEl.querySelectorAll("[data-user-service-chat-form]").forEach((form) => form.addEventListener("submit", handleUserServiceChatSubmit));
+    screenEl.querySelectorAll("[data-user-service-rating-form]").forEach((form) => form.addEventListener("submit", handleUserServiceRatingSubmit));
+    screenEl.querySelectorAll("[data-user-service-rating]").forEach((button) => button.addEventListener("click", () => {
+      state.userServiceCall.rating = Number(button.dataset.userServiceRating || 0);
+      render();
+    }));
     screenEl.querySelectorAll("[data-user-dialog-action]").forEach((b) => b.addEventListener("click", () => handleUserDialogAction(b)));
     screenEl.querySelectorAll("[data-user-dialog-rating]").forEach((b) => b.addEventListener("click", () => {
       state.userDialog.rating = Number(b.dataset.userDialogRating || 0);
@@ -784,6 +868,15 @@
 
   const subTabs = (items) => `<div class="sub-tabs">${items.map((i) => `<button class="sub-tab ${(state.subTab[state.tab] || items[0].id) === i.id ? "active" : ""}" data-sub-tab="${i.id}" type="button">${i.label}</button>`).join("")}</div>`;
 
+  function renderAdminCommentReview() {
+    const rows = comments.filter((c) => c.reportStatus === "待审核" || nForum(c.status) !== "正常");
+    return `<div class="mobile-list">${rows.length ? rows.map((c) => { const post = posts.find((p) => p.id === c.post); return `<article class="mobile-item"><div style="display:flex; justify-content:space-between; gap:12px;"><strong>${safe(c.author, "评论用户")}</strong><div style="display:flex; gap:6px; flex-wrap:wrap;">${c.reportStatus === "待审核" ? `<span class="pill">被举报</span>` : ""}${tag(nForum(c.status))}</div></div><div class="muted" style="margin-top:8px;">${safe(c.content, "评论内容")}</div><div class="muted" style="margin-top:6px;">所属帖子：${safe(post?.title, c.post)}</div><div style="display:flex; gap:8px; margin-top:12px;"><button class="btn btn-primary btn-sm" type="button" data-admin-action="comment-approve" data-admin-id="${c.id}">通过</button><button class="btn btn-danger btn-sm" type="button" data-admin-action="comment-remove" data-admin-id="${c.id}">删除</button></div></article>`; }).join("") : `<article class="mobile-item"><strong>暂无待审核评论</strong><div class="muted" style="margin-top:8px;">被举报或状态异常的评论会出现在这里。</div></article>`}</div>`;
+  }
+
+  function renderAdminSensitiveWords() {
+    return `<section class="admin-detail-card"><div class="eyebrow">Sensitive Words</div><h3>敏感词管理</h3><div class="muted" style="margin:6px 0 12px;">命中敏感词的帖子和评论会进入待处理队列，并触发论坛内容预警。</div><form class="admin-action-row" data-admin-sensitive-form style="margin-bottom:12px;"><input class="input" name="sensitiveWord" type="text" placeholder="输入敏感词，如：加微信" style="flex:1;" required><button class="btn btn-primary" type="submit">添加</button></form><div class="admin-comment-list">${state.adminSensitiveWords.length ? state.adminSensitiveWords.map((word) => `<div class="admin-comment-item" style="display:flex; align-items:center; gap:10px;"><strong style="flex:1;">${safe(word, "")}</strong><button class="btn btn-danger btn-sm" type="button" data-admin-action="sensitive-remove" data-admin-id="${safe(word, "")}">删除</button></div>`).join("") : `<div class="muted">暂无敏感词，请在上方添加。</div>`}</div></section>`;
+  }
+
   function renderAdmin() {
     if (state.tab === "home") {
       const todo = [
@@ -824,9 +917,12 @@
     }
     if (state.tab === "operations") {
       const active = state.subTab.operations || "cases";
+      const operationTabs = [{ id: "cases", label: "案例审核" }, { id: "forum", label: "帖子审核" }, { id: "comments", label: "评论审核" }, { id: "sensitive", label: "敏感词管理" }];
+      if (active === "comments") return `${subTabs(operationTabs)}${renderAdminCommentReview()}`;
+      if (active === "sensitive") return `${subTabs(operationTabs)}${renderAdminSensitiveWords()}`;
       const rows = active === "cases" ? cases : posts;
       const selected = rows.find((i) => i.id === state.adminSelected[active]) || rows[0];
-      return `${subTabs([{ id: "cases", label: "案例审核" }, { id: "forum", label: "论坛处理" }])}<div class="mobile-list">${rows.map((i) => active === "cases" ? `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === i.id ? "active" : ""}" type="button" data-admin-pick data-admin-type="cases" data-admin-id="${i.id}"><strong>${safe(i.title, "案例标题")}</strong><div class="muted" style="margin-top:8px;">${safe(i.model, "车型")} / ${safe(i.modType, "改装类型")} / ${safe(i.provider, "服务商")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nCaseAudit(i.audit))}<span class="pill">${nCaseDisplay(i.display)}</span></div></button>${selected?.id === i.id ? renderAdminCaseDetail(i) : ""}</div>` : `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === i.id ? "active" : ""}" type="button" data-admin-pick data-admin-type="forum" data-admin-id="${i.id}"><strong>${safe(i.title, "帖子标题")}</strong><div class="muted" style="margin-top:8px;">${safe(i.author, "作者")} / ${safe(i.time, "今天")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">回复 ${i.replies || 0}</span><span class="pill">点赞 ${i.likes || 0}</span><span class="pill">浏览 ${(i.views || 0).toLocaleString("zh-CN")}</span>${tag(nForum(i.status))}</div></button>${selected?.id === i.id ? renderAdminForumDetail(i) : ""}</div>`).join("")}</div>`;
+      return `${subTabs(operationTabs)}<div class="mobile-list">${rows.map((i) => active === "cases" ? `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === i.id ? "active" : ""}" type="button" data-admin-pick data-admin-type="cases" data-admin-id="${i.id}"><strong>${safe(i.title, "案例标题")}</strong><div class="muted" style="margin-top:8px;">${safe(i.model, "车型")} / ${safe(i.modType, "改装类型")} / ${safe(i.provider, "服务商")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nCaseAudit(i.audit))}<span class="pill">${nCaseDisplay(i.display)}</span></div></button>${selected?.id === i.id ? renderAdminCaseDetail(i) : ""}</div>` : `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected?.id === i.id ? "active" : ""}" type="button" data-admin-pick data-admin-type="forum" data-admin-id="${i.id}"><strong>${safe(i.title, "帖子标题")}</strong><div class="muted" style="margin-top:8px;">${safe(i.author, "作者")} / ${safe(i.time, "今天")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><span class="pill">回复 ${i.replies || 0}</span><span class="pill">点赞 ${i.likes || 0}</span><span class="pill">浏览 ${(i.views || 0).toLocaleString("zh-CN")}</span>${tag(nForum(i.status))}${i.reportStatus === "待审核" ? `<span class="pill">被举报</span>` : ""}</div></button>${selected?.id === i.id ? renderAdminForumDetail(i) : ""}</div>`).join("")}</div>`;
     }
     return renderAdminMe();
   }
@@ -842,7 +938,7 @@
 
   function renderAdminProviderDetail(item, active) {
     const stores = getProviderStores(item);
-    return `<section class="admin-detail-card"><div class="eyebrow">${active === "audit" ? "Provider Audit" : "Provider Detail"}</div><h3>${safe(item.name, "服务商详情")}</h3><div class="admin-kv-list"><div><span>联系人</span><strong>${safe(item.contact, "-")}</strong></div><div><span>所在区域</span><strong>${formatProviderRegion(item)}</strong></div><div><span>门店数量</span><strong>${stores.length} 家</strong></div><div><span>主营能力</span><strong>${safe(item.specialties, "-")}</strong></div><div><span>营业执照</span><strong>${safe(item.license, "-")}</strong></div></div><div class="admin-doc-list"><div class="admin-doc-item">营业执照副本</div><div class="admin-doc-item">门头照片</div><div class="admin-doc-item">施工环境照</div><div class="admin-doc-item">案例图片包</div></div><div class="admin-action-row">${active === "audit" ? `<button class="btn btn-primary" type="button" data-admin-action="provider-detail" data-admin-id="${item.id}">按门店审核</button>` : `<button class="btn btn-primary" type="button" data-admin-action="provider-toggle" data-admin-id="${item.id}">${nProvider(item.status) === "暂停接单" ? "恢复营业" : "暂停接单"}</button><button class="btn btn-secondary" type="button" data-admin-action="provider-detail" data-admin-id="${item.id}">查看详情</button>`}</div><div class="admin-timeline">${(item.timeline || []).slice(0, 4).map((l) => `<div>${l}</div>`).join("")}</div></section>`;
+    return `<section class="admin-detail-card"><div class="eyebrow">${active === "audit" ? "Provider Audit" : "Provider Detail"}</div><h3>${safe(item.name, "服务商详情")}</h3><div class="admin-kv-list"><div><span>联系人</span><strong>${safe(item.contact, "-")}</strong></div><div><span>所在区域</span><strong>${formatProviderRegion(item)}</strong></div><div><span>门店</span><strong>${safe(stores[0]?.name, "-")}</strong></div><div><span>主营能力</span><strong>${safe(item.specialties, "-")}</strong></div><div><span>营业执照</span><strong>${safe(item.license, "-")}</strong></div></div><div class="admin-doc-list"><div class="admin-doc-item">营业执照副本</div><div class="admin-doc-item">门头照片</div><div class="admin-doc-item">施工环境照</div><div class="admin-doc-item">案例图片包</div></div><div class="admin-action-row">${active === "audit" ? `<button class="btn btn-primary" type="button" data-admin-action="provider-detail" data-admin-id="${item.id}">审核门店资质</button>` : `<button class="btn btn-primary" type="button" data-admin-action="provider-toggle" data-admin-id="${item.id}">${nProvider(item.status) === "暂停接单" ? "恢复营业" : "暂停接单"}</button><button class="btn btn-secondary" type="button" data-admin-action="provider-detail" data-admin-id="${item.id}">查看详情</button>`}</div><div class="admin-timeline">${(item.timeline || []).slice(0, 4).map((l) => `<div>${l}</div>`).join("")}</div></section>`;
   }
 
   function getAdminProviderRelatedOrders(item) {
@@ -873,12 +969,12 @@
 
   function renderAdminProviderStoreList(item) {
     const stores = getProviderStores(item);
-    return `<section class="admin-detail-card"><div class="eyebrow">Store List</div><h3>门店列表 <span class="pill">${stores.length} 家</span></h3><div class="mobile-list">${stores
+    return `<section class="admin-detail-card"><div class="eyebrow">Store List</div><h3>门店信息</h3><div class="mobile-list">${stores
       .map(
         (store, index) => `
       <article class="mobile-item">
         <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
-          <strong>${index + 1}. ${safe(store.name, item.name)}${store.isPrimary ? ' <span class="pill">主门店</span>' : ""}</strong>
+          <strong>${safe(store.name, item.name)}</strong>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">${store.auditStatus ? tag(nAudit(store.auditStatus)) : ""}${store.status && store.status !== item.status ? tag(nProvider(store.status)) : ""}</div>
         </div>
         <div class="muted" style="margin-top:8px;">${formatStoreAddress(store)}</div>
@@ -894,7 +990,7 @@
     const stats = getAdminProviderBusinessStats(item);
     const qualificationRows = getAdminProviderQualificationRows(item);
     const stores = getProviderStores(item);
-    return `<div class="stack"><section class="admin-detail-card"><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-admin-action="provider-detail-back" data-admin-id="${item.id}">返回服务商列表</button><div style="display:flex; gap:10px; flex-wrap:wrap;">${tag(nProvider(item.status))}${tag(nAudit(item.auditStatus))}</div></div><div class="eyebrow">Provider Detail</div><h3>${safe(item.name, "服务商详情")}</h3><div class="muted">${formatProviderRegion(item)} / 评分 ${item.score || "-"}</div></section><div class="sub-tabs">${[{ id: "basic", label: "基础信息页" }, { id: "qualification", label: "资质信息页" }, { id: "business", label: "经营状态页" }].map((tab) => `<button class="sub-tab ${active === tab.id ? "active" : ""}" type="button" data-admin-provider-detail-tab="${tab.id}">${tab.label}</button>`).join("")}</div>${active === "basic" ? `<section class="admin-detail-card"><div class="eyebrow">Basic Information</div><h3>服务商基础信息</h3><div class="admin-kv-list"><div><span>服务商名称</span><strong>${safe(item.name, "-")}</strong></div><div><span>联系人</span><strong>${safe(item.contact, "-")}</strong></div><div><span>所在区域</span><strong>${formatProviderRegion(item)}</strong></div><div><span>门店数量</span><strong>${stores.length} 家</strong></div><div><span>主营能力</span><strong>${safe(item.specialties, "-")}</strong></div><div><span>营业执照</span><strong>${safe(item.license, "-")}</strong></div><div><span>入驻状态</span><strong>${nAudit(item.auditStatus)}</strong></div><div><span>接单状态</span><strong>${nProvider(item.status)}</strong></div></div></section>${renderAdminProviderStoreList(item)}` : active === "qualification" ? `<section class="admin-detail-card"><div class="eyebrow">Qualifications</div><h3>资质信息</h3><div class="mobile-list">${qualificationRows.map((row) => `<article class="mobile-item"><div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;"><strong>${row.title}</strong><span class="pill">${row.status}</span></div><div class="muted" style="margin-top:8px;">${row.note}</div></article>`).join("")}</div></section>` : `<section class="admin-detail-card"><div class="eyebrow">Business Status</div><h3>经营状态</h3><div class="admin-kv-list"><div><span>总接单量</span><strong>${stats.totalOrders}</strong></div><div><span>本月接单量</span><strong>${stats.monthOrders}</strong></div><div><span>当前订单数</span><strong>${stats.currentOrderCount}</strong></div><div><span>当前营业额</span><strong>${stats.currentRevenue}</strong></div><div><span>未结算金额</span><strong>${stats.unsettledAmount}</strong></div><div><span>已结算金额</span><strong>${stats.settledAmount}</strong></div></div></section>`}</div>`;
+    return `<div class="stack"><section class="admin-detail-card"><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-admin-action="provider-detail-back" data-admin-id="${item.id}">返回服务商列表</button><div style="display:flex; gap:10px; flex-wrap:wrap;">${tag(nProvider(item.status))}${tag(nAudit(item.auditStatus))}</div></div><div class="eyebrow">Provider Detail</div><h3>${safe(item.name, "服务商详情")}</h3><div class="muted">${formatProviderRegion(item)} / 评分 ${item.score || "-"}</div></section><div class="sub-tabs">${[{ id: "basic", label: "基础信息页" }, { id: "qualification", label: "资质信息页" }, { id: "business", label: "经营状态页" }].map((tab) => `<button class="sub-tab ${active === tab.id ? "active" : ""}" type="button" data-admin-provider-detail-tab="${tab.id}">${tab.label}</button>`).join("")}</div>${active === "basic" ? `<section class="admin-detail-card"><div class="eyebrow">Basic Information</div><h3>服务商基础信息</h3><div class="admin-kv-list"><div><span>服务商名称</span><strong>${safe(item.name, "-")}</strong></div><div><span>联系人</span><strong>${safe(item.contact, "-")}</strong></div><div><span>所在区域</span><strong>${formatProviderRegion(item)}</strong></div><div><span>门店</span><strong>${safe(stores[0]?.name, "-")}</strong></div><div><span>主营能力</span><strong>${safe(item.specialties, "-")}</strong></div><div><span>营业执照</span><strong>${safe(item.license, "-")}</strong></div><div><span>入驻状态</span><strong>${nAudit(item.auditStatus)}</strong></div><div><span>接单状态</span><strong>${nProvider(item.status)}</strong></div></div></section>${renderAdminProviderStoreList(item)}` : active === "qualification" ? `<section class="admin-detail-card"><div class="eyebrow">Qualifications</div><h3>资质信息</h3><div class="mobile-list">${qualificationRows.map((row) => `<article class="mobile-item"><div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;"><strong>${row.title}</strong><span class="pill">${row.status}</span></div><div class="muted" style="margin-top:8px;">${row.note}</div></article>`).join("")}</div></section>` : `<section class="admin-detail-card"><div class="eyebrow">Business Status</div><h3>经营状态</h3><div class="admin-kv-list"><div><span>总接单量</span><strong>${stats.totalOrders}</strong></div><div><span>本月接单量</span><strong>${stats.monthOrders}</strong></div><div><span>当前订单数</span><strong>${stats.currentOrderCount}</strong></div><div><span>当前营业额</span><strong>${stats.currentRevenue}</strong></div><div><span>未结算金额</span><strong>${stats.unsettledAmount}</strong></div><div><span>已结算金额</span><strong>${stats.settledAmount}</strong></div></div></section>`}</div>`;
   }
   function isAdminGoodsOrder(item) {
     return safe(item.type, "").includes("商品");
@@ -965,7 +1061,7 @@
     return `<section class="admin-detail-card"><div class="eyebrow">${canAssign ? "Order Dispatch" : "Service Order"}</div><h3>${item.id}</h3><div class="admin-kv-list"><div><span>订单类型</span><strong>服务订单</strong></div><div><span>用户</span><strong>${safe(item.user, "-")}</strong></div><div><span>车辆</span><strong>${safe(item.vehicle, "-")}</strong></div><div><span>改装项目</span><strong>${safe(item.service, "-")}</strong></div><div><span>报价金额</span><strong>${safe(item.quote, "-")}</strong></div><div><span>预约安装时间</span><strong>${safe(item.appointment, "-")}</strong></div><div><span>服务商</span><strong>${safe(item.provider, "待分配")}</strong></div><div><span>当前进度</span><strong>${safe(item.progress, "-")}</strong></div></div>${canAssign ? `<div class="admin-suggest-list">${opts.slice(0, 3).map((p) => `<button class="admin-suggest-item" type="button" data-admin-action="order-assign" data-admin-id="${item.id}" data-provider-id="${p.id}"><strong>${safe(p.name, "服务商")}</strong><span>${p.name === item.intention ? "客户意向门店" : safe(p.city, "城市门店")}</span></button>`).join("")}</div>` : ""}<div class="admin-timeline">${getOrderTimeline(item).map((line) => `<div>${line}</div>`).join("")}</div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-admin-action="order-detail" data-admin-id="${item.id}">查看详情</button>${canAssign ? `<button class="btn btn-primary" type="button" data-admin-action="order-assign-intention" data-admin-id="${item.id}">一键派给意向门店</button>` : ""}</div></section>`;
   }
   function renderAdminCaseDetail(item) { return `<section class="admin-detail-card"><div class="eyebrow">Case Review</div><h3>${safe(item.title, "案例详情")}</h3><div class="admin-kv-list"><div><span>服务商</span><strong>${safe(item.provider, "-")}</strong></div><div><span>车型</span><strong>${safe(item.model, "-")}</strong></div><div><span>风格</span><strong>${safe(item.style, "-")}</strong></div><div><span>改装类型</span><strong>${safe(item.modType, "-")}</strong></div><div><span>花费区间</span><strong>${safe(item.cost, "-")}</strong></div><div><span>审核状态</span><strong>${nCaseAudit(item.audit)}</strong></div><div><span>展示状态</span><strong>${nCaseDisplay(item.display)}</strong></div></div><div class="admin-doc-list"><div class="admin-doc-item">案例主图</div><div class="admin-doc-item">施工过程图</div><div class="admin-doc-item">完工对比图</div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-admin-action="case-approve" data-admin-id="${item.id}">审核通过</button><button class="btn btn-secondary" type="button" data-admin-action="case-display" data-admin-id="${item.id}">设为正常展示</button><button class="btn btn-danger" type="button" data-admin-action="case-reject" data-admin-id="${item.id}">审核驳回</button></div></section>`; }
-  function renderAdminForumDetail(post) { const related = comments.filter((i) => i.post === post.id); return `<section class="admin-detail-card"><div class="eyebrow">Forum Moderation</div><h3>${safe(post.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>作者</span><strong>${safe(post.author, "-")}</strong></div><div><span>发布时间</span><strong>${safe(post.time, "-")}</strong></div><div><span>当前状态</span><strong>${nForum(post.status)}</strong></div><div><span>互动数据</span><strong>回复 ${post.replies || 0} / 点赞 ${post.likes || 0} / 浏览 ${(post.views || 0).toLocaleString("zh-CN")}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-admin-action="forum-post-toggle" data-admin-id="${post.id}">${nForum(post.status) === "已删除" ? "恢复帖子" : "删除帖子"}</button></div><div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${related.length ? related.map((i) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(i.author, "评论用户")}</strong>${tag(nForum(i.status))}</div><p>${safe(i.content, "评论内容")}</p><button class="btn btn-secondary" type="button" data-admin-action="forum-comment-toggle" data-admin-id="${i.id}">${nForum(i.status) === "已删除" ? "恢复评论" : "删除评论"}</button></div>`).join("") : `<div class="muted">当前帖子暂无评论</div>`}</div></div></section>`; }
+  function renderAdminForumDetail(post) { const related = comments.filter((i) => i.post === post.id); return `<section class="admin-detail-card"><div class="eyebrow">Forum Moderation</div><h3>${safe(post.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>作者</span><strong>${safe(post.author, "-")}</strong></div><div><span>发布时间</span><strong>${safe(post.time, "-")}</strong></div><div><span>当前状态</span><strong>${nForum(post.status)}</strong></div><div><span>举报状态</span><strong>${post.reportStatus === "待审核" ? "被举报，待审核" : "无举报"}</strong></div><div><span>互动数据</span><strong>回复 ${post.replies || 0} / 点赞 ${post.likes || 0} / 浏览 ${(post.views || 0).toLocaleString("zh-CN")}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-admin-action="forum-post-toggle" data-admin-id="${post.id}">${nForum(post.status) === "已删除" ? "恢复帖子" : "删除帖子"}</button>${post.reportStatus === "待审核" ? `<button class="btn btn-secondary" type="button" data-admin-action="forum-report-clear" data-admin-id="${post.id}">驳回举报</button>` : ""}</div><div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${related.length ? related.map((i) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(i.author, "评论用户")}</strong>${tag(nForum(i.status))}</div><p>${safe(i.content, "评论内容")}</p><button class="btn btn-secondary" type="button" data-admin-action="forum-comment-toggle" data-admin-id="${i.id}">${nForum(i.status) === "已删除" ? "恢复评论" : "删除评论"}</button></div>`).join("") : `<div class="muted">当前帖子暂无评论</div>`}</div></div></section>`; }
   function renderAdminShippingForm(item) {
     return `<form class="provider-complete-form" data-admin-shipping-form data-admin-id="${item.id}"><div class="form-grid"><div class="field-group"><label class="field-label" for="admin-shipping-company-${item.id}">物流公司</label><input class="input" id="admin-shipping-company-${item.id}" name="shippingCompany" type="text" value="${safe(item.shippingCompany, "顺丰速运")}" required></div><div class="field-group"><label class="field-label" for="admin-shipping-no-${item.id}">物流单号</label><input class="input" id="admin-shipping-no-${item.id}" name="shippingNo" type="text" value="${safe(item.shippingNo, "")}" placeholder="请输入物流单号" required></div></div><div class="field-group"><label class="field-label" for="admin-shipping-remark-${item.id}">备注</label><textarea class="textarea" id="admin-shipping-remark-${item.id}" name="shippingRemark" placeholder="请填写包装说明、拆分发货或签收提醒" required>${safe(item.shippingRemark, "木箱加固包装，签收前请先检查外箱。")}</textarea></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">确认发货</button><button class="btn btn-secondary" type="button" data-admin-action="order-ship-cancel" data-admin-id="${item.id}">取消</button></div></form>`;
   }
@@ -1071,6 +1167,35 @@
       render();
       return;
     }
+    if (action === "forum-report-clear") {
+      const target = posts.find((item) => item.id === id);
+      if (target) target.reportStatus = "";
+      render();
+      return;
+    }
+    if (action === "comment-approve") {
+      const target = comments.find((item) => item.id === id);
+      if (target) {
+        target.status = "正常";
+        target.reportStatus = "";
+      }
+      render();
+      return;
+    }
+    if (action === "comment-remove") {
+      const target = comments.find((item) => item.id === id);
+      if (target) {
+        target.status = "已删除";
+        target.reportStatus = "";
+      }
+      render();
+      return;
+    }
+    if (action === "sensitive-remove") {
+      state.adminSensitiveWords = state.adminSensitiveWords.filter((word) => word !== id);
+      render();
+      return;
+    }
     if (action.startsWith("after-sale-")) {
       const target = orders.find((item) => item.id === id);
       if (!target) return;
@@ -1122,10 +1247,11 @@
   }
 
   function renderProviderHome() {
+    const pendingCaseCount = getProviderCaseRows().filter((item) => nCaseAudit(item.audit) !== "已通过").length;
     const cards = [
       { title: "待接单", value: getProviderPendingOrders().length, note: "", tab: "orders", ordersTarget: "pending" },
       { title: "施工中", value: getProviderProcessingOrders().length, note: "", tab: "orders", ordersTarget: "all" },
-      { title: "采购与运营", value: getProviderPurchasableProducts().length + getProviderCaseRows().filter((item) => nCaseAudit(item.audit) !== "已通过").length, note: "", tab: "operations", operationsTarget: "purchase" },
+      { title: "案例运营", value: pendingCaseCount, note: "", tab: "operations", operationsTarget: "cases" },
       { title: "待处理消息", value: fallback.providerMessages.filter((item) => item.status !== "已处理").length, note: "", tab: "messages", messagesTarget: "all" },
     ];
     return `<div class="stack"><section class="hero-banner" style="min-height:auto; padding-bottom:16px;"><div class="eyebrow">Store Dashboard</div><h3 style="margin:10px 0 0; font-size:28px; font-family:var(--font-display);">门店工作台</h3></section><section class="mobile-grid-2">${cards.map((item) => `<button class="m3-card admin-shortcut-card" type="button" data-provider-shortcut="${item.tab}" ${item.ordersTarget ? `data-orders-target="${item.ordersTarget}"` : ""} ${item.operationsTarget ? `data-operations-target="${item.operationsTarget}"` : ""} ${item.messagesTarget ? `data-messages-target="${item.messagesTarget}"` : ""} ${item.meTarget ? `data-me-target="${item.meTarget}"` : ""}><div class="muted">${item.title}</div><span class="mobile-stat">${item.value}</span>${item.note ? `<div class="muted">${item.note}</div>` : ""}</button>`).join("")}</section><section class="mobile-list"><article class="mobile-item"><strong>今日到店 6 台 / 完工 3 台</strong></article><article class="mobile-item"><strong>本周营收 ¥186,000</strong></article></section></div>`;
@@ -1144,36 +1270,23 @@
   }
 
   function renderProviderOperations() {
-    const active = state.subTab.operations || "purchase";
     const tabs = [
-      { id: "purchase", label: "配件采购" },
-      { id: "record", label: "采购记录" },
       { id: "pricing", label: "服务定价" },
       { id: "cases", label: "案例管理" },
       { id: "forum", label: "论坛管理" },
     ];
+    const requestedActive = state.subTab.operations || "pricing";
+    const active = tabs.some((item) => item.id === requestedActive) ? requestedActive : "pricing";
+    state.subTab.operations = active;
     if (active === "pricing") {
       return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${renderProviderServicePricing()}`;
     }
-    if (active === "purchase" && state.providerPurchase.sku) {
-      const product = getProviderPurchasableProducts().find((item) => item.sku === state.providerPurchase.sku);
-      if (product) {
-        return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${renderProviderPurchaseDetail(product)}`;
-      }
-    }
     const rows =
-      active === "purchase" ? getProviderPurchasableProducts() :
-      active === "record" ? getProviderPurchaseRecords() :
       active === "cases" ? getProviderCaseRows() :
       getProviderForumRows();
     const selected =
-      active === "purchase" || active === "record"
-        ? rows.find((item) => (item.sku || item.id) === state.providerSelected.products) || rows[0]
-        : rows.find((item) => item.id === state.providerSelected[active]) || rows[0];
-    if (active === "purchase") {
-      return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}<div class="user-mall-v3-grid" style="margin-top:12px;">${rows.map((item, index) => `<article class="user-mall-v3-card"><button class="user-mall-v3-card-art" type="button" data-provider-action="provider-product-pick" data-provider-id="${item.sku}" data-tone="${(index % 4) + 1}"></button><div class="user-mall-v3-card-body"><strong>${safe(item.name, "商品")}</strong><span>${safe(item.brand, "-")} / ${safe(item.category, "-")}</span><p>${safe(item.fitment, "适配当前车型")}</p><div><b>${safe(item.price, "-")}</b></div></div></article>`).join("")}</div>`;
-    }
-    return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "cases" ? `<div class="admin-action-row" style="margin-bottom:12px;"><button class="btn btn-primary" type="button" data-provider-action="case-add">新增案例</button></div>${state.providerCaseForm.mode === "create" ? renderProviderCaseForm() : ""}` : active === "forum" ? `<div class="admin-action-row" style="margin-bottom:12px;"><button class="btn btn-primary" type="button" data-provider-action="moderator-apply">${state.providerMe.moderatorStatus === "已通过" ? "版主权限管理" : state.providerMe.moderatorStatus === "待审核" ? "审核中" : "申请版主"}</button>${state.providerMe.moderatorStatus === "已通过" ? `<button class="btn btn-secondary" type="button" data-provider-action="moderator-manage">管理板块</button>` : ""}</div>${state.providerMe.moderatorApplyOpen ? renderProviderModeratorForm() : ""}` : ""}<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected && (selected.sku || selected.id) === (item.sku || item.id) ? "active" : ""}" type="button" data-provider-pick data-provider-type="products" data-provider-id="${item.sku || item.id}">${active === "record" ? `<strong>${safe(item.id, "采购记录")}</strong><div class="muted" style="margin-top:8px;">${safe(item.name, "商品")} / 型号 ${providerProductModel(item)}</div><div class="muted" style="margin-top:6px;">数量 ${item.quantity || 1} / ${safe(item.amount, "-")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nPurchaseStatus(item.status))}</div>` : active === "cases" ? `<strong>${safe(item.title, "案例")}</strong><div class="muted" style="margin-top:8px;">${safe(item.model, "车型")} / ${safe(item.modType, "改装类型")} / ${safe(item.cost, "-")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nCaseAudit(item.audit))}<span class="pill">${nCaseDisplay(item.display)}</span></div>` : `<strong>${safe(item.title, "帖子")}</strong><div class="muted" style="margin-top:8px;">回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</div><div style="margin-top:10px;">${tag(nForum(item.status))}</div>`}</button>${selected?.id === item.id ? (active === "purchase" || active === "record" ? renderProviderProductDetail(item) : active === "cases" ? renderProviderCaseDetail(item) : "") : ""}</div>`).join("")}</div>`;
+      rows.find((item) => item.id === state.providerSelected[active]) || rows[0];
+    return `${subTabs(tabs)}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "cases" ? `<div class="admin-action-row" style="margin-bottom:12px;"><button class="btn btn-primary" type="button" data-provider-action="case-add">新增案例</button></div>${state.providerCaseForm.mode === "create" ? renderProviderCaseForm() : ""}` : active === "forum" ? `<div class="admin-action-row" style="margin-bottom:12px;"><button class="btn btn-primary" type="button" data-provider-action="moderator-apply">${state.providerMe.moderatorStatus === "已通过" ? "版主权限管理" : state.providerMe.moderatorStatus === "待审核" ? "审核中" : "申请版主"}</button>${state.providerMe.moderatorStatus === "已通过" ? `<button class="btn btn-secondary" type="button" data-provider-action="moderator-manage">管理板块</button>` : ""}</div>${state.providerMe.moderatorApplyOpen ? renderProviderModeratorForm() : ""}` : ""}<div class="mobile-list">${rows.map((item) => `<div class="admin-inline-block"><button class="mobile-item admin-pick-card ${selected && selected.id === item.id ? "active" : ""}" type="button" data-provider-pick data-provider-type="${active}" data-provider-id="${item.id}">${active === "cases" ? `<strong>${safe(item.title, "案例")}</strong><div class="muted" style="margin-top:8px;">${safe(item.model, "车型")} / ${safe(item.modType, "改装类型")} / ${safe(item.cost, "-")}</div><div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">${tag(nCaseAudit(item.audit))}<span class="pill">${nCaseDisplay(item.display)}</span></div>` : `<strong>${safe(item.title, "帖子")}</strong><div class="muted" style="margin-top:8px;">回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</div><div style="margin-top:10px;">${tag(nForum(item.status))}</div>`}</button>${selected?.id === item.id ? (active === "cases" ? renderProviderCaseDetail(item) : "") : ""}</div>`).join("")}</div>`;
   }
 
   function renderProviderMessages() {
@@ -1191,7 +1304,7 @@
     const active = state.subTab.me || "profile";
     const store = getProviderStore();
     const stores = getProviderStores(store);
-    return `${subTabs([{ id: "business", label: "营业情况" }, { id: "profile", label: "门店资料" }])}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "profile" ? `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Store Profile</div><h3>门店与账号信息</h3><div class="admin-kv-list"><div><span>门店名称</span><strong>${safe(store.name, "高端改装门店")}</strong></div><div><span>联系人</span><strong>${safe(store.contact, "-")}</strong></div><div><span>门店数量</span><strong>${stores.length} 家</strong></div><div><span>主营能力</span><strong>${safe(store.specialties, "-")}</strong></div><div><span>审核状态</span><strong>${nAudit(store.auditStatus)}</strong></div><div><span>门店状态</span><strong>${nProvider(store.status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">${state.providerMe.profileEditOpen ? "收起资料表单" : "更新门店资料"}</button><button class="btn btn-primary" type="button" data-provider-action="provider-profile-contact">联系平台客服</button></div></section>${state.providerMe.profileEditOpen ? renderProviderProfileForm() : ""}</div>` : renderProviderBusiness()}`;
+    return `${subTabs([{ id: "business", label: "营业情况" }, { id: "profile", label: "门店资料" }])}${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}${active === "profile" ? `<div class="stack"><section class="admin-detail-card"><div class="eyebrow">Store Profile</div><h3>门店与账号信息</h3><div class="admin-kv-list"><div><span>门店名称</span><strong>${safe(store.name, "高端改装门店")}</strong></div><div><span>联系人</span><strong>${safe(store.contact, "-")}</strong></div><div><span>门店</span><strong>${safe(stores[0]?.name, "-")}</strong></div><div><span>主营能力</span><strong>${safe(store.specialties, "-")}</strong></div><div><span>审核状态</span><strong>${nAudit(store.auditStatus)}</strong></div><div><span>门店状态</span><strong>${nProvider(store.status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">${state.providerMe.profileEditOpen ? "收起资料表单" : "更新门店资料"}</button><button class="btn btn-primary" type="button" data-provider-action="provider-profile-contact">联系平台客服</button></div></section>${state.providerMe.profileEditOpen ? renderProviderProfileForm() : ""}</div>` : renderProviderBusiness()}`;
   }
 
   function renderProviderDialog() {
@@ -1364,37 +1477,6 @@
     return "订单已进入稳定阶段，注意客户回访与售后记录。";
   }
 
-  function getProviderPurchasableProducts() {
-    return products.slice(0, 4);
-  }
-
-  function getProviderPurchaseRecords() {
-    return providerPurchaseRecords;
-  }
-
-  function providerProductModel(item) {
-    return safe(item.model || item.spec || item.fitment || item.sku, "标准型号");
-  }
-
-  function renderProviderProductDetail(item, active) {
-    if (active === "purchase") {
-      const purchaseOpen = state.providerPurchase.sku === item.sku;
-      return `<section class="admin-detail-card"><div class="eyebrow">Purchase Action</div><div class="provider-product-hero"><div class="provider-product-visual large" data-product-tone="${(item.brand || "").length % 3}"><span>${safe(item.category, "商品")}</span></div><div><h3>${safe(item.name, "商品采购")}</h3><div class="muted" style="margin-top:8px;">${safe(item.description, "商品说明待补充")}</div></div></div><div class="admin-kv-list"><div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>型号</span><strong>${providerProductModel(item)}</strong></div><div><span>类目</span><strong>${safe(item.category, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>库存状态</span><strong>${nProduct(item.status)}</strong></div></div><div class="admin-action-row"><button class="btn btn-primary" type="button" data-provider-action="${purchaseOpen ? "product-purchase-cancel" : "product-purchase"}" data-provider-id="${item.sku}">${purchaseOpen ? "收起采购表单" : "采购"}</button></div>${purchaseOpen ? renderProviderPurchaseForm(item) : ""}</section>`;
-    }
-    return `<section class="admin-detail-card"><div class="eyebrow">Purchase Record</div><h3>${safe(item.id, "采购记录")}</h3><div class="admin-kv-list"><div><span>商品</span><strong>${safe(item.name, "-")}</strong></div><div><span>型号</span><strong>${providerProductModel(item)}</strong></div><div><span>数量</span><strong>${item.quantity || 1}</strong></div><div><span>金额</span><strong>${safe(item.amount, "-")}</strong></div><div><span>支付方式</span><strong>${safe(item.payment, "-")}</strong></div><div><span>收货地址</span><strong>${safe(item.address, "-")}</strong></div><div><span>状态</span><strong>${nPurchaseStatus(item.status)}</strong></div><div><span>进度说明</span><strong>${safe(item.note, "-")}</strong></div></div><div class="admin-action-row">${nPurchaseStatus(item.status) !== "已签收" ? `<button class="btn btn-primary" type="button" data-provider-action="purchase-record-confirm" data-provider-id="${item.id}">确认收货</button>` : `<button class="btn btn-secondary" type="button" disabled>已确认收货</button>`}<button class="btn btn-secondary" type="button" data-provider-action="purchase-record-detail" data-provider-id="${item.id}">查看记录</button></div></section>`;
-  }
-
-  function renderProviderPurchaseDetail(item) {
-    const formOpen = state.providerPurchase.formOpen;
-    return `<div class="stack provider-purchase-detail-page">${state.providerFeedback ? `<div class="provider-feedback">${state.providerFeedback}</div>` : ""}<section class="provider-purchase-detail"><header class="provider-purchase-detail-header"><button class="user-message-back" type="button" data-provider-action="provider-product-back">返回</button><div><div class="eyebrow">Product Detail</div><h3>${safe(item.name, "商品详情")}</h3></div>${tag(nProduct(item.status))}</header><div class="provider-purchase-detail-body"><div class="provider-product-visual large" data-product-tone="${(item.brand || "").length % 3}"><span>${safe(item.category, "商品")}</span></div><div class="admin-kv-list" style="margin-top:14px;"><div><span>品牌</span><strong>${safe(item.brand, "-")}</strong></div><div><span>型号</span><strong>${providerProductModel(item)}</strong></div><div><span>类目</span><strong>${safe(item.category, "-")}</strong></div><div><span>价格</span><strong>${safe(item.price, "-")}</strong></div><div><span>库存状态</span><strong>${nProduct(item.status)}</strong></div></div>${formOpen ? renderProviderPurchaseForm(item) : `<div class="admin-action-row" style="margin-top:16px;"><button class="btn btn-primary" type="button" data-provider-action="provider-product-buy" data-provider-id="${item.sku}">立即采购</button></div>`}</div></section></div>`;
-  }
-
-  function renderProviderPurchaseForm(item) {
-    const addressRows = getProviderAddresses();
-    const defaultAddress = addressRows.find((a) => a.tag === "门店地址") || addressRows[0];
-    return `<form class="provider-complete-form" data-provider-purchase-form data-provider-id="${item.sku}"><div class="form-grid"><div class="field-group"><label class="field-label" for="purchase-quantity-${item.sku}">采购数量</label><input class="input" id="purchase-quantity-${item.sku}" name="purchaseQuantity" type="number" min="1" max="99" value="1" required></div><div class="field-group"><label class="field-label" for="purchase-payment-${item.sku}">支付方式</label><select class="input" id="purchase-payment-${item.sku}" name="purchasePayment" required><option value="支付宝">支付宝</option><option value="微信支付">微信支付</option></select></div><div class="field-group field-group-full"><label class="field-label" for="purchase-address-${item.sku}">收货地址</label><select class="input" id="purchase-address-${item.sku}" name="purchaseAddressId" required>${addressRows.map((a) => `<option value="${a.id}" ${a.id === defaultAddress?.id ? "selected" : ""}>${a.tag} · ${a.address}</option>`).join("")}</select></div><div class="field-group field-group-full"><label class="field-label" for="purchase-note-${item.sku}">采购备注</label><input class="input" id="purchase-note-${item.sku}" name="purchaseNote" type="text" value="门店补货采购" required></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">确认采购</button><button class="btn btn-secondary" type="button" data-provider-action="provider-product-buy-cancel" data-provider-id="${item.sku}">取消</button></div></form>`;
-  }
-
   function renderProviderCaseForm(item) {
     const editing = !!item;
     const linked = editing ? (item.linkedProducts || []) : [];
@@ -1478,12 +1560,12 @@
     const completedOrders = allOrders.filter((item) => nOrder(item.status) === "已完成").length;
     const processingOrders = allOrders.filter((item) => nOrder(item.status) === "施工中").length;
     const acceptanceOrders = allOrders.filter((item) => nOrder(item.status) === "待验收").length;
-    const pendingPurchase = getProviderPurchaseRecords().filter((item) => nPurchaseStatus(item.status) !== "已签收").length;
     const caseCount = getProviderCaseRows().length;
+    const enabledServiceCount = getProviderServicePricingRows().filter((item) => item.enabled && item.status !== "停用").length;
     const revenue = getProviderSettlementRows()
       .map((item) => priceToNumber(getSettlementGrossAmount(item)))
       .reduce((sum, value) => sum + value, 0);
-    return `<div class="stack"><section class="hero-banner" style="min-height:auto; padding-bottom:16px;"><div class="eyebrow">Business Overview</div><h3 style="margin:10px 0 0; font-size:28px; font-family:var(--font-display);">门店营业情况</h3></section><section class="mobile-grid-2"><article class="m3-card"><div class="muted">累计完成订单</div><span class="mobile-stat">${completedOrders}</span></article><article class="m3-card"><div class="muted">施工中订单</div><span class="mobile-stat">${processingOrders}</span></article><article class="m3-card"><div class="muted">待客户验收</div><span class="mobile-stat">${acceptanceOrders}</span></article><article class="m3-card"><div class="muted">采购跟进中</div><span class="mobile-stat">${pendingPurchase}</span></article></section><section class="admin-detail-card"><div class="eyebrow">Store Status</div><h3>今日营业概览</h3><div class="admin-kv-list"><div><span>门店营业状态</span><strong>${nProvider(store.status)}</strong></div><div><span>案例展示数量</span><strong>${caseCount} 个</strong></div><div><span>累计订单数量</span><strong>${allOrders.length} 个</strong></div></div></section></div>`;
+    return `<div class="stack"><section class="hero-banner" style="min-height:auto; padding-bottom:16px;"><div class="eyebrow">Business Overview</div><h3 style="margin:10px 0 0; font-size:28px; font-family:var(--font-display);">门店营业情况</h3></section><section class="mobile-grid-2"><article class="m3-card"><div class="muted">累计完成订单</div><span class="mobile-stat">${completedOrders}</span></article><article class="m3-card"><div class="muted">施工中订单</div><span class="mobile-stat">${processingOrders}</span></article><article class="m3-card"><div class="muted">待客户验收</div><span class="mobile-stat">${acceptanceOrders}</span></article><article class="m3-card"><div class="muted">已启用服务</div><span class="mobile-stat">${enabledServiceCount}</span></article></section><section class="admin-detail-card"><div class="eyebrow">Store Status</div><h3>今日营业概览</h3><div class="admin-kv-list"><div><span>门店营业状态</span><strong>${nProvider(store.status)}</strong></div><div><span>案例展示数量</span><strong>${caseCount} 个</strong></div><div><span>累计订单数量</span><strong>${allOrders.length} 个</strong></div></div></section></div>`;
   }
 
   function renderProviderSettlementDetail(item) {
@@ -1503,8 +1585,7 @@
     return `
       <div class="provider-profile-store-row" data-provider-profile-store-index="${index}">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px;">
-          <span class="pill">门店 ${index + 1}${store.isPrimary ? " · 主门店" : ""}</span>
-          ${total > 1 ? `<button class="btn btn-danger btn-sm" type="button" data-provider-profile-store-remove="${index}">删除</button>` : ""}
+          <span class="pill">门店信息</span>
         </div>
         <div class="form-grid">
           <div class="field-group field-group-full">
@@ -1544,7 +1625,7 @@
   function renderProviderProfileForm() {
     const store = getProviderStore();
     const stores = getProviderProfileStores();
-    return `<form class="provider-complete-form" data-provider-profile-form><div class="form-grid"><div class="field-group"><label class="field-label" for="provider-contact-edit">联系人</label><input class="input" id="provider-contact-edit" name="providerContact" type="text" value="${safe(store.contact, "")}" required></div><div class="field-group"><label class="field-label" for="provider-specialties-edit">主营能力</label><input class="input" id="provider-specialties-edit" name="providerSpecialties" type="text" value="${safe(store.specialties, "")}" required></div></div><div class="provider-profile-stores"><div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin:18px 0 12px;"><h3 style="font-size:16px; margin:0;">门店信息</h3><button class="btn btn-secondary btn-sm" type="button" data-provider-profile-store-add>新增门店</button></div>${stores.map((item, index) => renderProviderProfileStoreRow(item, index, stores.length)).join("")}</div><div class="admin-action-row"><button class="btn btn-primary" type="submit">保存资料</button><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">取消</button></div></form>`;
+    return `<form class="provider-complete-form" data-provider-profile-form><div class="form-grid"><div class="field-group"><label class="field-label" for="provider-contact-edit">联系人</label><input class="input" id="provider-contact-edit" name="providerContact" type="text" value="${safe(store.contact, "")}" required></div><div class="field-group"><label class="field-label" for="provider-specialties-edit">主营能力</label><input class="input" id="provider-specialties-edit" name="providerSpecialties" type="text" value="${safe(store.specialties, "")}" required></div></div><div class="provider-profile-stores"><div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin:18px 0 12px;"><h3 style="font-size:16px; margin:0;">门店信息</h3></div>${stores.map((item, index) => renderProviderProfileStoreRow(item, index, stores.length)).join("")}</div><div class="admin-action-row"><button class="btn btn-primary" type="submit">保存资料</button><button class="btn btn-secondary" type="button" data-provider-action="provider-profile-edit">取消</button></div></form>`;
   }
 
   function handleProviderAction(button) {
@@ -1566,52 +1647,6 @@
         target.progress = "已与客户确认验收时间，等待客户完成验收";
         appendOrderTimeline(target, "门店已跟进客户验收时间");
         state.providerFeedback = `${id} 已更新客户验收跟进说明。`;
-      }
-      render();
-      return;
-    }
-    if (action === "provider-product-pick") {
-      state.providerPurchase.sku = id;
-      state.providerPurchase.formOpen = false;
-      render();
-      return;
-    }
-    if (action === "provider-product-back") {
-      state.providerPurchase.sku = "";
-      state.providerPurchase.formOpen = false;
-      render();
-      return;
-    }
-    if (action === "provider-product-buy") {
-      state.providerPurchase.formOpen = true;
-      render();
-      return;
-    }
-    if (action === "provider-product-buy-cancel") {
-      state.providerPurchase.formOpen = false;
-      render();
-      return;
-    }
-    if (action.startsWith("product-")) {
-      if (action === "product-purchase") {
-        state.providerPurchase.sku = id;
-      } else if (action === "product-purchase-cancel") {
-        state.providerPurchase.sku = "";
-      }
-      render();
-      return;
-    }
-    if (action.startsWith("purchase-record-")) {
-      const target = providerPurchaseRecords.find((item) => item.id === id);
-      if (!target) {
-        render();
-        return;
-      }
-      if (action === "purchase-record-confirm") {
-        target.status = "已签收";
-        target.note = "门店已完成签收，可安排安装、入库或后续施工。";
-        state.providerSelected.products = id;
-        state.providerFeedback = `${id} 已确认收货，可继续安排安装或入库。`;
       }
       render();
       return;
@@ -1717,43 +1752,6 @@
     state.subTab.orders = "acceptance";
     state.providerSelected.orders = id;
     state.providerFeedback = `${id} 已提交完工资料和图片，等待客户验收。`;
-    render();
-  }
-
-  function handleProviderPurchaseSubmit(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const sku = form.dataset.providerId || "";
-    const product = getProviderPurchasableProducts().find((item) => item.sku === sku);
-    if (!product) return;
-    const formData = new FormData(form);
-    const quantity = Math.max(1, Number(formData.get("purchaseQuantity") || 1));
-    const payment = String(formData.get("purchasePayment") || "支付宝").trim();
-    const addressId = String(formData.get("purchaseAddressId") || "").trim();
-    const addressItem = getProviderAddresses().find((a) => a.id === addressId);
-    const note = String(formData.get("purchaseNote") || "").trim() || "门店补货采购";
-    const id = `PO-${Date.now().toString().slice(-6)}`;
-    providerPurchaseRecords.unshift({
-      id,
-      sku: product.sku,
-      name: product.name,
-      brand: product.brand,
-      model: providerProductModel(product),
-      category: product.category,
-      quantity,
-      amount: `${product.price} x${quantity}`,
-      payment,
-      address: addressItem?.address || getProviderStore()?.address || "",
-      addressName: addressItem?.name || getProviderStore()?.name || "",
-      addressPhone: addressItem?.phone || "",
-      status: "待发货",
-      note,
-    });
-    state.providerPurchase.sku = "";
-    state.providerPurchase.formOpen = false;
-    state.subTab.operations = "record";
-    state.providerSelected.products = id;
-    state.providerFeedback = `${safe(product.name, "商品")} 已采购 ${quantity} 件，支付方式 ${payment}，已加入采购记录。`;
     render();
   }
 
@@ -1899,7 +1897,7 @@
     state.providerMe.profileStores = [];
     state.subTab.me = "profile";
     state.providerMe.profileEditOpen = false;
-    state.providerFeedback = `门店资料已更新，共 ${updatedStores.length} 家门店，平台将重新审核，审核通过后方可正常接单。`;
+    state.providerFeedback = "门店资料已更新，平台将重新审核，审核通过后方可正常接单。";
     render();
   }
 
@@ -2452,6 +2450,118 @@
     return `<div class="stack user-coupon-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-coupon-head"><div><span>Coupons</span><strong>优惠券管理</strong></div><small>${coupons.filter((c) => c.status === "available").length} 张可用</small></section><section class="user-coupon-filter">${filterTabs.map((t) => `<button class="${activeFilter === t.id ? "active" : ""}" type="button" data-user-action="user-coupon-filter" data-user-id="${t.id}">${t.label}</button>`).join("")}</section>${listHtml}</div>`;
   }
 
+  function getUserServiceChatMessages(call) {
+    return call?.messages?.length ? call.messages : [
+      { from: "agent", text: "您好，我是平台客服，请问需要咨询订单、售后还是商品问题？", time: "刚刚" },
+    ];
+  }
+
+  function readUserServiceRatingRequest() {
+    try {
+      return JSON.parse(window.localStorage.getItem(CUSTOMER_SERVICE_RATING_KEY) || "null");
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function syncUserServiceRatingRequest() {
+    const request = readUserServiceRatingRequest();
+    if (!request || request.rated) return;
+    if (state.userServiceCall?.sessionId === request.sessionId && state.userServiceCall?.status === "ended") return;
+    state.userServiceCall = {
+      ...state.userServiceCall,
+      sessionId: request.sessionId,
+      status: "ended",
+      agent: request.agent || state.userServiceCall.agent || "林晓",
+      rating: 0,
+      comment: "",
+      rated: false,
+      messages: [
+        ...getUserServiceChatMessages(state.userServiceCall),
+        { from: "agent", text: "本次客服会话已结束，请对服务进行评价。", time: "刚刚" },
+      ],
+    };
+  }
+
+  function renderUserServiceChatBody(call) {
+    const messages = getUserServiceChatMessages(call);
+    return `<div class="user-service-chat-body">${messages.map((message) => `<article class="provider-chat-bubble ${message.from === "user" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "user" ? "我" : "客服"}</div><p>${safe(message.text, "")}</p><time>${safe(message.time, "刚刚")}</time></article>`).join("")}</div>`;
+  }
+
+  function renderUserServiceThreadButton() {
+    const call = state.userServiceCall || {};
+    const statusText = call.rated ? "已评价" : call.status === "in-call" ? "会话中" : call.status === "ended" ? "待评价" : "待咨询";
+    const messages = getUserServiceChatMessages(call);
+    const preview = call.status === "ended" && !call.rated ? "客服已结束会话，请评价本次服务" : messages[messages.length - 1]?.text || "点击进入平台客服即时对话";
+    return `<button class="provider-chat-thread user-message-thread ${state.userMe.selectedMessage === PLATFORM_SERVICE_MESSAGE_ID ? "active" : ""}" type="button" data-user-action="user-message-pick" data-user-id="${PLATFORM_SERVICE_MESSAGE_ID}"><div class="provider-chat-thread-head"><strong>平台客服</strong><span>刚刚</span></div><div class="provider-chat-thread-preview">${safe(preview, "点击进入平台客服即时对话")}</div><div class="provider-chat-thread-meta">${tag(statusText)}</div></button>`;
+  }
+
+  function renderUserServiceRatingModal() {
+    const call = state.userServiceCall || {};
+    if (!(call.status === "ended" && !call.rated)) return "";
+    const rating = Number(call.rating || 0);
+    const starButtons = [1, 2, 3, 4, 5].map((score) => `<button class="user-service-rating-star ${rating >= score ? "active" : ""}" type="button" data-user-service-rating="${score}" aria-label="${score}星">${rating >= score ? "★" : "☆"}</button>`).join("");
+    return `<div class="modal visible"><div class="panel modal-card user-service-rating-modal"><div class="eyebrow">Service Rating</div><h3>评价本次客服服务</h3><p class="muted">客服已结束本次即时消息会话，请对服务态度和问题解决情况评分。</p><form class="user-service-rating-form" data-user-service-rating-form><div class="user-service-rating-row">${starButtons}</div><textarea class="input" name="serviceRatingComment" rows="3" placeholder="可以补充客服态度、响应速度或问题解决情况"></textarea><button class="btn btn-primary" type="submit">提交评价</button></form></div></div>`;
+  }
+
+  function renderUserServiceChatPanel() {
+    const call = state.userServiceCall || {};
+    const ended = call.status === "ended";
+    return `<section class="provider-chat-panel user-message-detail"><header class="provider-chat-header"><button class="user-message-back" type="button" data-user-action="user-message-back">返回</button><div><div class="eyebrow">Platform Service</div><h3>平台客服</h3></div>${tag(call.rated ? "已评价" : ended ? "已结束" : "会话中")}</header>${renderUserServiceChatBody(call)}${ended ? `<div class="user-service-ended-tip">${call.rated ? `已评价 ${Number(call.rating || 0)} 星` : "客服已结束本次会话，评价弹窗已打开。"}</div>` : `<form class="provider-chat-composer user-service-chat-composer" data-user-service-chat-form><input class="input" name="serviceChatMessage" type="text" placeholder="输入消息并发送给客服" autocomplete="off" required><button class="btn btn-primary" type="submit">发送</button></form>`}</section>${renderUserServiceRatingModal()}`;
+  }
+
+  function handleUserServiceChatSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const text = form.serviceChatMessage?.value?.trim() || "";
+    if (!text) return;
+    const current = state.userServiceCall || {};
+    const messages = [
+      ...getUserServiceChatMessages(current),
+      { from: "user", text, time: "刚刚" },
+      { from: "agent", text: "收到，我们会根据您提供的信息继续处理。", time: "刚刚" },
+    ];
+    state.userServiceCall = {
+      ...current,
+      status: "in-call",
+      messages,
+      rated: false,
+    };
+    state.userFeedback = "消息已发送。";
+    render();
+  }
+
+  function handleUserServiceRatingSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const rating = Number(state.userServiceCall?.rating || 0);
+    if (!rating) {
+      state.userFeedback = "请先选择客服评分。";
+      render();
+      return;
+    }
+    const comment = form.serviceRatingComment?.value?.trim() || "";
+    state.userServiceCall = {
+      ...state.userServiceCall,
+      rating,
+      comment,
+      rated: true,
+      status: "ended",
+    };
+    const request = readUserServiceRatingRequest();
+    if (request && request.sessionId === state.userServiceCall.sessionId) {
+      window.localStorage.setItem(CUSTOMER_SERVICE_RATING_KEY, JSON.stringify({
+        ...request,
+        rating,
+        comment,
+        rated: true,
+        ratedAt: Date.now(),
+      }));
+    }
+    state.userFeedback = "客服评价已提交。";
+    render();
+  }
+
   function renderUserMessages() {
     const rows = fallback.providerMessages.filter((item) => item.messages.some((message) => message.from === "user" || message.from === "provider" || message.from === "platform"));
     const selected = rows.find((item) => item.id === state.userMe.selectedMessage) || rows[0];
@@ -2502,8 +2612,9 @@
   }
 
   function renderUserForumCreateForm() {
-    const boardOptions = (forumBoards || []).filter((b) => b.status === "启用").map((b) => `<option value="${b.id}">${b.name}</option>`).join("");
-    return `<form class="topic-create-form" data-user-forum-form style="margin:0 16px 16px;"><div class="field-group"><label class="field-label" for="forum-title">帖子标题</label><input class="input" id="forum-title" name="forumTitle" type="text" placeholder="输入帖子标题" required></div><div class="field-group"><label class="field-label" for="forum-board">发布版面</label><select class="input" id="forum-board" name="forumBoard" required><option value="" disabled selected>请选择发布版面</option>${boardOptions || '<option value="" disabled>暂无可用版面</option>'}</select></div><div class="field-group"><label class="field-label">帖子内容</label><div class="rich-editor-shell"><div class="rich-editor-toolbar"><button type="button" data-rich-cmd="bold" title="加粗"><b>B</b></button><button type="button" data-rich-cmd="italic" title="斜体"><i>I</i></button><button type="button" data-rich-cmd="underline" title="下划线"><u>U</u></button><button type="button" data-rich-cmd="formatBlock" data-rich-val="H2" title="小标题">H2</button><button type="button" data-rich-cmd="formatBlock" data-rich-val="BLOCKQUOTE" title="引用">“</button><button type="button" data-rich-cmd="createLink" title="插入链接">🔗</button><button type="button" data-rich-cmd="insertHorizontalRule" title="分隔线">—</button></div><div class="rich-editor-area" id="forumRichEditor" contenteditable="true" data-placeholder="分享你的改装心得..."></div><input type="hidden" name="forumContent" id="forumContentHidden" /></div></div><div class="field-group"><label class="field-label" for="forum-tags">标签</label><input class="input" id="forum-tags" name="forumTags" type="text" placeholder="#轮毂 #排气 #车衣，多个标签用空格分隔"></div><div class="field-group"><label class="field-label" for="forum-media">上传图片或视频</label><label class="upload-panel" for="forum-media"><input id="forum-media" class="upload-input" name="forumMedia" type="file" accept="image/*,video/*" multiple><span class="upload-illustration"></span><strong>上传帖子素材</strong><small>支持上传图片或短视频，最多选择 9 个文件</small></label></div><div class="topic-create-actions"><button class="btn btn-secondary" type="button" data-user-action="user-forum-cancel">取消</button><button class="btn btn-primary" type="submit">发布帖子</button></div></form>`;
+    const draft = state.userForum.drafts.find((d) => d.id === state.userForum.draftId) || null;
+    const boardOptions = (forumBoards || []).filter((b) => b.status === "启用").map((b) => `<option value="${b.id}" ${draft?.board === b.id ? "selected" : ""}>${b.name}</option>`).join("");
+    return `<form class="topic-create-form" data-user-forum-form style="margin:0 16px 16px;"><div class="field-group"><label class="field-label" for="forum-title">帖子标题</label><input class="input" id="forum-title" name="forumTitle" type="text" value="${safe(draft?.title, "")}" placeholder="输入帖子标题" required></div><div class="field-group"><label class="field-label" for="forum-board">发布版面</label><select class="input" id="forum-board" name="forumBoard" required><option value="" disabled ${draft?.board ? "" : "selected"}>请选择发布版面</option>${boardOptions || '<option value="" disabled>暂无可用版面</option>'}</select></div><div class="field-group"><label class="field-label">帖子内容</label><div class="rich-editor-shell"><div class="rich-editor-toolbar"><button type="button" data-rich-cmd="bold" title="加粗"><b>B</b></button><button type="button" data-rich-cmd="italic" title="斜体"><i>I</i></button><button type="button" data-rich-cmd="underline" title="下划线"><u>U</u></button><button type="button" data-rich-cmd="formatBlock" data-rich-val="H2" title="小标题">H2</button><button type="button" data-rich-cmd="formatBlock" data-rich-val="BLOCKQUOTE" title="引用">“</button><button type="button" data-rich-cmd="createLink" title="插入链接">🔗</button><button type="button" data-rich-cmd="insertHorizontalRule" title="分隔线">—</button></div><div class="rich-editor-area" id="forumRichEditor" contenteditable="true" data-placeholder="分享你的改装心得...">${draft?.content || ""}</div><input type="hidden" name="forumContent" id="forumContentHidden" /></div></div><div class="field-group"><label class="field-label" for="forum-tags">标签</label><input class="input" id="forum-tags" name="forumTags" type="text" value="${safe(draft?.tags, "")}" placeholder="#轮毂 #排气 #车衣，多个标签用空格分隔"></div><div class="field-group"><label class="field-label" for="forum-media">上传图片或视频</label><label class="upload-panel" for="forum-media"><input id="forum-media" class="upload-input" name="forumMedia" type="file" accept="image/*,video/*" multiple><span class="upload-illustration"></span><strong>上传帖子素材</strong><small>支持上传图片或短视频，最多选择 9 个文件</small></label></div><div class="topic-create-actions"><button class="btn btn-secondary" type="button" data-user-action="user-forum-cancel">取消</button><button class="btn btn-secondary" type="button" data-user-action="user-forum-draft-save">存草稿</button><button class="btn btn-primary" type="submit">发布帖子</button></div></form>`;
   }
 
   function isUserOwnComment(comment) {
@@ -2522,6 +2633,13 @@
     const editing = state.userForum.editingPostId === item.id;
     const related = comments.filter((comment) => comment.post === item.id && nForum(comment.status) !== "已删除");
     const mine = safe(item.author, "") === "当前用户";
+    const sortedRelated = [...related].sort((a, b) => Number(b.pinned === "置顶") - Number(a.pinned === "置顶"));
+    const renderCommentItem = (comment) => {
+      const isAuthorComment = safe(comment.author, "") === safe(item.author, "");
+      const canDelete = isUserOwnComment(comment) || mine;
+      const replyToName = safe(comment.replyTo, "");
+      return `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(comment.author, "评论用户")}</strong>${isAuthorComment ? `<span class="comment-author-badge">作者</span>` : ""}${comment.pinned === "置顶" ? `<span class="comment-pinned-badge">置顶</span>` : ""}<span class="muted">${safe(comment.time, "刚刚")}</span></div><p>${replyToName ? `<span class="comment-reply-to">回复 @${replyToName}：</span>` : ""}${safe(comment.content, "评论内容")}</p><div class="comment-item-actions"><button class="btn btn-secondary btn-sm" type="button" data-user-action="user-forum-comment-reply" data-user-id="${comment.id}">回复</button>${!isUserOwnComment(comment) ? `<button class="btn btn-secondary btn-sm" type="button" data-user-action="user-forum-comment-report" data-user-id="${comment.id}" ${comment.reportStatus === "待审核" ? "disabled" : ""}>${comment.reportStatus === "待审核" ? "已举报" : "举报"}</button>` : ""}${mine ? `<button class="btn btn-secondary btn-sm" type="button" data-user-action="user-forum-comment-pin" data-user-id="${comment.id}">${comment.pinned === "置顶" ? "取消置顶" : "置顶"}</button>` : ""}${canDelete ? `<button class="btn btn-danger btn-sm user-comment-delete-btn" type="button" data-user-action="user-forum-comment-delete" data-user-id="${comment.id}">删除</button>` : ""}</div></div>`;
+    };
     if (editing) {
       return `<section class="admin-detail-card"><div class="eyebrow">Edit Post</div><h3>编辑帖子</h3>${renderUserForumEditForm(item)}</section>`;
     }
@@ -2533,11 +2651,16 @@
     const collectCount = (item.collects || Math.max(1, Math.round((item.likes || 0) / 4))) + (collected ? 1 : 0);
     const linkedProducts = (item.linkedProducts || []).map((sku) => products.find((p) => p.sku === sku)).filter(Boolean);
     const shareIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v7H4v-7"/><path d="M12 3v13"/><path d="M7 8l5-5 5 5"/></svg>`;
-    return `<section class="admin-detail-card topic-detail-embed"><div class="topic-author-bar"><button class="topic-back-btn" type="button" data-user-action="user-forum-back" aria-label="返回列表">‹</button><div class="topic-author-avatar-wrap"><div class="topic-author-avatar">${authorName.charAt(0)}</div>${mine ? "" : `<button class="topic-avatar-badge ${followed ? "followed" : ""}" type="button" data-user-action="user-forum-follow" data-user-id="${item.id}" aria-label="${followed ? "取消关注" : "关注"}">${followed ? "✓" : "+"}</button>`}</div><span class="topic-author-name">${authorName}</span><div class="topic-author-side"><button class="topic-share-btn" type="button" data-user-action="user-share-sheet-open" data-user-id="${item.id}" data-user-type="forum" aria-label="分享">${shareIcon}</button></div></div><h3>${safe(item.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>版面</span><strong>${safe(boardName, "-")}</strong></div><div><span>发布时间</span><strong>${safe(item.time, "-")}</strong></div><div><span>互动数据</span><strong>回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</strong></div><div><span>状态</span><strong>${nForum(item.status)}</strong></div></div>${item.content ? `<div class="rich-editor-area" style="margin:12px 0; padding:12px 14px; border:1px solid rgba(255,255,255,0.06); border-radius:12px; background:rgba(255,255,255,0.02);">${item.content}</div>` : ""}${linkedProducts.length ? `<div class="admin-comment-block"><strong>关联商品</strong><div class="admin-comment-list">${linkedProducts.map((product) => `<a class="admin-comment-item" style="display:block; text-decoration:none; color:inherit;" href="user-product-detail.html?sku=${encodeURIComponent(product.sku)}&name=${encodeURIComponent(safe(product.name, "商品"))}&price=${encodeURIComponent(safe(product.price, "-"))}&brand=${encodeURIComponent(safe(product.brand, "-"))}&fitment=${encodeURIComponent(safe(product.fitment, "适配车型待补充"))}"><div class="admin-comment-head"><strong>${safe(product.name, "商品")}</strong><span class="muted">${safe(product.price, "-")}</span></div><p>${safe(product.brand, "-")} / ${safe(product.category, "-")} / ${safe(product.fitment, "适配车型待补充")}</p></a>`).join("")}</div></div>` : ""}<div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${related.length ? related.map((comment) => `<div class="admin-comment-item"><div class="admin-comment-head"><strong>${safe(comment.author, "评论用户")}</strong><span class="muted">${safe(comment.time, "刚刚")}</span>${isUserOwnComment(comment) ? `<button class="btn btn-danger btn-sm user-comment-delete-btn" type="button" data-user-action="user-forum-comment-delete" data-user-id="${comment.id}">删除</button>` : ""}</div><p>${safe(comment.content, "评论内容")}</p></div>`).join("") : `<div class="muted">当前暂无评论</div>`}</div></div>${replyOpen ? renderUserForumReplyForm(item) : ""}<div class="topic-action-bar topic-action-bar-inline"><button class="topic-action-input" type="button" data-user-action="${replyOpen ? "user-forum-reply-cancel" : "user-forum-reply"}" data-user-id="${item.id}">✎ ${replyOpen ? "收起回复" : "说点什么..."}</button><button class="topic-action-item ${liked ? "active" : ""}" type="button" data-user-action="user-forum-like" data-user-id="${item.id}"><span class="topic-action-icon">${liked ? "❤" : "♡"}</span><b>${item.likes || 0}</b></button><button class="topic-action-item ${collected ? "active" : ""}" type="button" data-user-action="user-forum-collect" data-user-id="${item.id}"><span class="topic-action-icon">${collected ? "★" : "☆"}</span><b>${collectCount}</b></button><span class="topic-action-item"><span class="topic-action-icon">💬</span><b>${item.replies || 0}</b></span></div>${mine ? `<div class="admin-action-row" style="margin-top:10px;"><button class="btn btn-secondary btn-sm" type="button" data-user-action="user-forum-edit" data-user-id="${item.id}">编辑</button><button class="btn btn-danger btn-sm" type="button" data-user-action="user-forum-delete" data-user-id="${item.id}">删除</button></div>` : ""}</section>`;
+    return `<section class="admin-detail-card topic-detail-embed"><div class="topic-author-bar"><button class="topic-back-btn" type="button" data-user-action="user-forum-back" aria-label="返回列表">‹</button><div class="topic-author-avatar-wrap"><div class="topic-author-avatar">${authorName.charAt(0)}</div>${mine ? "" : `<button class="topic-avatar-badge ${followed ? "followed" : ""}" type="button" data-user-action="user-forum-follow" data-user-id="${item.id}" aria-label="${followed ? "取消关注" : "关注"}">${followed ? "✓" : "+"}</button>`}</div><span class="topic-author-name">${authorName}</span><div class="topic-author-side">${mine ? "" : `<button class="topic-report-btn" type="button" data-user-action="user-forum-report" data-user-id="${item.id}" ${item.reportStatus === "待审核" ? "disabled" : ""}>${item.reportStatus === "待审核" ? "已举报" : "举报"}</button>`}<button class="topic-share-btn" type="button" data-user-action="user-share-sheet-open" data-user-id="${item.id}" data-user-type="forum" aria-label="分享">${shareIcon}</button></div></div><h3>${safe(item.title, "帖子详情")}</h3><div class="admin-kv-list"><div><span>版面</span><strong>${safe(boardName, "-")}</strong></div><div><span>发布时间</span><strong>${safe(item.time, "-")}</strong></div><div><span>互动数据</span><strong>回复 ${item.replies || 0} / 点赞 ${item.likes || 0}</strong></div><div><span>状态</span><strong>${nForum(item.status)}</strong></div></div>${item.content ? `<div class="rich-editor-area" style="margin:12px 0; padding:12px 14px; border:1px solid rgba(255,255,255,0.06); border-radius:12px; background:rgba(255,255,255,0.02);">${item.content}</div>` : ""}${linkedProducts.length ? `<div class="admin-comment-block"><strong>关联商品</strong><div class="admin-comment-list">${linkedProducts.map((product) => `<a class="admin-comment-item" style="display:block; text-decoration:none; color:inherit;" href="user-product-detail.html?sku=${encodeURIComponent(product.sku)}&name=${encodeURIComponent(safe(product.name, "商品"))}&price=${encodeURIComponent(safe(product.price, "-"))}&brand=${encodeURIComponent(safe(product.brand, "-"))}&fitment=${encodeURIComponent(safe(product.fitment, "适配车型待补充"))}"><div class="admin-comment-head"><strong>${safe(product.name, "商品")}</strong><span class="muted">${safe(product.price, "-")}</span></div><p>${safe(product.brand, "-")} / ${safe(product.category, "-")} / ${safe(product.fitment, "适配车型待补充")}</p></a>`).join("")}</div></div>` : ""}<div class="admin-comment-block"><strong>评论区</strong><div class="admin-comment-list">${sortedRelated.length ? sortedRelated.map(renderCommentItem).join("") : `<div class="muted">当前暂无评论</div>`}</div></div>${replyOpen ? renderUserForumReplyForm(item) : ""}<div class="topic-action-bar topic-action-bar-inline"><button class="topic-action-input" type="button" data-user-action="${replyOpen ? "user-forum-reply-cancel" : "user-forum-reply"}" data-user-id="${item.id}">✎ ${replyOpen ? "收起回复" : "说点什么..."}</button><button class="topic-action-item ${liked ? "active" : ""}" type="button" data-user-action="user-forum-like" data-user-id="${item.id}"><span class="topic-action-icon">${liked ? "❤" : "♡"}</span><b>${item.likes || 0}</b></button><button class="topic-action-item ${collected ? "active" : ""}" type="button" data-user-action="user-forum-collect" data-user-id="${item.id}"><span class="topic-action-icon">${collected ? "★" : "☆"}</span><b>${collectCount}</b></button><span class="topic-action-item"><span class="topic-action-icon">💬</span><b>${item.replies || 0}</b></span></div>${mine ? `<div class="admin-action-row" style="margin-top:10px;"><button class="btn btn-secondary btn-sm" type="button" data-user-action="user-forum-edit" data-user-id="${item.id}">编辑</button><button class="btn btn-danger btn-sm" type="button" data-user-action="user-forum-delete" data-user-id="${item.id}">删除</button></div>` : ""}</section>`;
   }
 
   function renderUserForumReplyForm(item) {
-    return `<form class="provider-complete-form" data-user-forum-reply-form data-user-id="${item.id}"><div class="field-group"><label class="field-label" for="forum-reply-${item.id}">回复内容</label><textarea class="textarea" id="forum-reply-${item.id}" name="forumReply" required>这个搭配很顺眼，建议再试试更贴合街道使用场景的胎壁比例。</textarea></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交回复</button><button class="btn btn-secondary" type="button" data-user-action="user-forum-reply-cancel" data-user-id="${item.id}">取消</button></div></form>`;
+    const replyTarget = comments.find((comment) => comment.id === state.userForum.replyTo);
+    const label = replyTarget ? `回复 @${safe(replyTarget.author, "评论用户")}` : "回复内容";
+    const textarea = replyTarget
+      ? `<textarea class="textarea" id="forum-reply-${item.id}" name="forumReply" placeholder="回复 @${safe(replyTarget.author, "评论用户")}..." required></textarea>`
+      : `<textarea class="textarea" id="forum-reply-${item.id}" name="forumReply" required>这个搭配很顺眼，建议再试试更贴合街道使用场景的胎壁比例。</textarea>`;
+    return `<form class="provider-complete-form" data-user-forum-reply-form data-user-id="${item.id}"><div class="field-group"><label class="field-label" for="forum-reply-${item.id}">${label}</label>${textarea}</div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交回复</button><button class="btn btn-secondary" type="button" data-user-action="user-forum-reply-cancel" data-user-id="${item.id}">取消</button></div></form>`;
   }
 
   function renderUserMallDetail(item, active) {
@@ -2617,8 +2740,16 @@
     const type = button.dataset.userType || "";
     if (action === "user-logout") {
       if (typeof window !== "undefined" && window.localStorage) window.localStorage.removeItem(AUTH_STORAGE_KEY);
+      state.userAuthOpen = false;
+      state.userFeedback = "已退出登录，当前为游客模式。";
+      render();
+      return;
+    }
+    if (action === "user-guest-login") {
+      state.userAuthOpen = true;
+      state.userAuthMode = "login";
+      state.userAuthFeedback = "";
       state.userFeedback = "";
-      state.userAuthFeedback = "已退出登录。";
       render();
       return;
     }
@@ -2859,7 +2990,15 @@
     if (action === "user-order-contact") {
       state.tab = "me";
       state.subTab.me = "messages";
-      state.userMe.selectedMessage = fallback.providerMessages.find((item) => item.id === "msg-2")?.id || fallback.providerMessages[0]?.id || "";
+      state.userMe.selectedMessage = PLATFORM_SERVICE_MESSAGE_ID;
+      if (state.userServiceCall.status === "idle") {
+        state.userServiceCall = {
+          ...state.userServiceCall,
+          status: "in-call",
+          messages: getUserServiceChatMessages(state.userServiceCall),
+          rated: false,
+        };
+      }
       render();
       return;
     }
@@ -2898,11 +3037,78 @@
     }
     if (action === "user-message-pick") {
       state.userMe.selectedMessage = id;
+      if (id === PLATFORM_SERVICE_MESSAGE_ID && state.userServiceCall.status === "idle") {
+        state.userServiceCall = {
+          ...state.userServiceCall,
+          status: "in-call",
+          messages: getUserServiceChatMessages(state.userServiceCall),
+          rated: false,
+        };
+      }
       render();
       return;
     }
     if (action === "user-message-back") {
       state.userMe.selectedMessage = "";
+      render();
+      return;
+    }
+    if (action === "user-notices-open") {
+      state.userMe.noticesOpen = true;
+      state.userMe.noticesRead = true;
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-notices-back") {
+      state.userMe.noticesOpen = false;
+      render();
+      return;
+    }
+    if (action === "user-notices-tab") {
+      state.userMe.noticesTab = id;
+      render();
+      return;
+    }
+    if (action === "user-service-call-start") {
+      state.userServiceCall = {
+        ...state.userServiceCall,
+        status: "in-call",
+        rating: 0,
+        comment: "",
+        rated: false,
+        messages: [
+          { from: "agent", text: "您好，我是平台客服，请问需要咨询订单、售后还是商品问题？", time: "刚刚" },
+        ],
+      };
+      state.userFeedback = "已进入平台客服即时消息，会话结束后可以评价本次服务。";
+      render();
+      return;
+    }
+    if (action === "user-service-call-end") {
+      state.userServiceCall = {
+        ...state.userServiceCall,
+        status: "ended",
+        rating: 0,
+        comment: "",
+        rated: false,
+      };
+      state.userFeedback = "客服会话已结束，请对本次客服服务进行评价。";
+      render();
+      return;
+    }
+    if (action === "user-service-call-again") {
+      state.userServiceCall = {
+        ...state.userServiceCall,
+        status: "in-call",
+        rating: 0,
+        comment: "",
+        rated: false,
+        messages: [
+          { from: "agent", text: "您好，我是平台客服，请问需要继续咨询什么问题？", time: "刚刚" },
+        ],
+      };
+      state.userFeedback = "已重新进入平台客服即时消息。";
       render();
       return;
     }
@@ -2938,11 +3144,52 @@
     }
     if (action === "user-forum-create") {
       state.userForum.createOpen = true;
+      state.userForum.draftId = "";
       render();
       return;
     }
     if (action === "user-forum-cancel") {
       state.userForum.createOpen = false;
+      state.userForum.draftId = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-draft-save") {
+      const form = screenEl.querySelector("[data-user-forum-form]");
+      if (!form) return;
+      const title = String(form.querySelector('[name="forumTitle"]')?.value || "").trim();
+      const board = String(form.querySelector('[name="forumBoard"]')?.value || "");
+      const content = String(form.querySelector("#forumRichEditor")?.innerHTML || "").trim();
+      const tags = String(form.querySelector('[name="forumTags"]')?.value || "").trim();
+      if (!title && !content) {
+        state.userFeedback = "先填写标题或内容再保存草稿。";
+        render();
+        return;
+      }
+      const existing = state.userForum.drafts.find((d) => d.id === state.userForum.draftId);
+      if (existing) {
+        Object.assign(existing, { title, board, content, tags, time: "刚刚" });
+      } else {
+        state.userForum.drafts.unshift({ id: `DRAFT-${Date.now().toString().slice(-6)}`, title: title || "（无标题）", board, content, tags, time: "刚刚" });
+      }
+      state.userForum.createOpen = false;
+      state.userForum.draftId = "";
+      state.userForum.category = "mine";
+      state.userForum.mineTab = "drafts";
+      state.userFeedback = "草稿已保存到草稿箱。";
+      render();
+      return;
+    }
+    if (action === "user-forum-draft-open") {
+      state.userForum.draftId = id;
+      state.userForum.createOpen = true;
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-draft-delete") {
+      state.userForum.drafts = state.userForum.drafts.filter((d) => d.id !== id);
+      state.userFeedback = "草稿已删除。";
       render();
       return;
     }
@@ -2985,21 +3232,136 @@
       render();
       return;
     }
+    if (action === "user-forum-mine-view") {
+      state.userForum.mineView = id;
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-mine-tab") {
+      state.userForum.mineTab = id;
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-author-profile") {
+      state.userForum.profileAuthor = id;
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-author-back") {
+      state.userForum.profileAuthor = "";
+      state.userForum.privacyOpen = false;
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-chat-open") {
+      state.userForum.chatWith = id;
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-chat-back") {
+      state.userForum.chatWith = "";
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-privacy-open") {
+      state.userForum.privacyOpen = !state.userForum.privacyOpen;
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-my-privacy-open") {
+      state.userForum.myPrivacyOpen = !state.userForum.myPrivacyOpen;
+      state.userFeedback = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-my-privacy-toggle") {
+      const key = button.dataset.privacyKey || "";
+      if (!key) return;
+      state.userForum.myPrivacy[key] = !state.userForum.myPrivacy[key];
+      const labels = { posts: "帖子", comments: "评论", collections: "收藏", likes: "点赞" };
+      state.userFeedback = `主页「${labels[key] || key}」已设为${state.userForum.myPrivacy[key] ? "公开" : "私密"}。`;
+      render();
+      return;
+    }
+    if (action === "user-forum-privacy-toggle") {
+      const key = button.dataset.privacyKey || "";
+      if (!id || !key) return;
+      const current = state.userForum.privacy[id] || {};
+      current[key] = !current[key];
+      state.userForum.privacy[id] = current;
+      if (key === "blocked" && current.blocked) state.userForum.followed[id] = false;
+      const labels = { hideHis: "不看他", hideMe: "不让他看", blocked: "拉黑" };
+      state.userFeedback = `${labels[key] || "隐私设置"}${current[key] ? "已开启" : "已关闭"}。`;
+      render();
+      return;
+    }
+    if (action === "user-forum-follow-author") {
+      const followed = !getFollowedAuthors().includes(id);
+      state.userForum.followed[id] = followed;
+      state.userFeedback = followed ? `已关注 ${id}。` : `已取消关注 ${id}。`;
+      render();
+      return;
+    }
+    if (action === "user-forum-report") {
+      const target = posts.find((item) => item.id === id);
+      if (!target) return;
+      target.reportStatus = "待审核";
+      state.userFeedback = "已举报该帖子，平台会尽快审核处理。";
+      render();
+      return;
+    }
+    if (action === "user-forum-comment-report") {
+      const target = comments.find((item) => item.id === id);
+      if (!target) return;
+      target.reportStatus = "待审核";
+      state.userFeedback = "已举报该评论，平台会尽快审核处理。";
+      render();
+      return;
+    }
     if (action === "user-forum-reply") {
       state.userForum.replyPostId = id;
+      state.userForum.replyTo = "";
       render();
       return;
     }
     if (action === "user-forum-reply-cancel") {
       state.userForum.replyPostId = "";
+      state.userForum.replyTo = "";
+      render();
+      return;
+    }
+    if (action === "user-forum-comment-reply") {
+      const target = comments.find((item) => item.id === id);
+      if (!target) return;
+      state.userForum.replyPostId = target.post;
+      state.userForum.replyTo = id;
+      render();
+      return;
+    }
+    if (action === "user-forum-comment-pin") {
+      const target = comments.find((item) => item.id === id);
+      if (!target) return;
+      const post = posts.find((item) => item.id === target.post);
+      if (!post || safe(post.author, "") !== "当前用户") return;
+      target.pinned = target.pinned === "置顶" ? "" : "置顶";
+      state.userFeedback = target.pinned === "置顶" ? "评论已置顶。" : "已取消置顶。";
       render();
       return;
     }
     if (action === "user-forum-comment-delete") {
       const target = comments.find((item) => item.id === id);
-      if (!target || !isUserOwnComment(target)) return;
-      target.status = "已删除";
+      if (!target) return;
       const post = posts.find((item) => item.id === target.post);
+      const canManage = post && safe(post.author, "") === "当前用户";
+      if (!isUserOwnComment(target) && !canManage) return;
+      target.status = "已删除";
       if (post) post.replies = Math.max(0, Number(post.replies || 0) - 1);
       state.userFeedback = "评论已删除。";
       render();
@@ -3175,6 +3537,40 @@
     render();
   }
 
+  function getActiveSensitiveWords() {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem("mockSensitiveWords") || "null");
+      if (Array.isArray(stored) && stored.length) {
+        return stored.filter((item) => item && item.enabled !== false).map((item) => (typeof item === "string" ? item : item.word)).filter(Boolean);
+      }
+    } catch (error) {}
+    return window.MockData.sensitiveWords || ["加微信", "私下交易", "低价代购"];
+  }
+
+  function findSensitiveWord(text) {
+    const haystack = String(text || "").toLowerCase();
+    return getActiveSensitiveWords().find((word) => word && haystack.includes(String(word).toLowerCase())) || "";
+  }
+
+  function showFormError(form, message) {
+    let tip = form.querySelector(".form-error-tip");
+    if (!tip) {
+      tip = document.createElement("div");
+      tip.className = "form-error-tip";
+      tip.style.cssText = "color:#ff5b5b; font-size:12px; margin-top:8px;";
+      form.appendChild(tip);
+    }
+    tip.textContent = message;
+  }
+
+  function handleAdminSensitiveSubmit(event) {
+    event.preventDefault();
+    const word = String(new FormData(event.currentTarget).get("sensitiveWord") || "").trim();
+    if (!word) return;
+    if (!state.adminSensitiveWords.includes(word)) state.adminSensitiveWords.push(word);
+    render();
+  }
+
   function handleUserForumSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -3190,6 +3586,11 @@
     const boardId = String(formData.get("forumBoard") || "").trim();
     const board = (forumBoards || []).find((b) => b.id === boardId);
     if (!title || !content || !board) return;
+    const hitWord = findSensitiveWord(`${title} ${content} ${rawTags}`);
+    if (hitWord) {
+      showFormError(form, `内容包含敏感词「${hitWord}」，请修改后再发布。`);
+      return;
+    }
     const id = `POST-${Date.now().toString().slice(-6)}`;
     const linkedProducts = productUrl ? [productUrl] : [];
     const metaParts = [board.name];
@@ -3210,7 +3611,38 @@
     });
     state.userForum.selectedPost = id;
     state.userForum.createOpen = false;
+    if (state.userForum.draftId) {
+      state.userForum.drafts = state.userForum.drafts.filter((d) => d.id !== state.userForum.draftId);
+      state.userForum.draftId = "";
+    }
     state.userFeedback = mediaCount ? `${title} 已发布，并上传 ${mediaCount} 个图片或视频文件。` : `${title} 已发布。`;
+    render();
+  }
+
+  function handleForumChatSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const name = form.dataset.userId || "";
+    if (!name) return;
+    const text = String(new FormData(form).get("forumChatMessage") || "").trim();
+    if (!text) return;
+    const chat = state.userForum.chats[name] || [];
+    const mutual = isForumMutualFollow(name);
+    const myCount = chat.filter((m) => m.from === "me").length;
+    const theyReplied = chat.some((m) => m.from === "them");
+    if (!mutual && myCount >= 1 && !theyReplied) {
+      state.userFeedback = "未互相关注，仅可发送一条打招呼消息，对方回复后可继续聊天。";
+      render();
+      return;
+    }
+    chat.push({ from: "me", text, time: "刚刚" });
+    state.userForum.chats[name] = chat;
+    if (!theyReplied) {
+      window.setTimeout(() => {
+        chat.push({ from: "them", text: "你好呀，谢谢你的消息～", time: "刚刚" });
+        render();
+      }, 800);
+    }
     render();
   }
 
@@ -3222,6 +3654,12 @@
     if (!target) return;
     const text = String(new FormData(form).get("forumReply") || "").trim();
     if (!text) return;
+    const hitReplyWord = findSensitiveWord(text);
+    if (hitReplyWord) {
+      showFormError(form, `评论包含敏感词「${hitReplyWord}」，请修改后再发布。`);
+      return;
+    }
+    const replyTarget = comments.find((comment) => comment.id === state.userForum.replyTo);
     comments.unshift({
       id: `COMMENT-${Date.now().toString().slice(-6)}`,
       post: id,
@@ -3229,10 +3667,12 @@
       owner: "current",
       time: "刚刚",
       content: text,
+      replyTo: replyTarget ? safe(replyTarget.author, "") : "",
       status: "正常",
     });
     target.replies = (target.replies || 0) + 1;
     state.userForum.replyPostId = "";
+    state.userForum.replyTo = "";
     state.userFeedback = `${safe(target.title, "帖子")} 已回复。`;
     render();
   }
@@ -3246,6 +3686,11 @@
     const title = String(new FormData(form).get("forumEditTitle") || "").trim();
     const content = String(new FormData(form).get("forumEditContent") || "").trim();
     if (!title || !content) return;
+    const hitEditWord = findSensitiveWord(`${title} ${content}`);
+    if (hitEditWord) {
+      showFormError(form, `内容包含敏感词「${hitEditWord}」，请修改后再保存。`);
+      return;
+    }
     target.title = title;
     target.content = content;
     target.preview = content.slice(0, 80);
@@ -3335,6 +3780,29 @@
     if (nameEl) nameEl.textContent = fileName;
   }
 
+  function ensureUserProfileInviteField() {
+    const form = screenEl.querySelector("[data-user-profile-form]");
+    if (!form || form.querySelector('[name="profileInviteCode"]')) return;
+    const profile = getMockUserAuth() || {};
+    const inviteCode = String(profile.inviteCode || "").trim();
+    const field = document.createElement("label");
+    const title = document.createElement("span");
+    const input = document.createElement("input");
+    const hint = document.createElement("small");
+    title.textContent = "推荐码";
+    input.className = "input";
+    input.name = "profileInviteCode";
+    input.type = "text";
+    input.value = inviteCode;
+    input.placeholder = "请输入推荐码";
+    input.readOnly = Boolean(inviteCode);
+    hint.textContent = inviteCode ? "推荐码已填写，不可修改或删除。" : "推荐码填写后不可修改或删除。";
+    field.append(title, input, hint);
+    const passwordField = form.querySelector('input[name="profilePassword"]')?.closest("label");
+    if (passwordField) passwordField.before(field);
+    else form.append(field);
+  }
+
   async function handleUserProfileSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -3342,7 +3810,18 @@
     const current = getMockUserAuth() || {};
     const nickname = String(formData.get("profileNickname") || "").trim();
     const phone = String(formData.get("profilePhone") || "").trim();
+    const currentInviteCode = String(current.inviteCode || "").trim();
+    const enteredInviteCode = String(formData.get("profileInviteCode") || "").trim();
+    const inviteCode = currentInviteCode || enteredInviteCode;
     if (!nickname || !phone) return;
+    const invite = !currentInviteCode && inviteCode
+      ? (window.MockData.providerInvites || []).find((item) => item.code === inviteCode)
+      : null;
+    if (!currentInviteCode && inviteCode && !invite) {
+      state.userFeedback = "推荐码无效，请确认后再保存。";
+      render();
+      return;
+    }
     const avatarFile = form.querySelector('input[name="profileAvatar"]')?.files?.[0] || null;
     const uploadedAvatar = await readUserAvatarFile(avatarFile);
     const avatarUrl = formData.get("profileAvatarReset") === "on" ? "" : (uploadedAvatar || current.avatarUrl || "");
@@ -3352,7 +3831,8 @@
       nickname,
       phone,
       avatarUrl,
-      inviteProviderName: String(formData.get("profileInviteProviderName") || "").trim() || "自然流量",
+      inviteCode,
+      inviteProviderName: currentInviteCode ? (current.inviteProviderName || "自然流量") : (invite?.providerName || "自然流量"),
       updatedAt: getNowStamp(),
     });
     state.subTab.me = "profile";
@@ -3589,7 +4069,8 @@
       <div><span>寄回物流</span><strong>${item.returnShippingNo ? `${safe(item.returnShippingCompany, "物流")} ${safe(item.returnShippingNo, "-")}` : "待填写"}</strong></div>
       <div><span>换货物流</span><strong>${item.exchangeShippingNo ? `${safe(item.exchangeShippingCompany, "物流")} ${safe(item.exchangeShippingNo, "-")}` : "待商家发货"}</strong></div>
     ` : "";
-    return `<section class="provider-complete-form"><div class="eyebrow">After Sale</div><h3>售后进度</h3><div class="admin-kv-list"><div><span>售后类型</span><strong>${safe(item.afterSaleType, "-")}</strong></div><div><span>处理方式</span><strong>${safe(method, "待平台审核")}</strong></div><div><span>当前进度</span><strong>${stage}</strong></div><div><span>申请时间</span><strong>${safe(item.afterSaleTime, "-")}</strong></div>${refundRows}${exchangeRows}<div><span>问题描述</span><strong>${safe(item.afterSaleReason, "-")}</strong></div></div>${renderUserAfterSaleNextAction(item)}<div class="admin-timeline">${getOrderTimeline(item).filter((line) => String(line).includes("售后") || String(line).includes("退款") || String(line).includes("换货") || String(line).includes("物流") || String(line).includes("寄回")).slice(0, 6).map((line) => `<div>${line}</div>`).join("") || `<div>售后申请已提交，等待平台处理。</div>`}</div></section>`;
+    const mediaRow = Array.isArray(item.afterSaleMedia) && item.afterSaleMedia.length ? `<div><span>凭证资料</span><strong>${item.afterSaleMedia.length} 个图片/视频</strong></div>` : "";
+    return `<section class="provider-complete-form"><div class="eyebrow">After Sale</div><h3>售后进度</h3><div class="admin-kv-list"><div><span>售后类型</span><strong>${safe(item.afterSaleType, "-")}</strong></div><div><span>处理方式</span><strong>${safe(method, "待平台审核")}</strong></div><div><span>当前进度</span><strong>${stage}</strong></div><div><span>申请时间</span><strong>${safe(item.afterSaleTime, "-")}</strong></div>${refundRows}${exchangeRows}<div><span>问题描述</span><strong>${safe(item.afterSaleReason, "-")}</strong></div>${mediaRow}</div>${renderUserAfterSaleNextAction(item)}<div class="admin-timeline">${getOrderTimeline(item).filter((line) => String(line).includes("售后") || String(line).includes("退款") || String(line).includes("换货") || String(line).includes("物流") || String(line).includes("寄回")).slice(0, 6).map((line) => `<div>${line}</div>`).join("") || `<div>售后申请已提交，等待平台处理。</div>`}</div></section>`;
   }
 
   function renderUserAfterSaleNextAction(item) {
@@ -3629,7 +4110,51 @@
 
   function renderUserAfterSaleForm(item) {
     const types = ["退款", "换货"];
-    return `<form class="provider-complete-form" data-user-after-sale-form data-order-id="${item.id}"><div class="form-grid"><div class="field-group"><label class="field-label">售后类型</label><select class="input" name="afterSaleType" required>${types.map((t) => `<option value="${t}">${t}</option>`).join("")}</select></div><div class="field-group"><label class="field-label">问题描述</label><textarea class="textarea" name="afterSaleReason" placeholder="请简述售后原因" required>商品存在问题，申请平台售后处理。</textarea></div></div><div class="admin-action-row"><button class="btn btn-primary" type="submit">提交申请</button><button class="btn btn-secondary" type="button" data-user-action="user-after-sale-cancel" data-user-id="${item.id}">取消</button></div></form>`;
+    const commonIssues = ["商品破损或有划痕", "商品与描述不符", "少件或漏发", "尺寸或适配不合适", "安装后出现异常", "物流运输问题", "其他问题"];
+    return `<form class="provider-complete-form" data-user-after-sale-form data-order-id="${item.id}">
+      <div class="form-grid">
+        <div class="field-group"><label class="field-label">售后类型</label><select class="input" name="afterSaleType" required>${types.map((t) => `<option value="${t}">${t}</option>`).join("")}</select></div>
+        <div class="field-group"><label class="field-label">常见问题</label><select class="input" name="afterSaleIssue"><option value="">请选择问题类型</option>${commonIssues.map((issue) => `<option value="${issue}">${issue}</option>`).join("")}</select></div>
+        <div class="field-group field-group-full"><label class="field-label">问题描述</label><textarea class="textarea" name="afterSaleReason" placeholder="可补充具体问题、发生时间和处理诉求"></textarea><small class="form-help">可以直接选择常见问题，也可以在这里自行填写。</small></div>
+        <div class="field-group field-group-full"><label class="field-label">上传凭证</label><label class="upload-panel after-sale-upload-panel" for="after-sale-media-${item.id}"><input id="after-sale-media-${item.id}" class="upload-input" type="file" accept="image/*,video/*" multiple data-user-after-sale-media data-order-id="${item.id}"><span class="upload-illustration" style="height:54px;"></span><strong>上传图片或视频</strong><small>最多上传 9 个文件，支持问题照片、安装效果或故障视频</small></label><div class="after-sale-media-preview" data-after-sale-preview="${item.id}"></div></div>
+      </div>
+      <div class="admin-action-row"><button class="btn btn-primary" type="submit">提交申请</button><button class="btn btn-secondary" type="button" data-user-action="user-after-sale-cancel" data-user-id="${item.id}">取消</button></div>
+    </form>`;
+  }
+
+  function renderAfterSaleMediaPreview(previewEl, media) {
+    if (!previewEl) return;
+    previewEl.dataset.media = JSON.stringify(media);
+    previewEl.innerHTML = media.map((item, index) => `
+      <div class="after-sale-media-item">
+        ${item.type === "video" ? `<video src="${item.url}" muted playsinline></video><span class="after-sale-media-type">视频</span>` : `<img src="${item.url}" alt="售后凭证">`}
+        <button type="button" class="after-sale-media-remove" data-after-sale-media-remove="${index}" title="删除">×</button>
+      </div>
+    `).join("");
+    previewEl.querySelectorAll("[data-after-sale-media-remove]").forEach((button) => button.addEventListener("click", () => {
+      const index = Number(button.dataset.afterSaleMediaRemove);
+      const nextMedia = JSON.parse(previewEl.dataset.media || "[]");
+      const removed = nextMedia.splice(index, 1)[0];
+      if (removed?.url?.startsWith("blob:")) URL.revokeObjectURL(removed.url);
+      renderAfterSaleMediaPreview(previewEl, nextMedia);
+    }));
+  }
+
+  function handleUserAfterSaleMediaChange(event) {
+    const input = event.currentTarget;
+    const orderId = input.dataset.orderId || "";
+    const previewEl = screenEl.querySelector(`[data-after-sale-preview="${orderId}"]`);
+    if (!previewEl) return;
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    const existing = JSON.parse(previewEl.dataset.media || "[]");
+    const newMedia = files.map((file) => ({
+      type: file.type.startsWith("video/") ? "video" : "image",
+      url: URL.createObjectURL(file),
+      name: file.name,
+    }));
+    renderAfterSaleMediaPreview(previewEl, [...existing, ...newMedia].slice(0, 9));
+    input.value = "";
   }
 
   function handleUserAfterSaleSubmit(event) {
@@ -3640,8 +4165,12 @@
     if (!target) return;
     const formData = new FormData(form);
     const afterSaleType = String(formData.get("afterSaleType") || "").trim();
-    const afterSaleReason = String(formData.get("afterSaleReason") || "").trim();
+    const commonIssue = String(formData.get("afterSaleIssue") || "").trim();
+    const customReason = String(formData.get("afterSaleReason") || "").trim();
+    const afterSaleReason = [commonIssue, customReason].filter(Boolean).join("：");
     if (!afterSaleType || !afterSaleReason) return;
+    const previewEl = screenEl.querySelector(`[data-after-sale-preview="${orderId}"]`);
+    const media = previewEl ? JSON.parse(previewEl.dataset.media || "[]") : [];
     target.status = "售后中";
     target.afterSaleType = afterSaleType;
     target.afterSaleReason = afterSaleReason;
@@ -3649,6 +4178,7 @@
     target.afterSaleStep = "待平台审核";
     target.afterSaleMethod = String(afterSaleType).includes("换货") ? "换货" : "退款";
     target.afterSaleTime = getNowStamp();
+    target.afterSaleMedia = media.map(({ name, type }) => ({ name, type }));
     appendOrderTimeline(target, `用户提交售后申请：${afterSaleType}`);
     persistUserOrderState(target);
     state.userMe.afterSaleOrderId = "";
@@ -3764,6 +4294,7 @@
         });
       });
     }
+    bindForumCardLongPress();
     bindRemove();
   }
 
@@ -3844,6 +4375,8 @@
     state.userForum.category = "all";
     state.userForum.selectedPost = "";
     state.userForum.createOpen = false;
+    state.userForum.mineView = "";
+    state.userForum.profileAuthor = "";
     render();
   }
 
@@ -3944,6 +4477,9 @@
   function renderUserMe() {
     const active = state.subTab.me || "profile";
     const profile = getMockUserAuth() || {};
+    if (!getMockUserAuth()) {
+      return `<div class="user-me-page user-me-page-light"><header class="user-me-top"><strong>个人中心</strong></header>${state.userFeedback ? `<div class="provider-feedback user-me-feedback">${state.userFeedback}</div>` : ""}${renderUserProfile()}</div>`;
+    }
     const titleMap = {
       profile: "个人中心",
       orders: "我的订单",
@@ -3973,9 +4509,8 @@
   }
 
   function renderUserMeProfileHero(profile = getMockUserAuth() || {}) {
-    const availableLimit = safe(window.MockData.creditInfo?.availableLimit, "¥ 80,000");
     const userId = getUserDisplayId(profile);
-    return `<a class="user-me-red-hero compact user-me-profile-entry" href="user-app.html?tab=me&meTab=profileDetail" aria-label="编辑个人信息">${renderUserPortrait(profile)}<div class="user-me-red-copy"><div class="user-me-name-stack"><strong>${safe(profile.nickname, "未设置昵称")}</strong><small>用户ID ${userId}</small></div><span class="user-me-credit-limit">可用额度 ${availableLimit}</span></div><b>›</b></a>`;
+    return `<a class="user-me-red-hero compact user-me-profile-entry" href="user-app.html?tab=me&meTab=profileDetail" aria-label="编辑个人信息">${renderUserPortrait(profile)}<div class="user-me-red-copy"><div class="user-me-name-stack"><strong>${safe(profile.nickname, "未设置昵称")}</strong><small>用户ID ${userId}</small></div></div><b>›</b></a>`;
   }
 
   function getUserDisplayId(profile = getMockUserAuth() || {}) {
@@ -3985,28 +4520,25 @@
 
   function renderUserProfile() {
     const profile = getMockUserAuth() || {};
-    const socialStats = { following: 3, postCollections: 6, followers: 128 };
-    const pointRows = getUserPointRows();
-    const pointTotal = getUserPointTotal(pointRows);
-    const checkedIn = hasUserCheckedInToday(pointRows);
+    const isGuest = !getMockUserAuth();
     const orderRows = [
-      { label: "待付款", value: "0", tone: "pay" },
-      { label: "待发货", value: String(getUserOrders().filter((item) => nOrder(item.status).includes("待发货")).length), tone: "box" },
+      { label: "待付款", value: String(isGuest ? 0 : getUserOrders().filter((item) => nOrder(item.status).includes("待付款") || String(item.payment || "").includes("待支付")).length), tone: "pay" },
+      { label: "待发货", value: String(isGuest ? 0 : getUserOrders().filter((item) => nOrder(item.status).includes("待发货")).length), tone: "box" },
       { label: "待收货", value: "0", tone: "truck" },
-      { label: "待评价", value: String(getUserOrders().filter((item) => nOrder(item.status).includes("待验收")).length), tone: "card" },
+      { label: "待评价", value: String(isGuest ? 0 : getUserOrders().filter((item) => nOrder(item.status).includes("待验收")).length), tone: "card" },
       { label: "售后", value: "0", tone: "refund" },
     ];
     const menuRows = [
-      { label: "积分管理", sub: "points", icon: "✦" },
       { label: "我的收藏", sub: "collections", icon: "☆" },
       { label: "电子凭证", sub: "invoices", icon: "▭" },
       { label: "我的购物车", sub: "cart", icon: "□" },
-      { label: "金融授信", sub: "credit", icon: "¥" },
+      { label: "敬请期待", sub: "credit", icon: "¥" },
       { label: "收货地址", sub: "address", icon: "⌖" },
       { label: "优惠券管理", sub: "coupons", icon: "🎫" },
-      { label: "退出登录", action: "user-logout", icon: "↧" },
+      isGuest ? { label: "去登录", action: "user-guest-login", icon: "↥" } : { label: "退出登录", action: "user-logout", icon: "↧" },
     ];
-    return `<div class="user-me-light-home">${renderUserMeProfileHero(profile)}<section class="user-me-red-metrics"><button type="button" data-sub-tab="following"><strong>${socialStats.following}</strong><span>关注</span></button><button type="button" data-sub-tab="postCollections"><strong>${socialStats.postCollections}</strong><span>收藏</span></button><button type="button" data-sub-tab="followers"><strong>${socialStats.followers}</strong><span>粉丝</span></button></section><section class="user-me-white-block"><div style="display:flex; justify-content:space-between; align-items:center; padding:16px 0;"><div><span style="color:var(--text-muted); font-size:13px;">当前积分</span><strong style="display:block; font-size:28px; font-weight:500; color:var(--text);">${pointTotal.toLocaleString("zh-CN")}</strong></div><button class="btn btn-primary" type="button" data-user-action="user-points-checkin" ${checkedIn ? "disabled" : ""} style="min-height:38px; padding:0 14px; font-size:13px; border-radius:20px;">${checkedIn ? "今日已签到" : "每日签到 +10"}</button></div></section><section class="user-me-white-block"><div class="user-me-block-head"><strong>我的订单</strong><button type="button" data-sub-tab="orders">全部订单</button></div><div class="user-me-order-icons">${orderRows.map((item) => `<button type="button" data-sub-tab="orders"><i data-tone="${item.tone}">${item.value}</i><span>${item.label}</span></button>`).join("")}</div></section><section class="user-me-menu-grid">${menuRows.map((item) => item.action ? `<button class="user-me-menu-tile" type="button" data-user-action="${item.action}"><i>${item.icon}</i><span>${item.label}</span></button>` : `<button class="user-me-menu-tile" type="button" data-sub-tab="${item.sub}"><i>${item.icon}</i><span>${item.label}</span></button>`).join("")}</section></div>`;
+    const guestHero = `<section class="user-me-red-hero compact"><div class="user-me-portrait">游</div><div class="user-me-red-copy"><div class="user-me-name-stack"><strong>游客452788</strong><small>用户ID G-452788</small></div></div></section>`;
+    return `<div class="user-me-light-home">${isGuest ? guestHero : renderUserMeProfileHero(profile)}<section class="user-me-white-block"><div class="user-me-block-head"><strong>我的订单</strong><button type="button" data-sub-tab="orders">全部订单</button></div><div class="user-me-order-icons">${orderRows.map((item) => `<button type="button" data-sub-tab="orders"><i data-tone="${item.tone}">${item.value}</i><span>${item.label}</span></button>`).join("")}</div></section><section class="user-me-menu-grid">${menuRows.map((item) => item.action ? `<button class="user-me-menu-tile" type="button" data-user-action="${item.action}"><i>${item.icon}</i><span>${item.label}</span></button>` : `<button class="user-me-menu-tile" type="button" data-sub-tab="${item.sub}"><i>${item.icon}</i><span>${item.label}</span></button>`).join("")}</section></div>`;
   }
 
   function renderUserProfileDetail() {
@@ -4064,19 +4596,155 @@
     return `<div class="user-me-light-subpage"><section class="user-me-white-block"><div class="user-me-block-head"><strong>发票申请</strong><span>${invoiceRows.length} 条记录</span></div><form class="user-me-form light" data-user-invoice-form><label><span>选择订单</span><select class="input" name="orderId" required>${orderRows.map((item) => `<option value="${item.id}">${item.id} / ${safe(item.service, "订单")} / ${safe(item.quote, "-")}</option>`).join("")}</select></label><div class="user-me-form-row"><label><span>发票类型</span><select class="input" name="invoiceType"><option value="普票">普票</option><option value="专票">专票</option></select></label><label><span>发票抬头</span><input class="input" name="title" type="text" value="${safe(getMockUserAuth()?.nickname, "顾铭")}" required></label></div><label><span>税号</span><input class="input" name="taxNo" type="text" placeholder="专票必填"></label><label><span>接收邮箱</span><input class="input" name="email" type="email" value="user@example.com" required></label><label><span>联系电话</span><input class="input" name="phone" type="tel" value="${safe(getMockUserAuth()?.phone, "13800138000")}" required></label><label><span>注册地址</span><input class="input" name="address" type="text" value="${getUserDefaultAddress()}" required></label><label><span>开户行</span><input class="input" name="bankName" type="text" placeholder="专票填写开户行"></label><label><span>账号</span><input class="input" name="bankAccount" type="text" placeholder="专票填写账号"></label><button class="btn btn-primary user-me-full-btn" type="submit">提交申请</button></form></section><section class="user-me-white-block"><div class="user-me-block-head"><strong>申请记录</strong><span>${invoiceRows.length}</span></div><div class="user-me-record-list light">${invoiceRows.map((item) => renderInvoiceRecordRow(item)).join("") || `<article><div><strong>暂无发票申请</strong><span>提交后会保存在当前浏览器。</span></div></article>`}</div></section></div>`;
   }
 
+  const forumAuthorFans = { "满改官方": 128000, "御驰 Performance Studio": 5600, "Carbon_King": 1204, "Night_Owl": 857, "Turbo_Tom": 433, "陆川": 326, "当前用户": 128 };
+  const forumFollowers = [
+    { name: "陆川" },
+    { name: "Carbon_King" },
+    { name: "Night_Owl" },
+    { name: "Turbo_Tom" },
+  ];
+
+  function getFollowedAuthors() {
+    const seeds = ["满改官方", "御驰 Performance Studio", "Carbon_King", "Night_Owl"].filter((name) => state.userForum.followed[name] !== false);
+    const extra = Object.keys(state.userForum.followed).filter((name) => state.userForum.followed[name] === true);
+    return [...new Set([...seeds, ...extra])];
+  }
+
+  function renderForumAuthorRow(name, actionLabel) {
+    const followed = getFollowedAuthors().includes(name);
+    return `<div class="admin-comment-item" style="display:flex; align-items:center; gap:10px;"><div class="topic-author-avatar" style="width:32px; height:32px; font-size:13px;">${safe(name, "用").charAt(0)}</div><button class="btn btn-secondary btn-sm" style="flex:1; justify-content:flex-start;" type="button" data-user-action="user-forum-author-profile" data-user-id="${safe(name, "")}">${safe(name, "用户")}</button><button class="btn ${followed ? "btn-secondary" : "btn-primary"} btn-sm" type="button" data-user-action="user-forum-follow-author" data-user-id="${safe(name, "")}">${followed ? "已关注" : actionLabel}</button></div>`;
+  }
+
+  function renderForumPostList(rows, emptyText) {
+    return rows.length ? rows.map((p) => `<button class="admin-comment-item" style="display:block; width:100%; text-align:left;" type="button" data-user-action="user-forum-pick" data-user-id="${p.id}"><div class="admin-comment-head"><strong>${safe(p.title, "帖子")}</strong></div><p class="muted">回复 ${p.replies || 0} / 点赞 ${p.likes || 0} · ${safe(p.time, "")}</p></button>`).join("") : `<div class="muted">${emptyText}</div>`;
+  }
+
+  function renderUserForumMine(navTabs) {
+    const view = state.userForum.mineView || "";
+    const followedAuthors = getFollowedAuthors();
+    const collectedPosts = Object.keys(state.userForum.collected).filter((id) => state.userForum.collected[id]).map((id) => posts.find((p) => p.id === id)).filter(Boolean);
+    const feedbackHtml = state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : "";
+    const navHtml = `<section class="forum-home-nav">${navTabs.map((item) => `<button class="${item.id === "mine" ? "active" : ""}" type="button" data-user-action="user-forum-category" data-user-id="${item.id}">${item.label}</button>`).join("")}</section>`;
+    const subHead = (title) => `<div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><button class="topic-back-btn" type="button" data-user-action="user-forum-mine-view" data-user-id="" aria-label="返回">‹</button><strong style="font-size:16px;">${title}</strong></div>`;
+    if (view === "following") {
+      return `<div class="forum-home-feed">${feedbackHtml}${subHead("我的关注")}<section class="admin-comment-block"><div class="admin-comment-list">${followedAuthors.length ? followedAuthors.map((name) => renderForumAuthorRow(name, "关注")).join("") : `<div class="muted">还没有关注任何用户</div>`}</div></section></div>`;
+    }
+    if (view === "followers") {
+      return `<div class="forum-home-feed">${feedbackHtml}${subHead("我的粉丝")}<section class="admin-comment-block"><div class="admin-comment-list">${forumFollowers.map((item) => renderForumAuthorRow(item.name, "回关")).join("")}</div></section></div>`;
+    }
+    const myPosts = posts.filter((p) => safe(p.author, "") === "当前用户");
+    const myComments = comments.filter((c) => isUserOwnComment(c) && nForum(c.status) !== "已删除");
+    const likedPosts = Object.keys(state.userForum.liked).filter((id) => state.userForum.liked[id]).map((id) => posts.find((p) => p.id === id)).filter(Boolean);
+    const likeAndCollectCount = myPosts.reduce((sum, p) => sum + (p.likes || 0), 0) + collectedPosts.length;
+    const mineTab = state.userForum.mineTab || "posts";
+    const mineTabs = [
+      { id: "posts", label: "帖子" },
+      { id: "comments", label: "评论" },
+      { id: "collections", label: "收藏" },
+      { id: "likes", label: "点赞" },
+      { id: "drafts", label: "草稿" },
+    ];
+    const statBtn = (viewId, count, label) => `<button style="display:grid; gap:4px; justify-items:center; background:none; border:0; color:inherit; cursor:pointer; font:inherit;" type="button" data-user-action="user-forum-mine-view" data-user-id="${viewId}"><strong style="font-size:17px;">${count}</strong><span class="muted" style="font-size:12px;">${label}</span></button>`;
+    const statText = (count, label) => `<div style="display:grid; gap:4px; justify-items:center;"><strong style="font-size:17px;">${count}</strong><span class="muted" style="font-size:12px;">${label}</span></div>`;
+    const myPrivacyLabels = { posts: "帖子", comments: "评论", collections: "收藏", likes: "点赞" };
+    const myPrivacyRow = (key, desc) => `<div style="display:flex; align-items:center; gap:12px; padding:12px 0;"><div style="flex:1; min-width:0;"><strong style="font-size:14px;">${myPrivacyLabels[key]}</strong><div class="muted" style="font-size:11px; margin-top:3px;">${desc}</div></div><button class="sw-switch ${state.userForum.myPrivacy[key] ? "on" : ""}" type="button" data-user-action="user-forum-my-privacy-toggle" data-privacy-key="${key}" aria-label="${myPrivacyLabels[key]}"></button></div>`;
+    const myPrivacyPanel = state.userForum.myPrivacyOpen ? `<section class="admin-detail-card"><strong style="font-size:15px;">主页隐私设置</strong><div class="muted" style="font-size:11px; margin-top:4px;">控制其他用户访问你的主页时，哪些内容可见</div><div style="margin-top:4px;">${[myPrivacyRow("posts", "他人可查看你发布的帖子"), myPrivacyRow("comments", "他人可查看你发表的评论"), myPrivacyRow("collections", "他人可查看你收藏的帖子"), myPrivacyRow("likes", "他人可查看你点赞过的内容")].join(`<div style="border-top:1px solid rgba(255,255,255,0.05);"></div>`)}</div></section>` : "";
+    const commentRows = myComments.map((c) => {
+      const post = posts.find((p) => p.id === c.post);
+      return `<button class="admin-comment-item" style="display:block; width:100%; text-align:left;" type="button" data-user-action="user-forum-pick" data-user-id="${c.post}"><p>${safe(c.content, "评论内容")}</p><div class="muted" style="margin-top:6px; font-size:12px;">评论于《${safe(post?.title, c.post)}》 · ${safe(c.time, "")}</div></button>`;
+    }).join("");
+    let tabBody = "";
+    if (mineTab === "posts") tabBody = renderForumPostList(myPosts, "还没有发布帖子，点右下角 ＋ 发布第一条");
+    if (mineTab === "comments") tabBody = commentRows || `<div class="muted">还没有评论过任何帖子</div>`;
+    if (mineTab === "collections") tabBody = renderForumPostList(collectedPosts, "还没有收藏帖子，在帖子详情页点 ☆ 即可收藏");
+    if (mineTab === "likes") tabBody = renderForumPostList(likedPosts, "还没有点赞过帖子，在帖子详情页点 ♡ 即可点赞");
+    if (mineTab === "drafts") {
+      tabBody = state.userForum.drafts.length ? state.userForum.drafts.map((d) => {
+        const boardName = (forumBoards || []).find((b) => b.id === d.board)?.name || "未选择版面";
+        return `<div class="admin-comment-item" style="display:flex; align-items:center; gap:10px;"><button style="flex:1; text-align:left; background:none; border:0; color:inherit; font:inherit; cursor:pointer; padding:0;" type="button" data-user-action="user-forum-draft-open" data-user-id="${d.id}"><strong>${safe(d.title, "（无标题）")}</strong><div class="muted" style="margin-top:4px; font-size:12px;">${safe(boardName, "-")} · ${safe(d.time, "")}</div></button><button class="btn btn-danger btn-sm" type="button" data-user-action="user-forum-draft-delete" data-user-id="${d.id}">删除</button></div>`;
+      }).join("") : `<div class="muted">草稿箱是空的，发帖时点「存草稿」即可保存</div>`;
+    }
+    return `<div class="forum-home-feed">${navHtml}${feedbackHtml}<section class="admin-detail-card"><div style="display:flex; align-items:center; gap:12px;"><div class="topic-author-avatar" style="width:56px; height:56px; font-size:20px; flex-shrink:0;">当</div><div style="flex:1; min-width:0;"><strong style="display:block; font-size:17px;">当前用户</strong><span class="muted" style="font-size:12px;">满改号：U-20311</span></div></div><div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); text-align:center; margin-top:16px;">${statBtn("following", followedAuthors.length, "关注")}${statBtn("followers", forumFollowers.length, "粉丝")}${statText(likeAndCollectCount, "获赞与收藏")}</div><div style="display:flex; gap:8px; margin-top:14px;"><button class="btn btn-secondary btn-sm" style="flex:1; justify-content:center;" type="button" data-user-action="user-forum-author-profile" data-user-id="当前用户">主页预览</button><button class="btn btn-secondary btn-sm" style="flex:1; justify-content:center;" type="button" data-user-action="user-forum-my-privacy-open">隐私设置</button></div></section>${myPrivacyPanel}<section class="forum-home-nav" style="margin-top:4px;">${mineTabs.map((tab) => `<button class="${mineTab === tab.id ? "active" : ""}" type="button" data-user-action="user-forum-mine-tab" data-user-id="${tab.id}">${tab.label}${state.userForum.myPrivacy[tab.id] === false ? " 🔒" : ""}</button>`).join("")}</section><section class="admin-comment-block"><div class="admin-comment-list">${tabBody}</div></section></div><button class="forum-fab" type="button" data-user-action="user-forum-create" aria-label="发帖">＋</button>`;
+  }
+
+  function isForumMutualFollow(name) {
+    return getFollowedAuthors().includes(name) && forumFollowers.some((item) => item.name === name);
+  }
+
+  function renderForumUserChat(name) {
+    const chat = state.userForum.chats[name] || [];
+    const mutual = isForumMutualFollow(name);
+    const myCount = chat.filter((m) => m.from === "me").length;
+    const theyReplied = chat.some((m) => m.from === "them");
+    const limited = !mutual && myCount >= 1 && !theyReplied;
+    const placeholder = mutual ? "发送私信..." : myCount === 0 ? "打个招呼吧（未互关仅可发送一条）" : theyReplied ? "发送私信..." : "未互相关注，仅可发送一条打招呼消息，对方回复后可继续聊天";
+    return `<div class="forum-home-feed"><section class="admin-detail-card"><div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><button class="topic-back-btn" type="button" data-user-action="user-forum-chat-back" aria-label="返回">‹</button><strong style="font-size:16px;">${safe(name, "用户")}</strong><span class="pill" style="margin-left:auto;">${mutual ? "已互关" : "未互关"}</span></div><div class="provider-chat-body" style="min-height:200px; margin-bottom:12px;">${chat.length ? chat.map((m) => `<article class="provider-chat-bubble ${m.from === "me" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${m.from === "me" ? "我" : safe(name, "对方")}</div><p>${safe(m.text, "")}</p><time>${safe(m.time, "刚刚")}</time></article>`).join("") : `<div class="muted" style="text-align:center; padding:24px 0;">${mutual ? "开始和 TA 聊天吧" : "你们还未互相关注，可以先发一条打招呼消息"}</div>`}</div><form class="provider-chat-composer user-message-composer" data-forum-chat-form data-user-id="${safe(name, "")}"><input class="input" name="forumChatMessage" type="text" placeholder="${placeholder}" autocomplete="off" ${limited ? "disabled" : ""}><button class="btn btn-primary" type="submit" ${limited ? "disabled" : ""}>发送</button></form></section></div>`;
+  }
+
+  function renderForumUserProfile(author) {
+    const name = safe(author, "用户");
+    const authorPosts = posts.filter((p) => safe(p.author, "") === name);
+    const fans = forumAuthorFans[name] || 128;
+    const followed = getFollowedAuthors().includes(name);
+    const isSelf = name === "当前用户";
+    const privacy = state.userForum.privacy[name] || {};
+    const blocked = privacy.blocked === true;
+    const feedbackHtml = state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : "";
+    const privacyRow = (key, title, desc) => `<div style="display:flex; align-items:center; gap:12px; padding:12px 0;"><div style="flex:1; min-width:0;"><strong style="font-size:14px;">${title}</strong><div class="muted" style="font-size:11px; margin-top:3px;">${desc}</div></div><button class="sw-switch ${privacy[key] ? "on" : ""}" type="button" data-user-action="user-forum-privacy-toggle" data-user-id="${name}" data-privacy-key="${key}" aria-label="${title}"></button></div>`;
+    const privacyPanel = state.userForum.privacyOpen ? `<section class="admin-detail-card"><strong style="font-size:15px;">隐私设置</strong><div style="margin-top:4px;">${[privacyRow("hideHis", "不看他", "开启后社区信息流中不再出现 TA 的内容"), privacyRow("hideMe", "不让他看", "开启后 TA 无法查看你发布的帖子"), privacyRow("blocked", "拉黑", "拉黑后互相不可见，并自动取消关注")].join(`<div style="border-top:1px solid rgba(255,255,255,0.05);"></div>`)}</div></section>` : "";
+    const actionButtons = isSelf ? "" : `<div style="display:flex; gap:8px; margin-top:14px;"><button class="btn ${followed ? "btn-secondary" : "btn-primary"} btn-sm" style="flex:1; justify-content:center;" type="button" data-user-action="user-forum-follow-author" data-user-id="${name}" ${blocked ? "disabled" : ""}>${blocked ? "已拉黑" : followed ? "已关注" : "关注"}</button><button class="btn btn-secondary btn-sm" style="flex:1; justify-content:center;" type="button" data-user-action="user-forum-chat-open" data-user-id="${name}" ${blocked ? "disabled" : ""}>私信</button><button class="btn btn-secondary btn-sm" style="flex:1; justify-content:center;" type="button" data-user-action="user-forum-privacy-open">隐私设置</button></div>`;
+    let postsSection;
+    if (blocked) {
+      postsSection = `<section class="admin-comment-block"><strong>TA 的帖子</strong><div class="admin-comment-list"><div class="muted">已拉黑该用户，TA 的内容对你不可见。可在上方隐私设置中解除。</div></div></section>`;
+    } else if (isSelf) {
+      const myPrivacy = state.userForum.myPrivacy;
+      const selfTabs = [
+        { id: "posts", label: "帖子" },
+        { id: "comments", label: "评论" },
+        { id: "collections", label: "收藏" },
+        { id: "likes", label: "点赞" },
+      ];
+      const selfActive = state.userForum.mineTab || "posts";
+      const selfCollected = Object.keys(state.userForum.collected).filter((cid) => state.userForum.collected[cid]).map((cid) => posts.find((p) => p.id === cid)).filter(Boolean);
+      const selfLiked = Object.keys(state.userForum.liked).filter((lid) => state.userForum.liked[lid]).map((lid) => posts.find((p) => p.id === lid)).filter(Boolean);
+      const selfComments = comments.filter((c) => isUserOwnComment(c) && nForum(c.status) !== "已删除");
+      let selfBody = "";
+      if (!myPrivacy[selfActive]) {
+        selfBody = `<div class="muted">对方设置了隐私权限，该内容不可见</div>`;
+      } else if (selfActive === "posts") {
+        selfBody = renderForumPostList(authorPosts, "TA 还没有发布帖子");
+      } else if (selfActive === "comments") {
+        selfBody = selfComments.map((c) => {
+          const post = posts.find((p) => p.id === c.post);
+          return `<button class="admin-comment-item" style="display:block; width:100%; text-align:left;" type="button" data-user-action="user-forum-pick" data-user-id="${c.post}"><p>${safe(c.content, "评论内容")}</p><div class="muted" style="margin-top:6px; font-size:12px;">评论于《${safe(post?.title, c.post)}》 · ${safe(c.time, "")}</div></button>`;
+        }).join("") || `<div class="muted">TA 还没有发表过评论</div>`;
+      } else if (selfActive === "collections") {
+        selfBody = renderForumPostList(selfCollected, "TA 的收藏不可见或暂无收藏");
+      } else {
+        selfBody = renderForumPostList(selfLiked, "TA 的点赞不可见或暂无点赞");
+      }
+      postsSection = `<section class="forum-home-nav" style="margin-top:4px;">${selfTabs.map((tab) => `<button class="${selfActive === tab.id ? "active" : ""}" type="button" data-user-action="user-forum-mine-tab" data-user-id="${tab.id}">${tab.label}</button>`).join("")}</section><section class="admin-comment-block"><div class="admin-comment-list">${selfBody}</div></section>`;
+    } else {
+      postsSection = `<section class="admin-comment-block"><strong>TA 的帖子（${authorPosts.length}）</strong><div class="admin-comment-list">${renderForumPostList(authorPosts, "TA 还没有发布帖子")}</div></section>`;
+    }
+    return `<div class="forum-home-feed">${feedbackHtml}<section class="admin-detail-card"><div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><button class="topic-back-btn" type="button" data-user-action="user-forum-author-back" aria-label="返回">‹</button><strong style="font-size:16px;">个人主页</strong></div><div style="display:flex; align-items:center; gap:12px;"><div class="topic-author-avatar" style="width:56px; height:56px; font-size:20px; flex-shrink:0;">${name.charAt(0)}</div><div style="flex:1; min-width:0;"><strong style="display:block; font-size:17px;">${name}</strong><span class="muted" style="font-size:12px;">粉丝 ${fans.toLocaleString("zh-CN")} · 帖子 ${authorPosts.length}</span></div></div>${actionButtons}</section>${privacyPanel}${postsSection}</div>`;
+  }
+
   function renderUserForum() {
     if (state.userForum.createOpen) {
       return `<div class="forum-home-feed"><section class="forum-home-nav"><button class="active" type="button">新建内容</button></section>${renderUserForumCreateForm()}</div><button class="forum-fab" type="button" data-user-action="user-forum-create" aria-label="发帖">＋</button>`;
     }
     const selectedPost = posts.find((p) => p.id === state.userForum.selectedPost);
     if (selectedPost) return renderUserForumDetail(selectedPost);
+    if (state.userForum.chatWith) return renderForumUserChat(state.userForum.chatWith);
+    if (state.userForum.profileAuthor) return renderForumUserProfile(state.userForum.profileAuthor);
     const activeCategory = state.userForum.category || "all";
     const cards = [
       { title: "这套定制宽体终于落地了，碳纤维纹路完美对齐。", author: "Carbon_King", meta: "宽体 / JDM", heat: "1.2k", tone: "cyan", badge: "精选", type: "discussion" },
       { title: "【818活动】BBS轮毂限时85折，适配G20/001FR", author: "满改官方", meta: "活动 / 轮毂", heat: "3.5k", tone: "brand", badge: "官方", type: "official", link: "user-topic-detail.html?topic=818-bbs&product=PR-8801" },
       { title: "G20 330i 升级全段排气 + 锻造轮毂，声浪与姿态兼得", author: "御驰 Performance Studio", meta: "排气 / 轮毂 / 案例", heat: "3.2k", tone: "brand", badge: "热门", type: "case", link: "user-case-detail.html?id=CA-240402-007" },
-      { title: "718 Cayman 赛道化改造，从街车到圈速机器", author: "Racing One Atelier", meta: "赛道 / 性能 / 案例", heat: "2.8k", tone: "cyan", badge: "精选", type: "case", link: "user-case-detail.html?id=CA-240401-011" },
-      { title: "全段钛合金排气，这个声浪谁受得了？", author: "Turbo_Tom", meta: "排气 / 声浪", heat: "856", tone: "steel", badge: "", type: "discussion" },
+      { title: "718 Cayman 赛道化改造，从街车到圈速机器", author: "Racing One Atelier", meta: "赛道 / 性能 / 案例", heat: "2.8k", tone: "cyan", badge: "精选", type: "case", media: "video", link: "user-case-detail.html?id=CA-240401-011" },
+      { title: "全段钛合金排气，这个声浪谁受得了？", author: "Turbo_Tom", meta: "排气 / 声浪", heat: "856", tone: "steel", badge: "", type: "discussion", media: "video" },
       { title: "隐形车衣怎么选？XPEL LUX PLUS深度解析", author: "满改官方", meta: "科普 / 车衣", heat: "2.1k", tone: "brand", badge: "官方", type: "official", link: "user-topic-detail.html?topic=xpel-guide&product=PR-8804" },
       { title: "Model 3P 制动升级 + 底盘调校，赛道日稳了", author: "凌速 High Spec Garage", meta: "制动 / 底盘 / 案例", heat: "1.9k", tone: "steel", badge: "", type: "case", link: "user-case-detail.html?id=CA-240401-011" },
       { title: "上海夜晚的街道，才是这台车的归宿。", author: "Night_Owl", meta: "姿态 / 街拍", heat: "2.4k", tone: "violet", badge: "热门", type: "discussion" },
@@ -4094,16 +4762,21 @@
         tone: "brand",
         badge: board ? board.name : "",
         type: p.type || "discussion",
+        media: /视频/.test(`${p.title} ${p.content || ""} ${(p.tags || []).join(" ")}`) ? "video" : "",
         isPost: true,
       };
     });
     let rows = [...postCards, ...cards];
-    const followedAuthors = ["满改官方", "御驰 Performance Studio", "Carbon_King", "Night_Owl"];
     const topicModels = ["G20", "330i", "718", "Cayman", "Model 3", "001", "911"];
-    if (activeCategory === "follow") rows = rows.filter((item) => followedAuthors.includes(item.author));
+    if (activeCategory === "follow") rows = rows.filter((item) => getFollowedAuthors().includes(item.author));
     if (activeCategory === "official") rows = rows.filter((item) => item.type === "official");
     if (activeCategory === "topic") rows = rows.filter((item) => topicModels.some((model) => `${item.title} ${item.meta}`.includes(model)));
     if (activeCategory === "mine") rows = rows.filter((item) => item.author === "当前用户");
+    rows = rows.filter((item) => !state.userForum.disliked[item.isPost ? `post:${item.id}` : `card:${item.title}`]);
+    rows = rows.filter((item) => {
+      const setting = state.userForum.privacy[item.author];
+      return !(setting && (setting.hideHis || setting.blocked));
+    });
     const featured = rows[0] || cards[0];
     const navTabs = [
       { id: "all", label: "推荐" },
@@ -4120,16 +4793,57 @@
       mine: "你还没有发布过帖子，点右下角 ＋ 发布第一条",
     };
     const emptyForumHint = emptyHints[activeCategory] || "暂无内容";
-    return `<div class="forum-home-feed"><section class="forum-home-nav">${navTabs.map((item) => `<button class="${activeCategory === item.id ? "active" : ""}" type="button" data-user-action="user-forum-category" data-user-id="${item.id}">${item.label}</button>`).join("")}</section><section class="forum-home-topbar"><form class="forum-home-search" data-user-mall-search-form><span>⌕</span><input name="userMallKeyword" value="${safe(state.userMall.keyword, "")}" placeholder="搜索改装案例、品牌、车型" aria-label="搜索改装案例、品牌、车型"></form></section>${featured && activeCategory !== "mine" ? `<a class="forum-home-banner" href="${featured.link || "user-topic-detail.html"}"><div class="forum-home-banner-art" data-tone="${featured.tone}"></div><div class="forum-home-banner-copy"><span>${featured.type === "official" ? "官方推荐" : featured.type === "case" ? "精选案例" : "社区精选"}${featured.badge ? ` / ${featured.badge}` : ""}</span><strong>${featured.title}</strong><small>${featured.meta} / ${featured.author}</small></div><div class="forum-home-dots"><i></i><i></i><i></i></div></a>` : ""}<section class="forum-waterfall">${feedRows.map((item, index) => item.isPost ? `<button class="forum-waterfall-card ${index % 3 === 1 ? "tall" : ""}" type="button" data-user-action="user-forum-pick" data-user-id="${item.id}"><div class="forum-waterfall-art" data-tone="${item.tone}"></div><div class="forum-waterfall-body"><strong>${item.title}</strong><p>${item.author}${item.meta ? ` / ${item.meta}` : ""}</p><div><span>热度 ${item.heat}</span></div></div></button>` : `<a class="forum-waterfall-card ${index % 3 === 1 ? "tall" : ""}" href="${item.link || "user-topic-detail.html"}"><div class="forum-waterfall-art" data-tone="${item.tone}">${item.linkedProducts?.length ? `<span style="position:absolute;bottom:6px;right:6px;background:rgba(255,106,0,0.9);color:#fff;font-size:11px;padding:2px 8px;border-radius:999px;">已挂商品</span>` : ""}</div><div class="forum-waterfall-body"><strong>${item.title}</strong><p>${item.author}${item.meta ? ` / ${item.meta}` : ""}</p><div><span>热度 ${item.heat}</span>${item.type === "official" ? `<em>查看帖子</em>` : ""}</div></div></a>`).join("") || `<p class="muted" style="padding:32px 16px; text-align:center;">${emptyForumHint}</p>`}</section></div><button class="forum-fab" type="button" data-user-action="user-forum-create" aria-label="发帖">＋</button>`;
+    if (activeCategory === "mine") return renderUserForumMine(navTabs);
+    return `<div class="forum-home-feed"><section class="forum-home-nav">${navTabs.map((item) => `<button class="${activeCategory === item.id ? "active" : ""}" type="button" data-user-action="user-forum-category" data-user-id="${item.id}">${item.label}</button>`).join("")}</section>${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="forum-home-topbar"><form class="forum-home-search" data-user-mall-search-form><span>⌕</span><input name="userMallKeyword" value="${safe(state.userMall.keyword, "")}" placeholder="搜索改装案例、品牌、车型" aria-label="搜索改装案例、品牌、车型"></form></section>${featured && activeCategory !== "mine" ? `<a class="forum-home-banner" href="${featured.link || "user-topic-detail.html"}"><div class="forum-home-banner-art" data-tone="${featured.tone}"></div><div class="forum-home-banner-copy"><span>${featured.type === "official" ? "官方推荐" : featured.type === "case" ? "精选案例" : "社区精选"}${featured.badge ? ` / ${featured.badge}` : ""}</span><strong>${featured.title}</strong><small>${featured.meta} / ${featured.author}</small></div><div class="forum-home-dots"><i></i><i></i><i></i></div></a>` : ""}<section class="forum-waterfall">${feedRows.map((item, index) => item.isPost ? `<button class="forum-waterfall-card ${index % 3 === 1 ? "tall" : index % 3 === 2 ? "mid" : ""}" type="button" data-user-action="user-forum-pick" data-user-id="${item.id}" data-dislike-key="post:${item.id}"><div class="forum-waterfall-art" data-tone="${item.tone}">${item.media === "video" ? `<i class="forum-play-badge">▶</i>` : ""}</div><div class="forum-waterfall-body"><strong>${item.title}</strong><p>${item.author}${item.meta ? ` / ${item.meta}` : ""}</p><div><span>热度 ${item.heat}</span></div></div></button>` : `<a class="forum-waterfall-card ${index % 3 === 1 ? "tall" : index % 3 === 2 ? "mid" : ""}" href="${item.link || "user-topic-detail.html"}" data-dislike-key="card:${item.title}"><div class="forum-waterfall-art" data-tone="${item.tone}">${item.media === "video" ? `<i class="forum-play-badge">▶</i>` : ""}${item.linkedProducts?.length ? `<span style="position:absolute;bottom:6px;right:6px;background:rgba(255,106,0,0.9);color:#fff;font-size:11px;padding:2px 8px;border-radius:999px;">已挂商品</span>` : ""}</div><div class="forum-waterfall-body"><strong>${item.title}</strong><p>${item.author}${item.meta ? ` / ${item.meta}` : ""}</p><div><span>热度 ${item.heat}</span>${item.type === "official" ? `<em>查看帖子</em>` : ""}</div></div></a>`).join("") || `<p class="muted" style="padding:32px 16px; text-align:center;">${emptyForumHint}</p>`}</section></div><button class="forum-fab" type="button" data-user-action="user-forum-create" aria-label="发帖">＋</button>`;
+  }
+
+  const userInteractionNotices = [
+    { type: "like", user: "Carbon_King", text: "赞了你的帖子", target: "《刚提的 G20 330i，第一步想先换套轮毂，求推荐》", time: "10 分钟前" },
+    { type: "like", user: "Turbo_Tom", text: "赞了你的评论", target: "“选的是 Akrapovic 钛合金全段，低转安静不炸街…”", time: "26 分钟前" },
+    { type: "comment", user: "陆川", text: "评论了你的帖子", target: "预算 2-3 万的话 BBS 可以闭眼入，换完记得复查定位数据", time: "32 分钟前" },
+    { type: "collect", user: "Night_Owl", text: "收藏了你的帖子", target: "《隐形车衣贴了三个月，来分享下真实体验》", time: "1 小时前" },
+    { type: "mention", user: "EV_Addict", text: "@了你", target: "@当前用户 这套轮毂的数据能发我一下吗", time: "2 小时前" },
+  ];
+
+  function renderUserNoticesPage(notifications) {
+    const tabs = [
+      { id: "like", label: "点赞" },
+      { id: "comment", label: "评论" },
+      { id: "collect", label: "收藏" },
+      { id: "mention", label: "@" },
+      { id: "system", label: "系统通知" },
+    ];
+    const active = state.userMe.noticesTab || "like";
+    const items = active === "system"
+      ? notifications.map((n) => ({ user: "满改平台", text: safe(n.title, "系统通知"), target: safe(n.content, ""), time: safe(n.time, "刚刚") }))
+      : userInteractionNotices.filter((n) => n.type === active);
+    return `<div class="stack user-message-page"><section class="user-message-head"><div style="display:flex; align-items:center; gap:10px;"><button class="topic-back-btn" type="button" data-user-action="user-notices-back" aria-label="返回">‹</button><strong style="font-size:16px;">互动消息</strong></div><small>点赞 / 评论 / 收藏 / @ / 系统通知</small></section><section class="forum-home-nav">${tabs.map((tab) => `<button class="${active === tab.id ? "active" : ""}" type="button" data-user-action="user-notices-tab" data-user-id="${tab.id}">${tab.label}</button>`).join("")}</section><section class="mobile-list">${items.length ? items.map((item) => `<article class="mobile-item" style="display:flex; gap:10px; align-items:flex-start;"><div class="topic-author-avatar" style="width:36px; height:36px; font-size:14px; flex-shrink:0;">${safe(item.user, "用").charAt(0)}</div><div style="flex:1; min-width:0;"><div style="display:flex; justify-content:space-between; gap:10px;"><strong style="font-size:13px;">${safe(item.user, "用户")} ${safe(item.text, "")}</strong><span class="muted" style="font-size:11px; white-space:nowrap;">${safe(item.time, "")}</span></div><div class="muted" style="margin-top:4px; font-size:12px;">${safe(item.target, "")}</div></div></article>`).join("") : `<article class="mobile-item"><strong>暂无消息</strong><div class="muted" style="margin-top:6px;">该分类下暂时没有新消息。</div></article>`}</section></div>`;
   }
 
   function renderUserMessages() {
     const rows = fallback.providerMessages.filter((item) => item.messages.some((message) => message.from === "user" || message.from === "provider" || message.from === "platform"));
     const notifications = getNotificationsForRole("user");
+    syncUserServiceRatingRequest();
+    const isServiceSelected = state.userMe.selectedMessage === PLATFORM_SERVICE_MESSAGE_ID;
     const selected = rows.find((item) => item.id === state.userMe.selectedMessage);
     markNotificationsRead("user");
+    const serviceThread = renderUserServiceThreadButton();
+    if (state.userMe.noticesOpen) return renderUserNoticesPage(notifications);
+    if (state.userForum.chatWith) return renderForumUserChat(state.userForum.chatWith);
+    const unreadCount = state.userMe.noticesRead ? 0 : userInteractionNotices.length + notifications.length;
+    const latestNotice = userInteractionNotices[0];
+    const noticeEntry = `<button class="provider-chat-thread user-message-thread" style="position:relative;" type="button" data-user-action="user-notices-open"><div class="provider-chat-thread-head"><strong>互动消息</strong><span>${latestNotice.time}</span></div><div class="provider-chat-thread-preview">${latestNotice.user} ${latestNotice.text}${latestNotice.target}</div><div class="provider-chat-thread-meta"><span class="pill">点赞 · 评论 · 收藏 · @ · 系统通知</span></div>${unreadCount ? `<i style="position:absolute; top:10px; right:12px; min-width:16px; height:16px; border-radius:999px; background:#f5223d; color:#fff; font-size:10px; font-style:normal; display:grid; place-items:center; padding:0 4px;">${unreadCount}</i>` : ""}</button>`;
+    const privateChatEntries = Object.keys(state.userForum.chats).map((name) => {
+      const chat = state.userForum.chats[name] || [];
+      const last = chat[chat.length - 1] || {};
+      const isFan = forumFollowers.some((item) => item.name === name);
+      return `<button class="provider-chat-thread user-message-thread" type="button" data-user-action="user-forum-chat-open" data-user-id="${name}"><div class="provider-chat-thread-head"><strong>${name}</strong><span>${last.time || ""}</span></div><div class="provider-chat-thread-preview">${last.from === "me" ? "我：" : ""}${last.text || ""}</div><div class="provider-chat-thread-meta"><span class="pill" style="${isFan ? "color:#2fbf71;" : "color:#9ca5b2;"}">${isFan ? "粉丝" : "陌生人"}</span></div></button>`;
+    }).join("");
+    if (isServiceSelected) {
+      return `<div class="stack user-message-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}${renderUserServiceChatPanel()}</div>`;
+    }
     if (!selected) {
-      return `<div class="stack user-message-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-message-head"><div><span>Messages</span><strong>消息</strong></div><small>${rows.length} 个会话${notifications.length ? ` / ${notifications.length} 条通知` : ""}</small></section>${notifications.length ? `<section class="mobile-list" style="margin-bottom:12px;">${notifications.map((n) => `<article class="mobile-item" style="background:rgba(255,106,0,0.06); border-left:3px solid #ff6a00;"><div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;"><strong>${safe(n.title, "系统通知")}</strong><span style="font-size:11px; color:var(--text-muted);">${safe(n.time, "刚刚")}</span></div><div class="muted" style="margin-top:6px;">${safe(n.content, "")}</div></article>`).join("")}</section>` : ""}<section class="provider-chat-shell user-message-list-shell"><div class="provider-chat-list user-message-list">${rows.map((item) => `<button class="provider-chat-thread user-message-thread" type="button" data-user-action="user-message-pick" data-user-id="${item.id}"><div class="provider-chat-thread-head"><strong>${safe(item.title, "消息")}</strong><span>${safe(item.time, "刚刚")}</span></div><div class="provider-chat-thread-preview">${safe(item.preview, "暂无消息内容")}</div><div class="provider-chat-thread-meta">${tag(safe(item.status, "正常"))}</div></button>`).join("")}</div></section></div>`;
+      return `<div class="stack user-message-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="user-message-head"><div><span>Messages</span><strong>消息</strong></div><small>${rows.length + 2} 个会话${notifications.length ? ` / ${notifications.length} 条通知` : ""}</small></section><section class="provider-chat-shell user-message-list-shell"><div class="provider-chat-list user-message-list">${noticeEntry}${privateChatEntries}${serviceThread}${rows.map((item) => `<button class="provider-chat-thread user-message-thread" type="button" data-user-action="user-message-pick" data-user-id="${item.id}"><div class="provider-chat-thread-head"><strong>${safe(item.title, "消息")}</strong><span>${safe(item.time, "刚刚")}</span></div><div class="provider-chat-thread-preview">${safe(item.preview, "暂无消息内容")}</div><div class="provider-chat-thread-meta">${tag(safe(item.status, "正常"))}</div></button>`).join("")}</div></section></div>`;
     }
     return `<div class="stack user-message-page">${state.userFeedback ? `<div class="provider-feedback">${state.userFeedback}</div>` : ""}<section class="provider-chat-panel user-message-detail"><header class="provider-chat-header"><button class="user-message-back" type="button" data-user-action="user-message-back">返回</button><div><div class="eyebrow">Realtime Chat</div><h3>${safe(selected.title, "即时对话")}</h3></div>${tag(safe(selected.status, "正常"))}</header><div class="provider-chat-body">${selected.messages.map((message) => `<article class="provider-chat-bubble ${message.from === "user" ? "is-self" : ""}"><div class="provider-chat-bubble-role">${message.from === "user" ? "我" : "服务商"}</div><p>${message.text}</p><time>${message.time}</time></article>`).join("")}</div><form class="provider-chat-composer user-message-composer" data-user-chat-form data-user-id="${selected.id}"><label class="user-message-attach" title="添加附件"><input name="userChatAttachment" type="file" accept="image/*,video/*,.pdf,.doc,.docx" multiple><span>＋</span></label><input class="input" name="userChatMessage" type="text" placeholder="输入消息并实时发送" autocomplete="off"><button class="btn btn-primary" type="submit">发送</button></form></section></div>`;
   }
@@ -4238,6 +4952,25 @@
     });
   }
 
+  function renderUserMallCrossBrandRecommendations(rows, activeBrand) {
+    if (!rows.length) return "";
+    const allBrandLabel = getMallFilterBrands()[0] || "全部品牌";
+    const visibleSkus = new Set(rows.map((item) => item.sku).filter(Boolean));
+    const visibleBrands = new Set(rows.map((item) => item.brand).filter(Boolean));
+    const recommendations = products
+      .filter((item) => {
+        if (visibleSkus.has(item.sku)) return false;
+        if (activeBrand && activeBrand !== allBrandLabel) return item.brand !== activeBrand;
+        return !visibleBrands.has(item.brand);
+      })
+      .slice(0, 4);
+    if (!recommendations.length) return "";
+    return `<section class="user-mall-v3-cross-brand" data-mall-cross-brand><div class="user-mall-v3-section-head"><div><span class="user-mall-v3-cross-brand-kicker">看完当前筛选</span><strong>看看其他品牌</strong></div><span>换个品牌继续逛</span></div><div class="user-mall-v3-grid">${recommendations.map((item, index) => {
+      const detailUrl = `user-product-detail.html?sku=${encodeURIComponent(item.sku || "")}&name=${encodeURIComponent(safe(item.name, "商品"))}&price=${encodeURIComponent(safe(item.price, "¥0"))}&brand=${encodeURIComponent(safe(item.brand, "-"))}&fitment=${encodeURIComponent(safe(item.fitment || item.description, "适配当前车型"))}&mallPage=${encodeURIComponent(resolveUserMallPageByCategory(item.category))}`;
+      return `<article class="user-mall-v3-card"><a class="user-mall-v3-card-art" href="${detailUrl}" data-tone="${(index % 4) + 1}"></a><div class="user-mall-v3-card-body"><strong>${safe(item.name, "商品")}</strong><span>${safe(item.brand, "-")} / ${safe(item.category, "-")}</span><p>${safe(item.fitment, "适配当前车型")}</p><div><b>${safe(item.price, "-")}</b><button class="${isUserProductCollected(item.sku) ? "active" : ""}" type="button" data-user-action="user-mall-collect" data-user-id="${item.sku}">${isUserProductCollected(item.sku) ? "取消收藏" : "收藏"}</button></div></div></article>`;
+    }).join("")}</div></section>`;
+  }
+
   function renderMallFilterPanel() {
     const open = state.userMall.filterOpen;
     if (!open) return "";
@@ -4335,6 +5068,12 @@
     const comboLink = comboItems.length ? buildGarageComboOrderLink(selectedVehicle, comboItems) : "";
     return `<section class="garage-preview garage-config-preview"><div class="eyebrow">Render Lab</div><strong style="display:block; margin-top:10px; font-size:22px;">${safe(selectedVehicle?.model, "宝马 G20 330i")} 外观预览</strong><div class="muted" style="margin-top:6px;">点击选择轮毂、车衣和颜色，点击已选项可取消选择。</div><div class="garage-3d-stage"><div class="garage-3d-car" id="garage3dCar"><div class="garage-3d-wheel left" style="background:radial-gradient(circle, #a3a9b3 0 10%, ${shade(wheelColor, -30)} 12% 44%, #0a0d11 46% 100%);"></div><div class="garage-3d-wheel right" style="background:radial-gradient(circle, #a3a9b3 0 10%, ${shade(wheelColor, -30)} 12% 44%, #0a0d11 46% 100%);"></div><div class="garage-3d-body" style="background:linear-gradient(145deg, ${shade(colorValue, -18)}, ${colorValue}); box-shadow: inset 0 0 0 999px ${activeFilm?.tone ? "rgba(255,255,255,0.04)" : "transparent"};"></div></div></div><div class="garage-config-group"><div class="garage-config-head"><strong>车身颜色</strong><span>${state.garageColor >= 0 ? colorName : "未选择"}</span></div><div class="swatch-row">${matchedColors.map((item, index) => `<button class="swatch ${index === state.garageColor ? "active" : ""}" style="background:${item.colorValue || item.value};" type="button" title="${safe(item.colorName || item.name, "车身颜色")}" data-color-index="${index}"></button>`).join("")}</div></div></section><section class="garage-config-section"><div class="garage-config-head"><strong>轮毂</strong><span>${state.garageWheel >= 0 ? `${wheelItem.brand} / ${wheelItem.price}` : "未选择"}</span></div><div class="garage-choice-list">${matchedWheels.map((item, index) => `<button class="wheel-option ${index === state.garageWheel ? "active" : ""}" type="button" data-wheel-index="${index}"><span><strong>${safe(item.name, "轮毂样式")}</strong><div class="muted" style="margin-top:6px;">${safe(item.size || item.spokes, "-")} / ${safe(item.brand, "高端改装")} / ${safe(item.price, "")}</div></span><span class="wheel-badge" style="background:${item.color || "#c78a47"};"></span></button>`).join("")}</div></section><section class="garage-config-section"><div class="garage-config-head"><strong>车衣</strong><span>${state.garageFilm >= 0 ? `${filmItem.brand} / ${filmItem.price}` : "未选择"}</span></div><div class="garage-choice-list">${filmRows.map((item, index) => `<button class="wheel-option garage-film-option ${index === state.garageFilm ? "active" : ""}" type="button" data-film-index="${index}"><span><strong>${safe(item.name, "车衣方案")}</strong><div class="muted" style="margin-top:6px;">${safe(item.brand, "-")} / ${safe(item.price, "-")}</div></span><span class="wheel-badge" style="background:${item.tone};"></span></button>`).join("")}</div></section><section class="garage-combo-panel"><div class="garage-config-head"><strong>组合方案</strong><span>${formatCurrency(comboTotal)}</span></div><div class="garage-combo-list">${comboItems.length ? comboItems.map((item) => `<article><span>${item.name}</span><strong>${item.brand}</strong><b>${item.price}</b></article>`).join("") : `<article class="muted" style="text-align:center; padding:12px 0;">请在上方选择至少一项</article>`}</div>${comboItems.length ? `<a class="btn btn-primary user-me-full-btn" href="${comboLink}">组合方案下单</a>` : `<button class="btn btn-primary user-me-full-btn" type="button" disabled style="opacity:0.45;">组合方案下单</button>`}</section>`;
   }
+
+  window.addEventListener("storage", (event) => {
+    if (event.key !== CUSTOMER_SERVICE_RATING_KEY) return;
+    syncUserServiceRatingRequest();
+    if (state.tab === "messages" || state.subTab.me === "messages") render();
+  });
 
   render();
   updateGarageRender();
