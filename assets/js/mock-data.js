@@ -409,27 +409,13 @@ window.MockData = {
     { id: "MREC-001", slot: "mallHero", sku: "PR-8801", label: "本周推荐", title: "高端姿态方案", description: "M3 Touring 轻度姿态方案热度上涨，适合城市通勤与周末山路。", sort: 1, status: "启用" },
   ],
   categories: [
-    { name: "外观套件", parent: "", level: 0, sort: 1, status: "启用" },
-    { name: "前唇侧裙", parent: "外观套件", level: 1, sort: 11, status: "启用" },
-    { name: "尾翼尾唇", parent: "外观套件", level: 1, sort: 12, status: "启用" },
-    { name: "轮毂轮胎", parent: "", level: 0, sort: 2, status: "启用" },
-    { name: "锻造轮毂", parent: "轮毂轮胎", level: 1, sort: 21, status: "启用" },
-    { name: "高性能轮胎", parent: "轮毂轮胎", level: 1, sort: 22, status: "启用" },
-    { name: "排气系统", parent: "", level: 0, sort: 3, status: "启用" },
-    { name: "中尾段排气", parent: "排气系统", level: 1, sort: 31, status: "启用" },
-    { name: "阀门控制", parent: "排气系统", level: 1, sort: 32, status: "停用" },
-    { name: "制动升级", parent: "", level: 0, sort: 4, status: "启用" },
-    { name: "大六活塞套件", parent: "制动升级", level: 1, sort: 41, status: "启用" },
-    { name: "刹车盘皮", parent: "制动升级", level: 1, sort: 42, status: "启用" },
-    { name: "车衣改色", parent: "", level: 0, sort: 5, status: "启用" },
-    { name: "隐形车衣", parent: "车衣改色", level: 1, sort: 51, status: "启用" },
-    { name: "改色膜", parent: "车衣改色", level: 1, sort: 52, status: "启用" },
-    { name: "底盘型号", parent: "", level: 0, sort: 6, status: "启用" },
-    { name: "G 系底盘", parent: "底盘型号", level: 1, sort: 61, status: "启用" },
-    { name: "MQB 平台", parent: "底盘型号", level: 1, sort: 62, status: "启用" },
-    { name: "关键车型", parent: "", level: 0, sort: 7, status: "启用" },
-    { name: "宝马 G20 330i", parent: "关键车型", level: 1, sort: 71, status: "启用" },
-    { name: "极氪 001 FR", parent: "关键车型", level: 1, sort: 72, status: "启用" },
+    { name: "外观套件", parent: "", level: 0, sort: 1, status: "启用" },
+    { name: "轮毂轮胎", parent: "", level: 0, sort: 2, status: "启用" },
+    { name: "排气系统", parent: "", level: 0, sort: 3, status: "启用" },
+    { name: "制动升级", parent: "", level: 0, sort: 4, status: "启用" },
+    { name: "车衣改色", parent: "", level: 0, sort: 5, status: "启用" },
+    { name: "底盘型号", parent: "", level: 0, sort: 6, status: "启用" },
+    { name: "关键车型", parent: "", level: 0, sort: 7, status: "启用" },
   ],
   services: [
     { code: "SV-101", name: "高端隐形车衣", duration: "2-3 天", price: "¥ 9,800 起", status: "启用", desc: "适用于高端轿车、SUV 与新能源车型" },

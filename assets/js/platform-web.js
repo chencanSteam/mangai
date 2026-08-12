@@ -97,7 +97,6 @@
         { id: "orderList", label: "订单列表" },
         { id: "orderAssign", label: "订单分配", badge: orders.filter((item) => item.status === "待分配").length },
         { id: "afterSaleList", label: "售后订单", badge: orders.filter((item) => item.afterSaleStatus === "待平台审核").length },
-        { id: "chatRecords", label: "聊天记录", badge: orderChats.length },
       ],
     },
     {
@@ -3466,7 +3465,34 @@
   function renderReceptionTab(data) {
     const chats = serviceChats || [];
     const selected = chats.find((item) => item.id === (state.serviceChatSelected || chats[0]?.id));
-    return `<div class="cs-reception-layout"><aside class="panel cs-panel cs-reception-list"><div class="panel-header"><div><h2 class="section-title">会话列表</h2><p class="section-subtitle">${chats.length} 条会话 · ${chats.filter((item) => item.unread).length} 条未读</p></div></div>${chats.map((item) => `<button class="cs-reception-item ${selected?.id === item.id ? "active" : ""}" type="button" data-cs-chat="${item.id}"><span class="cs-avatar">${item.avatar}</span><span><strong>${item.fromName}</strong><small>${item.preview}</small></span>${item.unread ? `<b>${item.unread}</b>` : ""}</button>`).join("")}</aside><article class="panel cs-panel cs-reception-main">${selected ? `<div class="cs-reception-head"><div><span class="eyebrow">${String(selected.fromId).startsWith("SP-") ? "服务商咨询" : "用户咨询"}</span><h2 class="section-title">${selected.fromName}</h2><p class="section-subtitle">关联订单 ${selected.orderId || "-"} · 当前接待：${selected.agent || "林晓"}</p></div><div>${formatTag(selected.status)}<button class="btn btn-secondary" type="button" data-cs-action="transfer-chat" data-cs-id="${selected.id}">转接</button></div></div><div class="cs-chat-record">${(selected.messages || []).map((message) => `<div class="chat-bubble ${message.from === "platform" ? "platform-bubble" : message.from === "user" ? "user-bubble" : "provider-bubble"}"><div class="chat-bubble-meta"><span class="chat-role">${message.from === "platform" ? "平台客服" : message.from === "user" ? "用户" : "服务商"}</span><span class="chat-time">${message.time}</span></div><div class="chat-text">${message.text}</div>${message.card ? renderCsMessageCard(message.card) : ""}</div>`).join("")}</div><div class="cs-reply-tools"><div class="cs-tool-group"><button class="btn btn-secondary" type="button" data-cs-action="send-product" data-cs-id="${selected.id}">发商品</button><button class="btn btn-secondary" type="button" data-cs-action="adjust-price" data-cs-id="${selected.id}">改价格</button><button class="btn btn-secondary" type="button" data-cs-action="send-coupon" data-cs-id="${selected.id}">发优惠券</button><span class="cs-float-note">浮动空间 ¥${state.csFloatLimit}<button type="button" data-cs-action="set-float" data-cs-id="${selected.id}">调整</button></span></div><select class="input" data-cs-quick-reply style="margin-left:auto;"><option value="">选择快捷回复</option>${(data.quickReplies || []).map((item) => `<option value="${item.content}">${item.title}</option>`).join("")}</select><button class="btn btn-ghost" type="button" data-cs-action="close-chat" data-cs-id="${selected.id}">结束会话</button></div><div class="service-chat-composer"><input class="input" type="text" placeholder="输入回复内容，按 Enter 发送" data-cs-chat-input data-cs-id="${selected.id}"><button class="btn btn-primary" type="button" data-cs-action="send-chat" data-cs-id="${selected.id}">发送</button></div>` : `<div class="muted">暂无会话</div>`}</article></div>`;
+    return `<div class="cs-reception-layout"><aside class="panel cs-panel cs-reception-list"><div class="panel-header"><div><h2 class="section-title">会话列表</h2><p class="section-subtitle">${chats.length} 条会话 · ${chats.filter((item) => item.unread).length} 条未读</p></div></div>${chats.map((item) => `<button class="cs-reception-item ${selected?.id === item.id ? "active" : ""}" type="button" data-cs-chat="${item.id}"><span class="cs-avatar">${item.avatar}</span><span><strong>${item.fromName}</strong><small>${item.preview}</small></span>${item.unread ? `<b>${item.unread}</b>` : ""}</button>`).join("")}</aside><article class="panel cs-panel cs-reception-main">${selected ? `<div class="cs-reception-head"><div><span class="eyebrow">${String(selected.fromId).startsWith("SP-") ? "服务商咨询" : "用户咨询"}</span><h2 class="section-title">${selected.fromName}</h2><p class="section-subtitle">关联订单 ${selected.orderId || "-"} · 当前接待：${selected.agent || "林晓"}</p></div><div>${formatTag(selected.status)}<button class="btn btn-secondary" type="button" data-cs-action="transfer-chat" data-cs-id="${selected.id}">转接</button></div></div>${renderCsUserOrderPanel(selected)}<div class="cs-chat-record">${(selected.messages || []).map((message) => `<div class="chat-bubble ${message.from === "platform" ? "platform-bubble" : message.from === "user" ? "user-bubble" : "provider-bubble"}"><div class="chat-bubble-meta"><span class="chat-role">${message.from === "platform" ? "平台客服" : message.from === "user" ? "用户" : "服务商"}</span><span class="chat-time">${message.time}</span></div><div class="chat-text">${message.text}</div>${message.card ? renderCsMessageCard(message.card) : ""}</div>`).join("")}</div><div class="cs-reply-tools"><div class="cs-tool-group"><button class="btn btn-secondary" type="button" data-cs-action="send-product" data-cs-id="${selected.id}">发商品</button><button class="btn btn-secondary" type="button" data-cs-action="adjust-price" data-cs-id="${selected.id}">改价格</button><button class="btn btn-secondary" type="button" data-cs-action="send-coupon" data-cs-id="${selected.id}">发优惠券</button><span class="cs-float-note">浮动空间 ¥${state.csFloatLimit}<button type="button" data-cs-action="set-float" data-cs-id="${selected.id}">调整</button></span></div><select class="input" data-cs-quick-reply style="margin-left:auto;"><option value="">选择快捷回复</option>${(data.quickReplies || []).map((item) => `<option value="${item.content}">${item.title}</option>`).join("")}</select><button class="btn btn-ghost" type="button" data-cs-action="close-chat" data-cs-id="${selected.id}">结束会话</button></div><div class="service-chat-composer"><input class="input" type="text" placeholder="输入回复内容，按 Enter 发送" data-cs-chat-input data-cs-id="${selected.id}"><button class="btn btn-primary" type="button" data-cs-action="send-chat" data-cs-id="${selected.id}">发送</button></div>` : `<div class="muted">暂无会话</div>`}</article></div>`;
+  }
+
+  function getCsUserHistoryOrders(chat) {
+    if (!chat || String(chat.fromId || "").startsWith("SP-")) return [];
+    const userName = displayValue(chat.fromName, "");
+    const matched = (orders || []).filter((item) => {
+      const values = [item.user, item.recipient, item.customer, item.memberName].map((value) => displayValue(value, ""));
+      return item.id === chat.orderId || values.includes(userName);
+    });
+    return [...new Map(matched.map((item) => [item.id, item])).values()]
+      .sort((a, b) => (a.id === chat.orderId ? -1 : b.id === chat.orderId ? 1 : String(b.appointment || "").localeCompare(String(a.appointment || ""))))
+      .slice(0, 5);
+  }
+
+  function renderCsUserOrderPanel(chat) {
+    const rows = getCsUserHistoryOrders(chat);
+    if (String(chat?.fromId || "").startsWith("SP-")) return "";
+    const cards = rows.length ? rows.map((item) => `
+      <button class="cs-user-order-card ${item.id === chat.orderId ? "active" : ""}" type="button" data-cs-action="view-user-order" data-cs-id="${escapeAttribute(item.id)}">
+        <span><b>${escapeHtml(item.id)}</b>${formatTag(item.status || "-")}</span>
+        <strong>${escapeHtml(item.service || "-")}</strong>
+        <small>${escapeHtml(item.vehicle || "-")} · ${escapeHtml(item.provider || "待分配")}</small>
+        <em>${escapeHtml(item.quote || "-")}</em>
+        <small>${escapeHtml(item.payment || "-")} · ${escapeHtml(item.appointment || "-")}</small>
+      </button>
+    `).join("") : `<div class="cs-user-order-empty">当前用户暂无历史订单</div>`;
+    return `<section class="cs-user-orders-panel"><div class="cs-user-orders-head"><div><span>用户历史订单</span><strong>${escapeHtml(chat.fromName || "-")}</strong></div><small>${rows.length} 单，当前关联订单已高亮</small></div><div class="cs-user-order-list">${cards}</div></section>`;
   }
 
   function renderKnowledgeTab(tab, data) {
@@ -3633,6 +3659,30 @@
     `);
   }
 
+  function openCsUserOrderModal(id) {
+    const order = (orders || []).find((item) => item.id === id);
+    if (!order) return;
+    const fields = [
+      ["用户", order.user || order.recipient],
+      ["车辆", order.vehicle],
+      ["订单类型", order.type || order.displayType],
+      ["项目/商品", order.service],
+      ["服务商", order.provider || order.intention],
+      ["订单金额", order.quote],
+      ["支付状态", order.payment],
+      ["支付方式", order.paymentMethod],
+      ["预约/下单时间", order.appointment],
+      ["当前进度", order.progress],
+    ];
+    openModal(`
+      <div class="panel-header"><div><span class="eyebrow">User Order</span><h2 class="section-title">${escapeHtml(order.id)}</h2><p class="section-subtitle">客服会话内查看用户历史订单摘要</p></div>${formatTag(order.status || "-")}</div>
+      <div class="kv-list" style="margin-bottom:14px;">
+        ${fields.map(([label, value]) => `<div class="kv-row"><span class="muted">${escapeHtml(label)}</span><strong style="font-weight:600;">${escapeHtml(value || "-")}</strong></div>`).join("")}
+      </div>
+      <div style="display:flex; gap:12px; margin-top:18px;"><button class="btn btn-secondary" type="button" data-close-modal>关闭</button></div>
+    `);
+  }
+
   function openCsTransferModal(chatId) {
     const agents = ((customerService || {}).agents || []);
     openModal(`
@@ -3660,6 +3710,7 @@
     const data = customerService || {};
     if (["transfer", "transfer-all", "assign", "auto-assign", "run-quality", "quality-note", "export", "add-knowledge", "edit-knowledge", "export-performance", "view-performance", "view-customer"].includes(action)) { openFeedbackModal("操作已完成", "当前为前端 mock 交互，操作结果已在本次演示状态中生效。"); return; }
     if (action === "transfer-chat") { openCsTransferModal(id); return; }
+    if (action === "view-user-order") { openCsUserOrderModal(id); return; }
     if (action === "view-history") { openCsHistoryModal(id); return; }
     if (action === "toggle-knowledge") { const item = [...(data.quickReplies || []), ...(data.faqs || [])].find((row) => row.id === id); if (item) item.status = item.status === "启用" ? "停用" : "启用"; renderCustomerServicePage(pageId); return; }
     if (action === "save-metrics") { const total = [...contentEl.querySelectorAll("[data-cs-weight]")].reduce((sum, item) => sum + Number(item.value || 0), 0); openFeedbackModal(total === 100 ? "指标配置已保存" : "权重合计不正确", total === 100 ? "考核指标权重已保存，本次为前端 mock 状态。" : `当前权重合计为 ${total}%，请调整为 100%。`); return; }
@@ -7177,16 +7228,6 @@
     const isEdit = mode === "edit";
     const specTemplate = cloneSpecTemplate(isEdit && row.specTemplate?.length ? row.specTemplate : getProductSpecTemplate(row?.name));
     const selectedSpecNames = specTemplate.map((item) => item.name).filter(Boolean);
-    const parentOptions = ['<option value="">一级分类</option>']
-      .concat(
-        categories
-          .filter((item) => (item.level || 0) === 0 && (!isEdit || item.name !== row.name))
-          .map(
-            (item) =>
-              `<option value="${item.name}" ${((isEdit ? row.parent : "") || "") === item.name ? "selected" : ""}>${item.name}</option>`
-          )
-      )
-      .join("");
     openModal(`
       <div class="panel-header">
         <div>
@@ -7203,12 +7244,6 @@
         <div class="field-group">
           <div class="field-label">排序</div>
           <input class="input" data-category-field="sort" placeholder="请输入排序值" value="${isEdit ? row.sort : categories.length + 1}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">上级分类</div>
-          <select class="select" data-category-field="parent">
-            ${parentOptions}
-          </select>
         </div>
         <div class="field-group">
           <div class="field-label">状态</div>
@@ -9818,8 +9853,8 @@
     const payload = {
       name: getValue("name"),
       sort: Number(getValue("sort")) || 0,
-      parent: getValue("parent"),
-      level: getValue("parent") ? 1 : 0,
+      parent: "",
+      level: 0,
       status: getValue("status"),
       specTemplate,
     };
