@@ -229,7 +229,7 @@
 
   if (appType === "user" && typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);
-    if (window.location.pathname.endsWith("/pages/user-app.html")) {
+    if (params.toString()) {
       const targetTab = params.get("tab") || "";
       const mallPage = params.get("mallPage") || "";
       const meTab = params.get("meTab") || "";
@@ -4620,7 +4620,7 @@
 
   function renderUserMeProfileHero(profile = getMockUserAuth() || {}) {
     const userId = getUserDisplayId(profile);
-    return `<a class="user-me-red-hero compact user-me-profile-entry" href="user-app.html?tab=me&meTab=profileDetail" aria-label="编辑个人信息">${renderUserPortrait(profile)}<div class="user-me-red-copy"><div class="user-me-name-stack"><strong>${safe(profile.nickname, "未设置昵称")}</strong><small>用户ID ${userId}</small></div></div><b>›</b></a>`;
+    return `<button class="user-me-red-hero compact user-me-profile-entry" type="button" data-user-action="user-profile-detail" aria-label="编辑个人信息">${renderUserPortrait(profile)}<div class="user-me-red-copy"><div class="user-me-name-stack"><strong>${safe(profile.nickname, "未设置昵称")}</strong><small>用户ID ${userId}</small></div></div><b>›</b></button>`;
   }
 
   function getUserDisplayId(profile = getMockUserAuth() || {}) {
