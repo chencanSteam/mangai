@@ -8397,21 +8397,41 @@
       : "<p>主图突出商品核心卖点，补充细节图、安装位说明与实车效果展示。</p>";
     let selectedSpecs = cloneSpecTemplate(isEdit ? row.specs : getProductSpecTemplate(selectedCategory));
     const existingVariants = Array.isArray(row?.variants) ? row.variants : [];
-    const renderVariantRows = (variants) => variants.length ? variants.map((variant, index) => `
-      <div class="product-variant-row" data-product-variant-row data-variant-index="${index}" data-values='${escapeAttribute(JSON.stringify(variant.values || {}))}'>
-        <div class="product-variant-values">${selectedSpecs.map((spec) => `<label><span>${escapeHtml(spec.name)}</span><input class="input" data-variant-spec="${escapeAttribute(spec.name)}" value="${escapeAttribute(variant.values?.[spec.name] || "")}" placeholder="填写${escapeAttribute(spec.name)}" /></label>`).join("")}</div>
-        <input class="input" data-variant-field="sku" value="${escapeAttribute(variant.sku || "")}" placeholder="填写 SKU 编码" />
-        <input class="input" data-variant-field="price" value="${escapeAttribute(variant.price || "¥ 0")}" />
-        <input class="input" data-variant-field="stock" type="number" min="0" value="${Number(variant.stock || 0)}" />
-        <div class="product-variant-image-cell">
-          <input type="hidden" data-variant-field="image" value="${escapeAttribute(variant.image || "")}" />
-          <input type="file" accept="image/*" data-variant-image-input />
-          <span data-variant-image-name>${escapeHtml(variant.image || "未上传")}</span>
+    let variantRows = existingVariants.map((variant) => ({ ...variant, values: { ...(variant.values || {}) } }));
+    const combinationKey = (values, specs = selectedSpecs) => specs.map((spec) => `${spec.name}=${String(values?.[spec.name] || "").trim()}`).join("||");
+    const renderSpecBuilder = () => selectedSpecs.length ? selectedSpecs.map((spec, index) => `
+      <div class="product-spec-card" data-product-spec-row data-spec-index="${index}" data-options="${escapeAttribute(JSON.stringify(spec.options || []))}">
+        <div class="product-spec-card-head">
+          <input class="input" data-product-spec-name value="${escapeAttribute(spec.name)}" placeholder="规格名，如颜色" />
+          <button class="btn btn-ghost btn-sm" type="button" data-product-spec-remove aria-label="删除${escapeAttribute(spec.name)}">删除规格</button>
         </div>
-        <select class="select" data-variant-field="status"><option value="上架" ${(variant.status || "上架") === "上架" ? "selected" : ""}>上架</option><option value="缺货" ${variant.status === "缺货" ? "selected" : ""}>缺货</option><option value="下架" ${variant.status === "下架" ? "selected" : ""}>下架</option></select>
-        <button class="btn btn-danger btn-sm" type="button" data-product-variant-remove>删除</button>
+        <div class="product-spec-values" data-product-spec-values>
+          ${(spec.options || []).map((option) => `<span class="product-spec-chip"><span>${escapeHtml(option)}</span><button type="button" data-product-spec-value-remove aria-label="删除${escapeAttribute(option)}">×</button></span>`).join("")}
+          <input class="input product-spec-value-input" data-product-spec-value-input placeholder="输入规格值后回车，可批量用逗号分隔" />
+        </div>
+        <div class="field-hint">${index === 0 ? "建议先填写最重要的销售规格；规格值将用于生成 SKU 组合。" : "规格值可随时补充，生成组合前会自动去重。"}</div>
       </div>
-    `).join("") : `<div class="muted" data-product-variant-empty>还没有 SKU，请点击“添加 SKU”并手动填写规格值。</div>`;
+    `).join("") : `<div class="product-spec-empty">当前为单规格商品。需要按颜色、尺寸等区分库存时，点击“添加销售规格”。</div>`;
+    const renderVariantRows = (variants) => variants.length ? variants.map((variant, index) => {
+      const isOutOfStock = Number(variant.stock || 0) <= 0;
+      const incomplete = selectedSpecs.length && selectedSpecs.some((spec) => !variant.values?.[spec.name]);
+      return `<div class="product-variant-row ${incomplete ? "is-incomplete" : ""} ${isOutOfStock ? "is-out-of-stock" : ""}" data-product-variant-row data-variant-index="${index}" data-values="${escapeAttribute(JSON.stringify(variant.values || {}))}">
+        <label class="product-variant-check"><input type="checkbox" data-variant-select aria-label="选择第${index + 1}个 SKU" /></label>
+        <div class="product-variant-combination" data-label="规格组合">${selectedSpecs.length ? selectedSpecs.map((spec) => `<span class="product-variant-value"><b>${escapeHtml(spec.name)}</b>${escapeHtml(variant.values?.[spec.name] || "待填写")}<input type="hidden" data-variant-spec="${escapeAttribute(spec.name)}" value="${escapeAttribute(variant.values?.[spec.name] || "")}" /></span>`).join("") : `<span class="product-variant-value">单规格商品</span>`}</div>
+        <input class="input" data-variant-field="sku" aria-label="SKU 编码" data-label="SKU 编码" value="${escapeAttribute(variant.sku || "")}" placeholder="自动生成，可修改" />
+        <div class="product-variant-price" data-label="销售价"><span>¥</span><input class="input" data-variant-field="price" aria-label="销售价" inputmode="decimal" value="${escapeAttribute(String(variant.price || "").replace(/^[¥￥]\s*/, ""))}" placeholder="销售价" /></div>
+        <input class="input" data-variant-field="stock" aria-label="库存" data-label="库存" type="number" min="0" step="1" value="${Number(variant.stock || 0)}" placeholder="库存" />
+        <div class="product-variant-image-cell" data-label="图片">
+          <input type="hidden" data-variant-field="image" value="${escapeAttribute(variant.image || "")}" />
+          ${variant.image ? `<img class="product-variant-thumb" src="${escapeAttribute(variant.image)}" alt="SKU 图片" />` : `<span class="product-variant-thumb-empty">无图</span>`}
+          <button class="btn btn-ghost btn-sm product-variant-image-trigger" type="button" data-variant-image-trigger>${variant.image ? "更换" : "上传"}</button>
+          <input type="file" accept="image/*" data-variant-image-input hidden />
+          <span data-variant-image-name class="sr-only">${escapeHtml(variant.image ? "已上传" : "未上传")}</span>
+        </div>
+        <select class="select" data-variant-field="status" aria-label="SKU 状态" data-label="状态"><option value="上架" ${(variant.status || "上架") !== "下架" ? "selected" : ""}>上架</option><option value="下架" ${variant.status === "下架" ? "selected" : ""}>下架</option></select>
+        <button class="btn btn-ghost btn-sm" type="button" data-product-variant-remove aria-label="删除第${index + 1}个 SKU">删除</button>
+      </div>`;
+    }).join("") : `<div class="muted" data-product-variant-empty>还没有 SKU 组合，请先填写规格值并点击“生成 SKU”。</div>`;
     const isImageField = (key) => /^productImage\d+$/.test(key) || /^installImage\d+$/.test(key);
     const standardFieldHtml = productStandardFields.map(({ key, label }) => {
       const value = isEdit ? row[key] || "" : "";
@@ -8449,7 +8469,7 @@
           <p class="section-subtitle">${isEdit ? `正在编辑 ${row.name}` : "创建新的平台商品资料"}</p>
         </div>
       </div>
-      <div class="form-grid">
+      <div class="product-editor-layout"><div class="product-editor-form"><div class="form-grid">
         <div class="field-group">
           <div class="field-label">SPU编码</div>
           <input class="input" data-product-field="sku" value="${skuValue}" ${isEdit ? "readonly" : ""} />
@@ -8468,18 +8488,6 @@
           <select class="select" data-product-field="category">${categoryOptions}</select>
         </div>
         <div class="field-group">
-          <div class="field-label">原价</div>
-          <input class="input" data-product-field="originalPrice" placeholder="请输入原价" value="${isEdit ? row.originalPrice || "" : ""}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">现价</div>
-          <input class="input" data-product-field="price" placeholder="请输入现价" value="${isEdit ? row.price : "¥ 22,800"}" />
-        </div>
-        <div class="field-group">
-          <div class="field-label">库存</div>
-          <input class="input" data-product-field="stock" placeholder="请输入库存数量" value="${isEdit ? row.stock : "12"}" />
-        </div>
-        <div class="field-group">
           <div class="field-label">定制商品</div>
           <select class="select" data-product-field="isCustomProduct">
             <option value="否" ${(isEdit ? row.isCustomProduct || "否" : "否") === "否" ? "selected" : ""}>否</option>
@@ -8496,26 +8504,16 @@
           </div>
         </div>
         <div class="field-group field-group-full product-spec-editor">
-          <div class="field-label">商品规格</div>
-          <div class="muted" style="margin:6px 0 10px;">当前类目只提供规格字段名，具体规格值请在下方每个 SKU 中填写。</div>
-          <div class="product-spec-input-list" data-product-spec-list>
-            ${selectedSpecs.length ? selectedSpecs.map((spec) => `<div class="product-spec-input-row" data-product-spec-row><input class="input" data-product-spec-name value="${escapeAttribute(spec.name)}" readonly /></div>`).join("") : `<div class="muted">当前类目暂无规格模板，商品将按单规格销售。</div>`}
+          <div class="product-editor-section-head">
+            <div><div class="field-label">销售规格</div><div class="field-hint">先设置规格名称和规格值，再生成 SKU 组合；规格值可跨类目通用。</div></div>
           </div>
+          <div class="product-spec-input-list" data-product-spec-list>${renderSpecBuilder()}</div>
+          <div class="product-spec-actions"><button class="btn btn-secondary btn-sm" type="button" data-product-spec-add>+ 添加销售规格</button><button class="btn btn-ghost btn-sm" type="button" data-product-spec-generate>生成 SKU 组合</button><span class="field-hint" data-product-spec-count></span></div>
         </div>
         <div class="field-group field-group-full product-variant-editor">
-          <div class="field-label">SKU 明细</div>
-          <div class="field-hint">每行手动维护一个 SKU，以及对应的规格值、价格、库存和图片</div>
-          <button class="btn btn-secondary btn-sm" type="button" data-product-variant-add style="margin-top:10px;">+ 添加 SKU</button>
-          <div class="product-variant-table" data-product-variant-list>
-            ${renderVariantRows(existingVariants)}
-          </div>
-        </div>
-        <div class="field-group">
-          <div class="field-label">状态</div>
-          <select class="select" data-product-field="status">
-            <option value="上架" ${(isEdit ? row.status : "上架") === "上架" ? "selected" : ""}>上架</option>
-            <option value="缺货" ${(isEdit ? row.status : "上架") === "缺货" ? "selected" : ""}>缺货</option>
-          </select>
+          <div class="product-editor-section-head"><div><div class="field-label">SKU 明细</div><div class="field-hint">生成组合后填写各 SKU 的销售价、库存和图片；也可删除不销售的组合。</div></div><div class="product-variant-summary" data-product-variant-summary></div></div>
+          <div class="product-variant-bulk" data-product-variant-bulk><label class="product-variant-select-all"><input type="checkbox" data-variant-select-all /> 全选</label><span class="product-variant-selected-count" data-variant-selected-count>未选择时将应用到全部 SKU</span><button class="btn btn-ghost btn-sm" type="button" data-variant-bulk-price>批量设价</button><button class="btn btn-ghost btn-sm" type="button" data-variant-bulk-stock>批量设库存</button></div>
+          <div class="product-variant-table-wrap"><div class="product-variant-header" aria-hidden="true"><span>选择</span><span>规格组合</span><span>SKU 编码</span><span>销售价</span><span>库存</span><span>图片</span><span>状态</span><span>操作</span></div><div class="product-variant-table" data-product-variant-list>${renderVariantRows(variantRows)}</div></div>
         </div>
         <div class="field-group field-group-full">
           <div class="field-label">图片</div>
@@ -8570,7 +8568,7 @@
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button class="btn btn-primary" type="button" data-save-product data-mode="${mode}" ${isEdit ? `data-sku="${row.sku}"` : ""}>${isEdit ? "保存修改" : "确认新增"}</button>
         <button class="btn btn-secondary" type="button" data-close-modal>取消</button>
-      </div>
+      </div></div><aside class="product-editor-preview-pane"><div class="product-editor-preview-card" data-product-editor-preview></div></aside></div>
     `);
     const brandSelect = modalCardEl.querySelector('[data-product-field="brand"]');
     const categorySelect = modalCardEl.querySelector('[data-product-field="category"]');
@@ -8579,18 +8577,54 @@
       categorySelect.innerHTML = options.map((name) => `<option value="${name}">${name}</option>`).join("");
       categorySelect.dispatchEvent(new Event("change"));
     });
+    const syncProductPreview = () => {
+      const preview = modalCardEl.querySelector("[data-product-editor-preview]");
+      if (!preview) return;
+      const getField = (key) => modalCardEl.querySelector(`[data-product-field="${key}"]`)?.value?.trim() || "";
+      const rows = typeof readVariantRows === "function" ? readVariantRows() : variantRows;
+      const sellable = rows.filter((item) => item.status !== "下架" && Number(item.stock || 0) > 0);
+      const priceValues = sellable.map((item) => Number(String(item.price || "").replace(/[^\d.]/g, ""))).filter((value) => value > 0);
+      const priceText = priceValues.length ? `¥ ${Math.min(...priceValues).toLocaleString("zh-CN")}${Math.max(...priceValues) !== Math.min(...priceValues) ? ` - ¥ ${Math.max(...priceValues).toLocaleString("zh-CN")}` : ""}` : "待定价";
+      const fitment = getProductFitmentSelection(modalCardEl.querySelector("[data-product-fitment-picker]")).join(" / ");
+      const image = getField("image") || sellable.find((item) => item.image)?.image || "";
+      const detail = modalCardEl.querySelector("[data-product-rich-editor]")?.innerHTML?.trim() || "";
+      const specText = selectedSpecs.flatMap((spec) => (spec.options || []).slice(0, 4).map((option) => `${spec.name}：${option}`)).slice(0, 8);
+      preview.innerHTML = `<div class="product-preview-label">实时商品预览</div><div class="product-preview-image">${image ? `<img src="${escapeAttribute(image)}" alt="商品主图" />` : `<span>商品主图</span>`}</div><div class="product-preview-brand">${escapeHtml(getField("brand") || "品牌未填写")} · ${escapeHtml(getField("category") || "未选择类目")}</div><h3>${escapeHtml(getField("name") || "商品名称待填写")}</h3><div class="product-preview-price">${priceText}</div><div class="product-preview-fitment">${fitment ? escapeHtml(fitment) : "暂未选择适配车型"}</div><div class="product-preview-stats"><span>${rows.length} 个 SKU</span><span>库存 ${rows.reduce((sum, item) => sum + (Number(item.stock) || 0), 0)}</span><span>${sellable.length ? "有库存" : "暂时缺货"}</span></div>${specText.length ? `<div class="product-preview-specs">${specText.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}</div>` : ""}${getField("promoLabel") ? `<div class="product-preview-promo">${escapeHtml(getField("promoLabel"))} · ${escapeHtml(getField("promoDiscount"))}</div>` : ""}<div class="product-preview-detail pd-rich-content">${detail || `<p class="muted">商品详情将在这里展示</p>`}</div>`;
+    };
+    const updateSpecCount = () => {
+      const countEl = modalCardEl.querySelector("[data-product-spec-count]");
+      const total = selectedSpecs.reduce((count, spec) => count * Math.max(1, (spec.options || []).length), 1);
+      if (countEl) countEl.textContent = selectedSpecs.length ? `当前 ${selectedSpecs.length} 个规格，预计生成 ${total} 个 SKU` : "单规格商品无需生成组合";
+      const summary = modalCardEl.querySelector("[data-product-variant-summary]");
+      const incomplete = variantRows.filter((variant) => !variant.sku || !variant.price || Number(variant.stock) < 0).length;
+      if (summary) summary.textContent = `${variantRows.length} 个 SKU · 库存 ${variantRows.reduce((sum, item) => sum + (Number(item.stock) || 0), 0)}${incomplete ? ` · 待完善 ${incomplete}` : ""}`;
+      syncProductPreview();
+    };
+    const renderSpecs = () => {
+      const specList = modalCardEl.querySelector("[data-product-spec-list]");
+      if (specList) specList.innerHTML = renderSpecBuilder();
+      updateSpecCount();
+    };
+    const migrateCategorySpecs = (nextSpecs) => {
+      const oldByName = new Map(selectedSpecs.map((spec) => [spec.name, spec]));
+      selectedSpecs = nextSpecs.map((spec) => {
+        const old = oldByName.get(spec.name);
+        return old ? { ...spec, options: [...new Set([...(spec.options || []), ...(old.options || [])])] } : spec;
+      });
+      renderSpecs();
+    };
     categorySelect?.addEventListener("change", () => {
       if (isEdit && categorySelect.value === row.category) return;
-      selectedSpecs = getProductSpecTemplate(categorySelect.value);
-      const specList = modalCardEl.querySelector("[data-product-spec-list]");
-      if (!specList) return;
-      specList.innerHTML = selectedSpecs.length
-        ? selectedSpecs.map((spec) => `<div class="product-spec-input-row" data-product-spec-row><input class="input" data-product-spec-name value="${escapeAttribute(spec.name)}" readonly /></div>`).join("")
-        : `<div class="muted">当前类目暂无规格模板，商品将按单规格销售。</div>`;
-      const variantList = modalCardEl.querySelector("[data-product-variant-list]");
-      if (variantList) variantList.innerHTML = `<div class="muted" data-product-variant-empty>类目规格已变化，请点击“添加 SKU”并手动填写。</div>`;
+      const next = getProductSpecTemplate(categorySelect.value);
+      if (variantRows.length && selectedSpecs.length && !window.confirm("切换类目将更新推荐规格，已有 SKU 数据会保留但需要重新生成组合。是否继续？")) {
+        categorySelect.value = isEdit ? row.category : selectedCategory;
+        return;
+      }
+      migrateCategorySpecs(next);
+      updateSpecCount();
     });
-
+    modalCardEl.addEventListener("input", (event) => { if (event.target.matches("[data-product-field], [data-variant-field], [data-product-rich-editor]")) syncProductPreview(); });
+    modalCardEl.addEventListener("change", (event) => { if (event.target.matches("[data-product-field], [data-variant-field]")) syncProductPreview(); });
     const richEditor = modalCardEl.querySelector("[data-product-rich-editor]");
     const richMediaInputs = {
       image: modalCardEl.querySelector('[data-product-rich-media-input="image"]'),
@@ -8678,20 +8712,49 @@
     });
 
     const variantList = modalCardEl.querySelector("[data-product-variant-list]");
-    const readVariantRows = () => Array.from(modalCardEl.querySelectorAll("[data-product-variant-row]")).map((variantRow) => ({
+    function readVariantRows() { return Array.from(modalCardEl.querySelectorAll("[data-product-variant-row]")).map((variantRow, index) => ({
+      ...(variantRows[index] || {}),
       sku: variantRow.querySelector('[data-variant-field="sku"]')?.value.trim() || "",
       price: variantRow.querySelector('[data-variant-field="price"]')?.value.trim() || "",
       stock: Number(variantRow.querySelector('[data-variant-field="stock"]')?.value || 0),
       image: variantRow.querySelector('[data-variant-field="image"]')?.value || "",
       status: variantRow.querySelector('[data-variant-field="status"]')?.value || "上架",
-      values: Object.fromEntries(Array.from(variantRow.querySelectorAll("[data-variant-spec]")).map((field) => [field.dataset.variantSpec, field.value.trim()])),
-    }));
+    })); }
+    const syncVariantSelection = () => {
+      const checks = Array.from(modalCardEl.querySelectorAll("[data-variant-select]"));
+      const selectedCount = checks.filter((input) => input.checked).length;
+      const all = modalCardEl.querySelector("[data-variant-select-all]");
+      if (all) {
+        all.checked = checks.length > 0 && selectedCount === checks.length;
+        all.indeterminate = selectedCount > 0 && selectedCount < checks.length;
+      }
+      const count = modalCardEl.querySelector("[data-variant-selected-count]");
+      if (count) count.textContent = selectedCount ? `已选 ${selectedCount} 个 SKU` : "未选择时将应用到全部 SKU";
+      modalCardEl.querySelectorAll("[data-variant-bulk-price], [data-variant-bulk-stock]").forEach((button) => { button.disabled = checks.length === 0; });
+    };
     const writeVariantRows = (variants) => {
-      if (variantList) variantList.innerHTML = renderVariantRows(variants);
+      variantRows = variants.map((variant) => ({ ...variant, values: { ...(variant.values || {}) } }));
+      if (variantList) variantList.innerHTML = renderVariantRows(variantRows);
       bindVariantImageInputs();
+      updateSpecCount();
+      syncVariantSelection();
+    };
+    const generateVariants = () => {
+      const dimensions = selectedSpecs.filter((spec) => (spec.options || []).length);
+      if (!dimensions.length) {
+        openFeedbackModal("无法生成 SKU", "请至少添加一个销售规格，并填写规格值。");
+        return;
+      }
+      const projected = dimensions.reduce((count, spec) => count * spec.options.length, 1);
+      if (projected > 200 && !window.confirm(`将生成 ${projected} 个 SKU，数量较多，是否继续？`)) return;
+      const combinations = dimensions.reduce((result, spec) => result.flatMap((base) => spec.options.map((option) => ({ ...base, [spec.name]: option }))), [{}]);
+      const oldByKey = new Map(variantRows.map((variant) => [combinationKey(variant.values), variant]));
+      writeVariantRows(combinations.map((values, index) => oldByKey.get(combinationKey(values)) || { sku: `${skuValue}-V${String(index + 1).padStart(2, "2")}`, values, price: "", stock: 0, image: "", status: "上架" }));
     };
     const bindVariantImageInputs = () => {
       modalCardEl.querySelectorAll("[data-variant-image-input]").forEach((input) => {
+        const trigger = input.closest("[data-product-variant-row]")?.querySelector("[data-variant-image-trigger]");
+        trigger?.addEventListener("click", () => input.click());
         input.addEventListener("change", (event) => {
           const file = event.target.files?.[0];
           if (!file) return;
@@ -8701,6 +8764,10 @@
             const field = rowEl?.querySelector('[data-variant-field="image"]');
             const label = rowEl?.querySelector("[data-variant-image-name]");
             if (field) field.value = String(reader.result || "");
+            const preview = rowEl?.querySelector(".product-variant-thumb, .product-variant-thumb-empty");
+            if (preview) { const image = document.createElement("img"); image.className = "product-variant-thumb"; image.src = String(reader.result || ""); image.alt = "SKU 图片"; preview.replaceWith(image); }
+            const trigger = rowEl?.querySelector("[data-variant-image-trigger]");
+            if (trigger) trigger.textContent = "更换";
             if (label) label.textContent = file.name;
           };
           reader.readAsDataURL(file);
@@ -8708,14 +8775,96 @@
       });
     };
     bindVariantImageInputs();
-    modalCardEl.querySelector("[data-product-variant-add]")?.addEventListener("click", () => {
-      const variants = [...readVariantRows(), { sku: "", values: {}, price: "", stock: 0, image: "", status: "上架" }];
-      writeVariantRows(variants);
+    modalCardEl.querySelector("[data-product-spec-generate]")?.addEventListener("click", () => {
+      selectedSpecs = Array.from(modalCardEl.querySelectorAll("[data-product-spec-row]")).map((row) => ({
+        name: row.querySelector("[data-product-spec-name]")?.value.trim() || "",
+        options: (() => { try { return JSON.parse(row.dataset.options || "[]"); } catch { return []; } })(),
+        required: true,
+        sku: true,
+      })).filter((spec) => spec.name);
+      generateVariants();
+      renderSpecs();
     });
+    modalCardEl.querySelector("[data-product-spec-add]")?.addEventListener("click", () => {
+      selectedSpecs.push({ name: "", options: [], required: true, sku: true });
+      renderSpecs();
+      const last = modalCardEl.querySelector("[data-product-spec-list] [data-product-spec-row]:last-child [data-product-spec-name]");
+      last?.focus();
+    });
+    modalCardEl.querySelector("[data-product-spec-list]")?.addEventListener("keydown", (event) => {
+      const input = event.target.closest("[data-product-spec-value-input]");
+      if (!input || event.key !== "Enter") return;
+      event.preventDefault();
+      const row = input.closest("[data-product-spec-row]");
+      const index = Number(row?.dataset.specIndex || 0);
+      const values = String(input.value || "").split(/[,，、\n]/).map((value) => value.trim()).filter(Boolean);
+      selectedSpecs[index].options = [...new Set([...(selectedSpecs[index].options || []), ...values])];
+      input.value = "";
+      renderSpecs();
+    });
+    modalCardEl.querySelector("[data-product-spec-list]")?.addEventListener("click", (event) => {
+      const specRow = event.target.closest("[data-product-spec-row]");
+      if (!specRow) return;
+      const index = Number(specRow.dataset.specIndex || 0);
+      if (event.target.closest("[data-product-spec-remove]")) {
+        selectedSpecs.splice(index, 1);
+        renderSpecs();
+      } else if (event.target.closest("[data-product-spec-value-remove]")) {
+        const chip = event.target.closest("[data-product-spec-chip]");
+        const value = chip?.querySelector("span")?.textContent || "";
+        selectedSpecs[index].options = selectedSpecs[index].options.filter((option) => option !== value);
+        renderSpecs();
+      }
+    });
+    const openBulkEditor = (field) => {
+      const currentRows = readVariantRows();
+      variantRows = currentRows;
+      const checked = Array.from(modalCardEl.querySelectorAll("[data-variant-select]:checked")).map((input) => Number(input.closest("[data-product-variant-row]")?.dataset.variantIndex)).filter(Number.isFinite);
+      const selected = checked.length ? checked : currentRows.map((_, index) => index);
+      const scopeLabel = checked.length ? `已选的 ${selected.length} 个 SKU` : `全部 ${selected.length} 个 SKU`;
+      if (!selected.length) return;
+      const title = field === "price" ? "批量设置销售价" : "批量设置库存";
+      const hint = field === "price" ? "请输入非负金额，最多保留两位小数。" : "请输入非负整数。";
+      const pattern = field === "price" ? "^(?:\\d+)(?:\\.\\d{1,2})?$" : "^\\d+$";
+      const dialog = document.createElement("div");
+      dialog.className = "product-bulk-dialog-backdrop";
+      dialog.innerHTML = `<div class="product-bulk-dialog" role="dialog" aria-modal="true" aria-labelledby="product-bulk-title"><h3 id="product-bulk-title">${title}</h3><p class="field-hint">将应用到${scopeLabel}。${hint}</p><label class="field-label" for="product-bulk-value">${field === "price" ? "销售价（元）" : "库存数量"}</label><input class="input" id="product-bulk-value" data-product-bulk-value type="text" inputmode="decimal" pattern="${pattern}" autofocus /><div class="product-bulk-error" data-product-bulk-error role="alert"></div><div class="product-bulk-actions"><button class="btn btn-secondary btn-sm" type="button" data-product-bulk-cancel>取消</button><button class="btn btn-primary btn-sm" type="button" data-product-bulk-apply>应用到 ${scopeLabel}</button></div></div>`;
+      modalCardEl.appendChild(dialog);
+      const input = dialog.querySelector("[data-product-bulk-value]");
+      const error = dialog.querySelector("[data-product-bulk-error]");
+      const close = () => dialog.remove();
+      dialog.querySelector("[data-product-bulk-cancel]")?.addEventListener("click", close);
+      dialog.addEventListener("click", (event) => { if (event.target === dialog) close(); });
+      dialog.querySelector("[data-product-bulk-apply]")?.addEventListener("click", () => {
+        const value = input.value.trim();
+        const valid = new RegExp(pattern).test(value) && Number.isFinite(Number(value));
+        if (!valid) { error.textContent = field === "price" ? "请输入合法的非负金额（最多两位小数）。" : "请输入非负整数库存。"; input.focus(); return; }
+        const latest = readVariantRows();
+        const target = latest.map((item, index) => selected.includes(index) ? { ...item, [field]: field === "stock" ? Number(value) : value } : item);
+        close();
+        writeVariantRows(target);
+      });
+      input?.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); if (event.key === "Enter") dialog.querySelector("[data-product-bulk-apply]")?.click(); });
+      input?.focus();
+    };
+    modalCardEl.querySelector("[data-product-variant-bulk-price]")?.addEventListener("click", () => openBulkEditor("price"));
+    modalCardEl.querySelector("[data-product-variant-bulk-stock]")?.addEventListener("click", () => openBulkEditor("stock"));
+    modalCardEl.querySelector("[data-variant-select-all]")?.addEventListener("change", (event) => { modalCardEl.querySelectorAll("[data-variant-select]").forEach((input) => { input.checked = event.target.checked; }); syncVariantSelection(); });
+    variantList?.addEventListener("change", (event) => { if (event.target.matches("[data-variant-select]")) syncVariantSelection(); });
+    modalCardEl.querySelectorAll("[data-product-variant-add]").forEach((button) => button.addEventListener("click", () => {
+      const current = readVariantRows();
+      writeVariantRows([...current, { sku: `${skuValue}-V${String(current.length + 1).padStart(2, "0")}`, values: {}, price: "", stock: 0, image: "", status: "上架" }]);
+    }));
     variantList?.addEventListener("click", (event) => {
       const remove = event.target.closest("[data-product-variant-remove]");
-      if (remove) remove.closest("[data-product-variant-row]")?.remove();
+      if (remove) {
+        const index = Number(remove.closest("[data-product-variant-row]")?.dataset.variantIndex || 0);
+        const current = readVariantRows();
+        writeVariantRows(current.filter((_, rowIndex) => rowIndex !== index));
+      }
     });
+    updateSpecCount();
+    syncProductPreview();
   }
 
   function openVehicleBrandEditorModal() {
@@ -9645,15 +9794,15 @@
       name: getValue("name"),
       brand: getValue("brand"),
       category: getValue("category"),
-      originalPrice: getValue("originalPrice"),
-      price: getValue("price"),
-      stock: Number(getValue("stock")) || 0,
+      originalPrice: mode === "edit" ? products.find((item) => item.sku === sourceSku)?.originalPrice || "" : "",
+      price: "",
+      stock: 0,
       isCustomProduct: getValue("isCustomProduct") || "否",
       fitment,
       image: getValue("image"),
       description: descriptionText,
       descriptionHtml,
-      status: getValue("status"),
+      status: mode === "edit" ? products.find((item) => item.sku === sourceSku)?.status || "上架" : "上架",
       spec: getValue("spec"),
       promotion: promoType ? {
         type: promoType,
@@ -9690,6 +9839,11 @@
 
     if (variants.some((item) => !item.sku || !item.price)) {
       openFeedbackModal("SKU 信息不完整", "请为每个 SKU 填写 SKU 编码和价格。");
+      return;
+    }
+    const invalidVariant = variants.find((item) => !/^(?:\d+)(?:\.\d{1,2})?$/.test(String(item.price).replace(/^[¥￥]\s*/, "")) || !Number.isInteger(item.stock) || item.stock < 0);
+    if (invalidVariant) {
+      openFeedbackModal("价格或库存无效", "销售价必须是非负金额（最多两位小数），库存必须是非负整数。");
       return;
     }
 
